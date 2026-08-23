@@ -638,6 +638,10 @@ struct npc_cork_gizeltonAI : npc_escortAI
 
     void SummonCaravan()
     {
+        // Nothing removes a creature from its group when it despawns, so a group left over
+        // from a previous run has to go before Cork can lead a new one.
+        m_creature->LeaveCreatureGroup();
+
         m_lCaravanGuid.push_back(m_creature->GetObjectGuid());
         AddToFormation(m_creature, FORMATION_CORK);
 
@@ -677,6 +681,9 @@ struct npc_cork_gizeltonAI : npc_escortAI
 
     void DespawnCaravan()
     {
+        // Disband while the members are still loaded, so they drop their group pointer too.
+        m_creature->LeaveCreatureGroup();
+
         for (const auto& guid : m_lCaravanGuid)
         {
             if (guid != m_creature->GetObjectGuid())
