@@ -300,13 +300,26 @@ struct boss_anubrekhanAI : public ScriptedAI
         // Setting in combat with zone and pulling the two crypt-guards
         m_creature->SetInCombatWithZone();
 
-        for (const auto& guid : summonedCryptGuards)
+        for (auto it = summonedCryptGuards.begin(); it != summonedCryptGuards.end();)
         {
-            if (Creature* cg = m_pInstance->GetCreature(guid))
+            Creature* cg = m_pInstance->GetCreature(*it);
+
+            // Guards despawned by the corpse explosion are still listed here, drop them.
+            if (!cg)
+            {
+                it = summonedCryptGuards.erase(it);
+                continue;
+            }
+
+            // A guard killed in a previous attempt can still lie around as a corpse. It has no
+            // threat list while dead, so leave it for the corpse explosion to consume.
+            if (cg->IsAlive())
             {
                 cg->AI()->AttackStart(pWho);
                 cg->SetInCombatWithZone();
             }
+
+            ++it;
         }
 
         DoScriptText(PickRandomValue(SAY_AGGRO1, SAY_AGGRO2, SAY_AGGRO3), m_creature);
