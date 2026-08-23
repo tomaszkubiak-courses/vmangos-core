@@ -2497,6 +2497,17 @@ Movement.PendingAckResponseTime = 4000
 #        Give loot / money / reputation at ".die" command
 #        Default: 1 (enable)
 #
+#    Command.DieForPlayers
+#        Custom. Let accounts below gamemaster level use the ".die" command,
+#        killing whatever unit they have selected. The command is listed at
+#        player level, but is refused for accounts below gamemaster level while
+#        this is disabled.
+#        Note that this lets any player kill any other player they can select.
+#        Set flags = 1 on the `die` row of the world DB `command` table to
+#        restrict it to the caller's own character.
+#        Default: 0 (gamemaster level and above only)
+#                 1 (any player)
+#
 #    GM.AllowTrades
 #        Allow trades / mails / AH / ...
 #        Default: 1
@@ -2535,6 +2546,7 @@ GM.LogTrade = 1
 GM.StartLevel = 1
 GM.LowerSecurity = 0
 GM.CreditOnDie = 1
+Command.DieForPlayers = 0
 GM.AllowTrades = 1
 GM.AllowPublicChannels = 0
 GMTickets.Enable = 1

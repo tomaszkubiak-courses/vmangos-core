@@ -676,6 +676,7 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_BOOL_GM_LOG_TRADE,           "GM.LogTrade", false);
     setConfigMinMax(CONFIG_UINT32_START_GM_LEVEL, "GM.StartLevel", 1, getConfig(CONFIG_UINT32_START_PLAYER_LEVEL), MAX_LEVEL);
     setConfig(CONFIG_BOOL_DIE_COMMAND_CREDIT,     "GM.CreditOnDie", true);
+    setConfig(CONFIG_BOOL_DIE_COMMAND_FOR_PLAYERS, "Command.DieForPlayers", false);
     setConfig(CONFIG_BOOL_GM_LOWER_SECURITY,      "GM.LowerSecurity", false);
     setConfig(CONFIG_BOOL_GM_ALLOW_TRADES,        "GM.AllowTrades", true);
     setConfig(CONFIG_BOOL_GMS_ALLOW_PUBLIC_CHANNELS,         "GM.AllowPublicChannels", false);

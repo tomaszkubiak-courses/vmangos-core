@@ -561,7 +561,7 @@ group sub-commands.
 
 | Command | Lvl | C | Syntax | Example |
 |---|---|---|---|---|
-| `.die` | 3 |  | `.die` |  |
+| `.die` | 0 |  | `.die` | requires `Command.DieForPlayers = 1` below gamemaster level |
 
 ## dismount
 
