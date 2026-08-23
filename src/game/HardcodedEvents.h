@@ -87,7 +87,8 @@ struct DragonsOfNightmare : WorldEvent
     static void CheckSingleVariable(uint32 idx, uint32& value);
 
 private:
-    void GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGuid> const& dragons, uint32& alive, time_t respawnTime);
+    // Returns false when a dragon's map is not loaded, leaving the alive count undetermined.
+    bool GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGuid> const& dragons, uint32& alive, time_t respawnTime);
     bool LoadDragons(std::vector<ObjectGuid>& dragonGUIDs);
     //void GetExistingDragons(std::vector<ObjectGuid>& dragonGUIDs, std::vector<Creature*>& existingDragons);
     void PermutateDragons();

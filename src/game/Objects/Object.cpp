@@ -3562,7 +3562,10 @@ void WorldObject::LoadMapCellsAround(float dist) const
 FactionTemplateEntry const* WorldObject::GetFactionTemplateEntry() const
 {
     FactionTemplateEntry const* entry = sObjectMgr.GetFactionTemplateEntry(GetFactionTemplateId());
-    if (!entry)
+
+    // Faction template 0 means no faction at all, which is the normal value for the
+    // majority of gameobjects. Only a unit is expected to always carry a real one.
+    if (!entry && !(IsGameObject() && GetFactionTemplateId() == 0))
     {
         static ObjectGuid guid;                             // prevent repeating spam same faction problem
 
