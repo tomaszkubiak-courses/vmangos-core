@@ -11051,6 +11051,12 @@ void Player::SplitItem(uint16 src, uint16 dst, uint32 count)
         return;
     }
 
+    if (!IsAlive() && sWorld.getConfig(CONFIG_BOOL_DEATH_LOCK_INVENTORY))
+    {
+        SendEquipError(EQUIP_ERR_YOU_ARE_DEAD, pSrcItem, nullptr);
+        return;
+    }
+
     if (pSrcItem->HasGeneratedLoot())                       // prevent split looting item (stackable items can has only temporary loot and this meaning that loot window open)
     {
         //best error message found for attempting to split while looting
@@ -11174,7 +11180,9 @@ void Player::SwapItem(uint16 src, uint16 dst)
 
     sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "STORAGE: SwapItem bag = %u, slot = %u, item = %u", dstbag, dstslot, pSrcItem->GetEntry());
 
-    if (!IsAlive() && !(IsInventoryPos(src) && IsInventoryPos(dst)))
+    // Moving items between two inventory slots stays allowed while dead, unless the
+    // whole inventory is locked by the custom Death.LockInventory option.
+    if (!IsAlive() && (!(IsInventoryPos(src) && IsInventoryPos(dst)) || sWorld.getConfig(CONFIG_BOOL_DEATH_LOCK_INVENTORY)))
     {
         SendEquipError(EQUIP_ERR_YOU_ARE_DEAD, pSrcItem, pDstItem);
         return;

@@ -51,6 +51,12 @@ How this fork differs from upstream VMaNGOS.
   nothing is selected, so that case is now refused at every security level unless the new
   `Command.DieSelfKill` option is enabled. Killing another selected unit is unaffected.
 
+**New options**
+- `Death.LockInventory` (default off) refuses every item move inside the inventory while the
+  character is dead. Without it only moves involving an equipment, bag or bank slot are
+  refused, and items can still be rearranged inside the bags, which is how retail behaved.
+  The option covers dragging, splitting and auto storing a stack into a bag.
+
 **Updated libraries**
 
 The Windows dependencies vendored under `dep/windows` were badly out of date:

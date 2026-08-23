@@ -2781,6 +2781,13 @@ Visibility.ForceActiveObjects = 1
 #         Default: 1 (enabled)
 #                  0 (disabled)
 #
+#    Death.LockInventory
+#        Custom. Refuse every item move inside the inventory while the character is
+#        dead, instead of only the moves that involve an equipment, bag or bank
+#        slot. Covers dragging, splitting and auto storing a stack into a bag.
+#        Default: 0 (items can be rearranged inside the bags while dead)
+#                 1 (the inventory is locked while dead)
+#
 #    Corpses.UpdateMinutes
 #        Interval (minutes) for corpse cleanup/update processing.
 #        Default:     20
@@ -2872,6 +2879,7 @@ Death.CorpseReclaimDelay.PvP = 1
 Death.CorpseReclaimDelay.PvE = 1
 Death.Bones.World = 1
 Death.Bones.Battleground = 1
+Death.LockInventory = 0
 Corpses.UpdateMinutes = 20
 Bones.ExpireMinutes = 60
 Death.Ghost.RunSpeed.World = 1.0

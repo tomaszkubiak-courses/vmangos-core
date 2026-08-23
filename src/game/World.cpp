@@ -776,6 +776,7 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_BOOL_DEATH_CORPSE_RECLAIM_DELAY_PVE, "Death.CorpseReclaimDelay.PvE", true);
     setConfig(CONFIG_BOOL_DEATH_BONES_WORLD,              "Death.Bones.World", true);
     setConfig(CONFIG_BOOL_DEATH_BONES_BG,                 "Death.Bones.Battleground", true);
+    setConfig(CONFIG_BOOL_DEATH_LOCK_INVENTORY,           "Death.LockInventory", false);
     setConfigMinMax(CONFIG_FLOAT_GHOST_RUN_SPEED_WORLD,   "Death.Ghost.RunSpeed.World", 1.0f, 0.1f, 10.0f);
     setConfigMinMax(CONFIG_FLOAT_GHOST_RUN_SPEED_BG,      "Death.Ghost.RunSpeed.Battleground", 1.0f, 0.1f, 10.0f);
 
