@@ -677,6 +677,7 @@ void World::LoadConfigSettings(bool reload)
     setConfigMinMax(CONFIG_UINT32_START_GM_LEVEL, "GM.StartLevel", 1, getConfig(CONFIG_UINT32_START_PLAYER_LEVEL), MAX_LEVEL);
     setConfig(CONFIG_BOOL_DIE_COMMAND_CREDIT,     "GM.CreditOnDie", true);
     setConfig(CONFIG_BOOL_DIE_COMMAND_FOR_PLAYERS, "Command.DieForPlayers", false);
+    setConfig(CONFIG_BOOL_DIE_COMMAND_SELF, "Command.DieSelfKill", false);
     setConfig(CONFIG_BOOL_GM_LOWER_SECURITY,      "GM.LowerSecurity", false);
     setConfig(CONFIG_BOOL_GM_ALLOW_TRADES,        "GM.AllowTrades", true);
     setConfig(CONFIG_BOOL_GMS_ALLOW_PUBLIC_CHANNELS,         "GM.AllowPublicChannels", false);
@@ -775,6 +776,7 @@ void World::LoadConfigSettings(bool reload)
     setConfig(CONFIG_BOOL_DEATH_CORPSE_RECLAIM_DELAY_PVE, "Death.CorpseReclaimDelay.PvE", true);
     setConfig(CONFIG_BOOL_DEATH_BONES_WORLD,              "Death.Bones.World", true);
     setConfig(CONFIG_BOOL_DEATH_BONES_BG,                 "Death.Bones.Battleground", true);
+    setConfig(CONFIG_BOOL_DEATH_LOCK_INVENTORY,           "Death.LockInventory", false);
     setConfigMinMax(CONFIG_FLOAT_GHOST_RUN_SPEED_WORLD,   "Death.Ghost.RunSpeed.World", 1.0f, 0.1f, 10.0f);
     setConfigMinMax(CONFIG_FLOAT_GHOST_RUN_SPEED_BG,      "Death.Ghost.RunSpeed.Battleground", 1.0f, 0.1f, 10.0f);
 

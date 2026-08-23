@@ -2508,6 +2508,14 @@ Movement.PendingAckResponseTime = 4000
 #        Default: 0 (gamemaster level and above only)
 #                 1 (any player)
 #
+#    Command.DieSelfKill
+#        Custom. Let the ".die" command kill the caller's own character. The
+#        command falls back to the caller when nothing is selected, so with this
+#        disabled ".die" on yourself is refused and nothing happens, at every
+#        security level. Killing another selected unit is unaffected.
+#        Default: 0 (refuse)
+#                 1 (allow)
+#
 #    GM.AllowTrades
 #        Allow trades / mails / AH / ...
 #        Default: 1
@@ -2547,6 +2555,7 @@ GM.StartLevel = 1
 GM.LowerSecurity = 0
 GM.CreditOnDie = 1
 Command.DieForPlayers = 0
+Command.DieSelfKill = 0
 GM.AllowTrades = 1
 GM.AllowPublicChannels = 0
 GMTickets.Enable = 1
@@ -2772,6 +2781,13 @@ Visibility.ForceActiveObjects = 1
 #         Default: 1 (enabled)
 #                  0 (disabled)
 #
+#    Death.LockInventory
+#        Custom. Refuse every item move inside the inventory while the character is
+#        dead, instead of only the moves that involve an equipment, bag or bank
+#        slot. Covers dragging, splitting and auto storing a stack into a bag.
+#        Default: 0 (items can be rearranged inside the bags while dead)
+#                 1 (the inventory is locked while dead)
+#
 #    Corpses.UpdateMinutes
 #        Interval (minutes) for corpse cleanup/update processing.
 #        Default:     20
@@ -2863,6 +2879,7 @@ Death.CorpseReclaimDelay.PvP = 1
 Death.CorpseReclaimDelay.PvE = 1
 Death.Bones.World = 1
 Death.Bones.Battleground = 1
+Death.LockInventory = 0
 Corpses.UpdateMinutes = 20
 Bones.ExpireMinutes = 60
 Death.Ghost.RunSpeed.World = 1.0

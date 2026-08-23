@@ -47,6 +47,15 @@ How this fork differs from upstream VMaNGOS.
   security, and still honours `GM.CreditOnDie`. Note that enabling it lets any player kill any
   other player they can select; setting `flags` = 1 on the `die` row of the world DB `command`
   table restricts it to the caller's own character.
+- `.die` no longer kills your own character by default. The command falls back to the caller when
+  nothing is selected, so that case is now refused at every security level unless the new
+  `Command.DieSelfKill` option is enabled. Killing another selected unit is unaffected.
+
+**New options**
+- `Death.LockInventory` (default off) refuses every item move inside the inventory while the
+  character is dead. Without it only moves involving an equipment, bag or bank slot are
+  refused, and items can still be rearranged inside the bags, which is how retail behaved.
+  The option covers dragging, splitting and auto storing a stack into a bag.
 
 **Updated libraries**
 
@@ -65,6 +74,16 @@ Because the vendored headers are shared between architectures and cannot match t
 versions at once, the 32-bit Windows libraries were dropped rather than left stale. A 32-bit
 build now fails at configure time with an explanation. `MYSQL_ROOT_DIR` was added for pointing
 the build at an external MySQL client.
+
+**Fixes**
+- Out of combat health regeneration no longer stops completely at low spirit. The per class
+  formula in `Unit::GetRegenHPPerSpirit` is a straight line fitted to the level 60 stat range,
+  and its negative constant term drove the result below zero — where it was clamped to zero —
+  for any warrior, rogue, hunter or shaman whose spirit fell far enough. Resurrection sickness
+  cuts all stats by 75% and did exactly that, so a sick character regenerated no health at all;
+  low level characters had the same problem without any debuff. The first 50 points of spirit
+  now regenerate at their own rate and everything above them at the published slope, the way
+  the client tables the fit came from are shaped. Values from 50 spirit upwards are unchanged.
 
 **Other**
 - `doc/BUILDING_WINDOWS.md` — a full Windows build and setup guide.

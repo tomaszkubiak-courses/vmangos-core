@@ -25,6 +25,7 @@
 #include "Opcodes.h"
 #include "Log.h"
 #include "ObjectMgr.h"
+#include "World.h"
 #include "Player.h"
 #include "Item.h"
 #include "Bag.h"
@@ -792,6 +793,12 @@ void WorldSession::HandleAutoStoreBagItemOpcode(WorldPackets::Item::AutoStoreBag
     Item *pItem = _player->GetItemByPos(packet.srcbag, packet.srcslot);
     if (!pItem)
         return;
+
+    if (!_player->IsAlive() && sWorld.getConfig(CONFIG_BOOL_DEATH_LOCK_INVENTORY))
+    {
+        _player->SendEquipError(EQUIP_ERR_YOU_ARE_DEAD, pItem, nullptr);
+        return;
+    }
 
     if (!_player->IsValidPos(packet.dstbag, NULL_SLOT, false))     // can be autostore pos
     {
