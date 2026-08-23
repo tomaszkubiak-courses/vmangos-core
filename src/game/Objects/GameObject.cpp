@@ -167,7 +167,10 @@ void GameObject::RemoveFromWorld()
                 owner->RemoveGameObject(this, false);
             else
             {
-                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Delete %s with SpellId %u LinkedGO %u that lost references to owner %s GO list. Crash possible later.",
+                // Every path that drops a gameobject from the owner's list clears the owner guid
+                // before deleting it, so an owner that cannot be found here never held a pointer
+                // to this object. Spell summoned gameobjects outliving their caster take this.
+                sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "Delete %s with SpellId %u LinkedGO %u whose owner %s is no longer in the world.",
                               GetGuidStr().c_str(), m_spellId, GetGOInfo()->GetLinkedGameObjectEntry(), owner_guid.GetString().c_str());
             }
         }
@@ -531,10 +534,15 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
 
                     if (ok && (!AI() || !AI()->OnUse(ok)))
                     {
-                        if (owner)
-                            owner->CastSpell(ok, goInfo->trap.spellId, true, nullptr, nullptr, GetObjectGuid());
-                        else
-                            CastSpell(ok, goInfo->trap.spellId, true, nullptr, nullptr, GetObjectGuid());
+                        // Some traps carry no spell at all and exist only for their animation
+                        // or to be handled by a script, so casting is skipped for those.
+                        if (goInfo->trap.spellId)
+                        {
+                            if (owner)
+                                owner->CastSpell(ok, goInfo->trap.spellId, true, nullptr, nullptr, GetObjectGuid());
+                            else
+                                CastSpell(ok, goInfo->trap.spellId, true, nullptr, nullptr, GetObjectGuid());
+                        }
 
                         // use template cooldown if provided
                         m_cooldownTime = time(nullptr) + (goInfo->trap.cooldown ? goInfo->trap.cooldown : uint32(4));
