@@ -2682,6 +2682,15 @@ bool ChatHandler::HandleNameDieCommand(char* args)
 
 bool ChatHandler::HandleDieCommand(char* /*args*/)
 {
+    // Custom. The command is registered at player level so that it can be opened
+    // up without a DB edit, but stays gamemaster only unless enabled in the config.
+    if (GetAccessLevel() < SEC_GAMEMASTER && !sWorld.getConfig(CONFIG_BOOL_DIE_COMMAND_FOR_PLAYERS))
+    {
+        SendSysMessage(LANG_COMMAND_UNAVAILABLE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
     Unit* target = GetSelectedUnit();
     return HandleDieHelper(target);
 }
