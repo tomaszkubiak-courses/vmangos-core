@@ -632,21 +632,24 @@ struct sapphiron_birthAI : public GameObjectAI
         m_pInstance = (instance_naxxramas*)me->GetInstanceData();
     }
 
+    // Always returns true so the core never falls back to default trap behaviour on this
+    // gameobject. It has no trap spell, and the fallback consumes its single charge, which
+    // deactivates the bones for a full respawn cycle and makes the encounter unreachable.
     bool OnUse(Unit* user) override
     {
         if (!user || !user->IsPlayer() || !user->IsAlive() || ((Player*)user)->IsGameMaster())
-            return false;
+            return true;
 
         if (!m_pInstance)
-            return false;
+            return true;
 
         // Only trigger if encounter hasn't started yet
         if (m_pInstance->GetData(TYPE_SAPPHIRON) != NOT_STARTED)
-            return false;
+            return true;
 
         // Don't trigger if Sapphiron already exists
         if (m_pInstance->GetSingleCreatureFromStorage(NPC_SAPPHIRON))
-            return false;
+            return true;
 
         m_pInstance->SetData(TYPE_SAPPHIRON, SPECIAL);
 
