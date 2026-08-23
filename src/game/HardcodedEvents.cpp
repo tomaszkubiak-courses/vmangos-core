@@ -177,8 +177,11 @@ void DragonsOfNightmare::Update()
     {
         // Event is active, dragons exist in the world
         uint32 alive = 0;
-        // Update respawn time to max time value if the dragon is dead, get current alive count
-        GetAliveCountAndUpdateRespawnTime(dragonGUIDs, alive, std::numeric_limits<time_t>::max());
+        // Update respawn time to max time value if the dragon is dead, get current alive count.
+        // A continent nobody is on has no map to look the dragons up in, and counting those as
+        // dead would run the stop delay down and end the event with the dragons never killed.
+        if (!GetAliveCountAndUpdateRespawnTime(dragonGUIDs, alive, std::numeric_limits<time_t>::max()))
+            return;
 
         // If any dragons are still alive, do not pass go. We'll update once they are all dead
         if (alive)
@@ -242,7 +245,8 @@ void DragonsOfNightmare::CheckSingleVariable(uint32 idx, uint32& value)
 
     if (!variableExists)
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "GameEventMgr: [Dragons of Nightmare] variable does not exist! Setting default.");
+        // Expected the first time the event runs on a world that has no row for it yet.
+        sLog.Out(LOG_BASIC, LOG_LVL_BASIC, "GameEventMgr: [Dragons of Nightmare] variable %u does not exist! Setting default.", idx);
         sObjectMgr.SetSavedVariable(idx, value, true);
     }
     else
@@ -251,7 +255,7 @@ void DragonsOfNightmare::CheckSingleVariable(uint32 idx, uint32& value)
     }
 }
 
-void DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGuid> const& dragons, uint32& alive, time_t respawnTime)
+bool DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGuid> const& dragons, uint32& alive, time_t respawnTime)
 {
     for (auto const& guid : dragons)
     {
@@ -270,8 +274,10 @@ void DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGui
 
         if (!map)
         {
-            sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "GameEventMgr: [Dragons of Nightmare] instance %u of map %u not found!", instanceId, cData->position.mapId);
-            continue;
+            // Continent maps are only created once somebody is on them, so this is the normal
+            // state of an empty continent and not something the caller can act on.
+            sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "GameEventMgr: [Dragons of Nightmare] instance %u of map %u not found!", instanceId, cData->position.mapId);
+            return false;
         }
 
         auto pCreature = map->GetCreature(guid);
@@ -287,6 +293,8 @@ void DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGui
         else
             ++alive;
     }
+
+    return true;
 }
 
 bool DragonsOfNightmare::LoadDragons(std::vector<ObjectGuid>& dragonGUIDs)
