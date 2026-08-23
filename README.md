@@ -47,6 +47,9 @@ How this fork differs from upstream VMaNGOS.
   security, and still honours `GM.CreditOnDie`. Note that enabling it lets any player kill any
   other player they can select; setting `flags` = 1 on the `die` row of the world DB `command`
   table restricts it to the caller's own character.
+- `.die` no longer kills your own character by default. The command falls back to the caller when
+  nothing is selected, so that case is now refused at every security level unless the new
+  `Command.DieSelfKill` option is enabled. Killing another selected unit is unaffected.
 
 **Updated libraries**
 

@@ -2692,6 +2692,16 @@ bool ChatHandler::HandleDieCommand(char* /*args*/)
     }
 
     Unit* target = GetSelectedUnit();
+
+    // Custom. Killing your own character is a separate opt-in, since an empty
+    // selection makes the command default to the caller.
+    if (target == m_session->GetPlayer() && !sWorld.getConfig(CONFIG_BOOL_DIE_COMMAND_SELF))
+    {
+        SendSysMessage(LANG_COMMAND_UNAVAILABLE);
+        SetSentErrorMessage(true);
+        return false;
+    }
+
     return HandleDieHelper(target);
 }
 

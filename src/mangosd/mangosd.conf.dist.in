@@ -2508,6 +2508,14 @@ Movement.PendingAckResponseTime = 4000
 #        Default: 0 (gamemaster level and above only)
 #                 1 (any player)
 #
+#    Command.DieSelfKill
+#        Custom. Let the ".die" command kill the caller's own character. The
+#        command falls back to the caller when nothing is selected, so with this
+#        disabled ".die" on yourself is refused and nothing happens, at every
+#        security level. Killing another selected unit is unaffected.
+#        Default: 0 (refuse)
+#                 1 (allow)
+#
 #    GM.AllowTrades
 #        Allow trades / mails / AH / ...
 #        Default: 1
@@ -2547,6 +2555,7 @@ GM.StartLevel = 1
 GM.LowerSecurity = 0
 GM.CreditOnDie = 1
 Command.DieForPlayers = 0
+Command.DieSelfKill = 0
 GM.AllowTrades = 1
 GM.AllowPublicChannels = 0
 GMTickets.Enable = 1
