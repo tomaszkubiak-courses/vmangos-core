@@ -39,6 +39,15 @@ How this fork differs from upstream VMaNGOS.
   online and offline characters, at the same security level. Both commands now share their
   argument parsing and saturate at the money cap instead of overflowing.
 
+**Changed commands**
+- `.die` is registered at player level instead of gamemaster level, so that server owners can
+  hand it out without a database edit. It is refused below gamemaster level unless the new
+  `Command.DieForPlayers` option is enabled, and that option defaults to off. Behaviour is
+  otherwise unchanged: it kills the selected unit, still refuses a target of equal or higher
+  security, and still honours `GM.CreditOnDie`. Note that enabling it lets any player kill any
+  other player they can select; setting `flags` = 1 on the `die` row of the world DB `command`
+  table restricts it to the caller's own character.
+
 **Updated libraries**
 
 The Windows dependencies vendored under `dep/windows` were badly out of date:
@@ -59,4 +68,5 @@ the build at an external MySQL client.
 
 **Other**
 - `doc/BUILDING_WINDOWS.md` — a full Windows build and setup guide.
+- `doc/COMMANDS.md` — every chat command with its security level, argument syntax and an example.
 - The GitHub workflows and JetBrains project files were removed; this fork runs no CI.
