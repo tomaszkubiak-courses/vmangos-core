@@ -69,6 +69,16 @@ versions at once, the 32-bit Windows libraries were dropped rather than left sta
 build now fails at configure time with an explanation. `MYSQL_ROOT_DIR` was added for pointing
 the build at an external MySQL client.
 
+**Fixes**
+- Out of combat health regeneration no longer stops completely at low spirit. The per class
+  formula in `Unit::GetRegenHPPerSpirit` is a straight line fitted to the level 60 stat range,
+  and its negative constant term drove the result below zero — where it was clamped to zero —
+  for any warrior, rogue, hunter or shaman whose spirit fell far enough. Resurrection sickness
+  cuts all stats by 75% and did exactly that, so a sick character regenerated no health at all;
+  low level characters had the same problem without any debuff. The first 50 points of spirit
+  now regenerate at their own rate and everything above them at the published slope, the way
+  the client tables the fit came from are shaped. Values from 50 spirit upwards are unchanged.
+
 **Other**
 - `doc/BUILDING_WINDOWS.md` — a full Windows build and setup guide.
 - `doc/COMMANDS.md` — every chat command with its security level, argument syntax and an example.

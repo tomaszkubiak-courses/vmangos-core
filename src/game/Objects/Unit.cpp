@@ -6453,45 +6453,63 @@ int32 Unit::ModifyPower(Powers power, int32 dVal)
     return gain;
 }
 
+// Spirit covered by the low end rate of the client regeneration tables.
+static float constexpr REGEN_BASE_SPIRIT = 50.0f;
+
 float Unit::GetRegenHPPerSpirit() const
 {
-    float regen = 0.0f;
+    // The 1.12 client ships no gtOCTRegenHP.dbc / gtRegenHPPerSpt.dbc, so health
+    // regeneration uses the published per class fit below instead. That fit is a
+    // straight line through the level 60 stat range and turns negative once spirit
+    // drops far enough - resurrection sickness cuts spirit by 75%, and low level
+    // characters never reach the range in the first place - which used to clamp
+    // regeneration to zero outright.
+    // Split it the way the client tables do instead: the first 50 points of spirit
+    // regenerate at their own rate, everything above them at the published slope.
+    // The result is identical from 50 spirit upwards and now reaches zero only at
+    // zero spirit.
+    float slope = 0.0f;                                     // regeneration per point of spirit
+    float offset = 0.0f;                                    // constant term of the published fit
 
-    float Spirit = GetStat(STAT_SPIRIT);
-    uint8 Class = GetClass();
-
-    switch (Class)
+    switch (GetClass())
     {
         case CLASS_DRUID:
-            regen = (Spirit * 0.11 + 1);
+            slope = 0.11f; offset = 1.0f;
             break;
         case CLASS_HUNTER:
-            regen = (Spirit * 0.43 - 5.5);
+            slope = 0.43f; offset = -5.5f;
             break;
         case CLASS_MAGE:
-            regen = (Spirit * 0.11 + 1);
+            slope = 0.11f; offset = 1.0f;
             break;
         case CLASS_PALADIN:
-            regen = (Spirit * 0.25);
+            slope = 0.25f; offset = 0.0f;
             break;
         case CLASS_PRIEST:
-            regen = (Spirit * 0.15 + 1.4);
+            slope = 0.15f; offset = 1.4f;
             break;
         case CLASS_ROGUE:
-            regen = (Spirit * 0.84 - 13);
+            slope = 0.84f; offset = -13.0f;
             break;
         case CLASS_SHAMAN:
-            regen = (Spirit * 0.28 - 3.6);
+            slope = 0.28f; offset = -3.6f;
             break;
         case CLASS_WARLOCK:
-            regen = (Spirit * 0.12 + 1.5);
+            slope = 0.12f; offset = 1.5f;
             break;
         case CLASS_WARRIOR:
-            regen = (Spirit * 1.26 - 22.6);
+            slope = 1.26f; offset = -22.6f;
             break;
+        default:
+            return 0.0f;
     }
 
-    return std::max(0.0f, regen);
+    float const spirit = GetStat(STAT_SPIRIT);
+    float const baseSpirit = std::min(spirit, REGEN_BASE_SPIRIT);
+    float const extraSpirit = spirit - baseSpirit;
+    float const baseSlope = slope + offset / REGEN_BASE_SPIRIT;
+
+    return std::max(0.0f, baseSpirit * baseSlope + extraSpirit * slope);
 }
 
 float Unit::GetRegenMPPerSpirit() const
