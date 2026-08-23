@@ -4603,7 +4603,10 @@ void Player::SetFly(bool enable)
     }
     else
     {
-        m_movementInfo.moveFlags = (MOVEFLAG_NONE);
+        // Keep the swimming flag when flight is turned off in water. Clearing it
+        // leaves the server treating the character as walking, at walk speed and
+        // out of swim state, until the client's next movement packet resyncs it.
+        m_movementInfo.moveFlags = IsInWater() ? MOVEFLAG_SWIMMING : MOVEFLAG_NONE;
     }
 
     GetSession()->RejectMovementPacketsFor(100);
