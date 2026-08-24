@@ -83,6 +83,7 @@
 #include "world/scourge_invasion.h"
 #include "world/world_event_wareffort.h"
 
+#include <algorithm>
 #include <climits>
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
@@ -354,6 +355,127 @@ bool Player::ValidateAppearance(uint8 race, uint8 gender, uint8 hairID, uint8 ha
         return false;
 
     return true;
+}
+
+// Highest facial hair style the client accepts. Only used to enumerate the
+// styles of races that have no character sections of that type.
+#define MAX_FACIAL_HAIR_STYLES 16
+
+// Sorted list of the variation indices a race has for a section, optionally
+// restricted to a single color index. Pass a negative color for all of them.
+static void GetCharSectionVariations(uint8 race, CharSectionType type, uint8 gender, int32 color, std::vector<uint8>& variations)
+{
+    std::vector<std::pair<uint8, uint8>> validPairs;
+    GetAllValidCharSectionVariationAndColorPairs(race, type, gender, validPairs);
+
+    for (auto const& itr : validPairs)
+    {
+        if (color < 0 || itr.second == uint8(color))
+            variations.push_back(itr.first);
+    }
+
+    std::sort(variations.begin(), variations.end());
+    variations.erase(std::unique(variations.begin(), variations.end()), variations.end());
+}
+
+// Same for the color indices, optionally restricted to a single variation.
+static void GetCharSectionColors(uint8 race, CharSectionType type, uint8 gender, int32 variation, std::vector<uint8>& colors)
+{
+    std::vector<std::pair<uint8, uint8>> validPairs;
+    GetAllValidCharSectionVariationAndColorPairs(race, type, gender, validPairs);
+
+    for (auto const& itr : validPairs)
+    {
+        if (variation < 0 || itr.first == uint8(variation))
+            colors.push_back(itr.second);
+    }
+
+    std::sort(colors.begin(), colors.end());
+    colors.erase(std::unique(colors.begin(), colors.end()), colors.end());
+}
+
+// Facial hair styles usable by a race, which the client must also have an entry
+// for. Tauren and most female races have no sections of that type at all, their
+// styles are horns, earrings and the like defined only in the facial hair dbc.
+static void GetCharFacialHairStyles(uint8 race, uint8 gender, int32 hairColor, std::vector<uint8>& styles)
+{
+    GetCharSectionVariations(race, SECTION_TYPE_FACIAL_HAIR, gender, hairColor, styles);
+
+    if (styles.empty())
+    {
+        for (uint8 style = 0; style < MAX_FACIAL_HAIR_STYLES; ++style)
+        {
+            if (GetCharFacialHairEntry(race, gender, style))
+                styles.push_back(style);
+        }
+
+        return;
+    }
+
+    styles.erase(std::remove_if(styles.begin(), styles.end(),
+        [race, gender](uint8 style) { return !GetCharFacialHairEntry(race, gender, style); }), styles.end());
+}
+
+// Picks the entry sitting at the same position in the new list as the current
+// value does in the old one, so that for example the third hair color of the
+// old race becomes the third hair color of the new race.
+static uint8 GetEquivalentAppearanceValue(uint8 value, std::vector<uint8> const& oldValues, std::vector<uint8> const& newValues)
+{
+    if (newValues.empty())
+        return 0;
+
+    auto itr = std::find(oldValues.begin(), oldValues.end(), value);
+    size_t const position = (itr != oldValues.end()) ? size_t(std::distance(oldValues.begin(), itr)) : 0;
+
+    return newValues[std::min(position, newValues.size() - 1)];
+}
+
+void Player::ConvertAppearanceForRace(uint8 oldRace, uint8 newRace, uint8 gender, uint8& hairID, uint8& hairColor, uint8& faceID, uint8& facialHair, uint8& skinColor)
+{
+    if (oldRace == newRace)
+        return;
+
+    // Skin tone first, since the faces available depend on it.
+    {
+        std::vector<uint8> oldColors, newColors;
+        GetCharSectionColors(oldRace, SECTION_TYPE_SKIN, gender, 0, oldColors);
+        GetCharSectionColors(newRace, SECTION_TYPE_SKIN, gender, 0, newColors);
+        skinColor = GetEquivalentAppearanceValue(skinColor, oldColors, newColors);
+    }
+
+    {
+        std::vector<uint8> oldFaces, newFaces;
+        GetCharSectionVariations(oldRace, SECTION_TYPE_FACE, gender, -1, oldFaces);
+        GetCharSectionVariations(newRace, SECTION_TYPE_FACE, gender, skinColor, newFaces);
+        faceID = GetEquivalentAppearanceValue(faceID, oldFaces, newFaces);
+    }
+
+    // Hair color before the style, for the same reason as the skin tone.
+    {
+        std::vector<uint8> oldColors, newColors;
+        GetCharSectionColors(oldRace, SECTION_TYPE_HAIR, gender, -1, oldColors);
+        GetCharSectionColors(newRace, SECTION_TYPE_HAIR, gender, -1, newColors);
+        hairColor = GetEquivalentAppearanceValue(hairColor, oldColors, newColors);
+    }
+
+    {
+        std::vector<uint8> oldStyles, newStyles;
+        GetCharSectionVariations(oldRace, SECTION_TYPE_HAIR, gender, -1, oldStyles);
+        GetCharSectionVariations(newRace, SECTION_TYPE_HAIR, gender, hairColor, newStyles);
+        hairID = GetEquivalentAppearanceValue(hairID, oldStyles, newStyles);
+    }
+
+    {
+        std::vector<uint8> oldStyles, newStyles;
+        GetCharFacialHairStyles(oldRace, gender, -1, oldStyles);
+        GetCharFacialHairStyles(newRace, gender, hairColor, newStyles);
+        facialHair = GetEquivalentAppearanceValue(facialHair, oldStyles, newStyles);
+    }
+
+    // The dbc data does not guarantee that every combination picked above exists
+    // together, so fall back to a random valid look rather than an invalid one.
+    if (!ValidateAppearance(newRace, gender, hairID, hairColor, faceID, facialHair, skinColor))
+        SelectRandomAppearance(newRace, gender, hairID, hairColor, faceID, facialHair, skinColor);
 }
 
 void Player::SelectRandomAppearance(uint8 race, uint8 gender, uint8& hairID, uint8& hairColor, uint8& faceID, uint8& facialHair, uint8& skinColor)
@@ -21328,11 +21450,23 @@ bool Player::ChangeRace(uint8 newRace)
     SetUInt32Value(UNIT_FIELD_DISPLAYID, gender == GENDER_MALE ? info->displayId_m : info->displayId_f);
     SetUInt32Value(UNIT_FIELD_NATIVEDISPLAYID, gender == GENDER_MALE ? info->displayId_m : info->displayId_f);
 
-    // The old skin, face and hair are not valid for the new race, so reset them to
-    // the first available option. Only the facial style byte of PLAYER_BYTES_2 is
-    // part of the appearance, the rest of the field must be left alone.
-    SetUInt32Value(PLAYER_BYTES, 1 | (1 << 8) | (1 << 16) | (1 << 24));
-    SetByteValue(PLAYER_BYTES_2, PLAYER_BYTES_2_OFFSET_FACIAL_STYLE, 1);
+    // The old appearance is not valid for the new race, so carry it over as
+    // closely as the character sections of the new race allow.
+    uint8 skinColor = GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_SKIN_ID);
+    uint8 faceID = GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_FACE_ID);
+    uint8 hairID = GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_HAIR_STYLE_ID);
+    uint8 hairColor = GetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_HAIR_COLOR_ID);
+    uint8 facialHair = GetByteValue(PLAYER_BYTES_2, PLAYER_BYTES_2_OFFSET_FACIAL_STYLE);
+
+    ConvertAppearanceForRace(oldRace, newRace, gender, hairID, hairColor, faceID, facialHair, skinColor);
+
+    SetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_SKIN_ID, skinColor);
+    SetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_FACE_ID, faceID);
+    SetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_HAIR_STYLE_ID, hairID);
+    SetByteValue(PLAYER_BYTES, PLAYER_BYTES_OFFSET_HAIR_COLOR_ID, hairColor);
+    // Only the facial style byte of PLAYER_BYTES_2 is part of the appearance,
+    // the rest of the field holds the bank bag slots and must be left alone.
+    SetByteValue(PLAYER_BYTES_2, PLAYER_BYTES_2_OFFSET_FACIAL_STYLE, facialHair);
 
     if (!ChangeReputationsForRace(oldRace, newRace))
     {

@@ -1243,6 +1243,7 @@ class Player final: public Unit
         void UpdateCharacterFlags();
         static bool ValidateAppearance(uint8 race, uint8 gender, uint8 hairID, uint8 hairColor, uint8 faceID, uint8 facialHair, uint8 skinColor);
         static void SelectRandomAppearance(uint8 race, uint8 gender, uint8& hairID, uint8& hairColor, uint8& faceID, uint8& facialHair, uint8& skinColor);
+        static void ConvertAppearanceForRace(uint8 oldRace, uint8 newRace, uint8 gender, uint8& hairID, uint8& hairColor, uint8& faceID, uint8& facialHair, uint8& skinColor);
 
         /*********************************************************/
         /***                   SAVE SYSTEM                     ***/
