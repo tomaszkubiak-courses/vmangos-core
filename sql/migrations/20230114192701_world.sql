@@ -23,7 +23,7 @@ UPDATE `quest_template` SET `entry`=7401, `RewRepFaction1`=729, `RewRepFaction2`
 UPDATE `quest_template` SET `entry`=7163, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=100, `RewRepValue2`=100 WHERE `entry`=7163 AND `patch`=3;
 UPDATE `quest_template` SET `entry`=7166, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=200, `RewRepValue2`=200 WHERE `entry`=7166 AND `patch`=3;
 UPDATE `quest_template` SET `entry`=7181, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=200, `RewRepValue2`=100 WHERE `entry`=7181 AND `patch`=3;
-UPDATE `quest_template` SET `entry`=7181, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=200, `RewRepValue2`=100 WHERE `entry`=7182 AND `patch`=6;
+UPDATE `quest_template` SET `entry`=7182, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=200, `RewRepValue2`=100 WHERE `entry`=7182 AND `patch`=6;
 UPDATE `quest_template` SET `entry`=7165, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=150, `RewRepValue2`=150 WHERE `entry`=7165 AND `patch`=3;
 UPDATE `quest_template` SET `entry`=7167, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=200, `RewRepValue2`=200 WHERE `entry`=7167 AND `patch`=3;
 UPDATE `quest_template` SET `entry`=7361, `RewRepFaction1`=729, `RewRepFaction2`=76, `RewRepValue1`=500, `RewRepValue2`=500 WHERE `entry`=7361 AND `patch`=3;
