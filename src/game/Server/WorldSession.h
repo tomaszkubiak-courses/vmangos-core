@@ -785,6 +785,7 @@ class WorldSession
         void HandleCompleteCinematic(NullClientPacket const& packet);
         void HandleNextCinematicCamera(NullClientPacket const& packet);
 
+        bool CanQueryPageText(ObjectGuid guid, uint32 pageID) const;
         void HandlePageTextQueryOpcode(WorldPackets::Query::QueryPageText const& packet);
 
         void HandleTutorialFlagOpcode(WorldPackets::Misc::TutorialFlag const& packet);

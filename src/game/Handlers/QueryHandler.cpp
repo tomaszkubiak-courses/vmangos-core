@@ -30,6 +30,8 @@
 #include "ObjectMgr.h"
 #include "ObjectGuid.h"
 #include "Player.h"
+#include "GameObject.h"
+#include "Item.h"
 
 void WorldSession::SendNameQueryOpcode(Player* p)
 {
@@ -260,8 +262,63 @@ void WorldSession::HandleNpcTextQueryOpcode(WorldPackets::Npc::NpcTextQuery cons
     SendPacket(std::move(response));
 }
 
+// Page text is only requested for an item the player carries, for a game object
+// of type text, or for a goober with a page attached to it. Clients that send us
+// the source of the request let us confirm that the page really belongs to it.
+bool WorldSession::CanQueryPageText(ObjectGuid guid, uint32 pageID) const
+{
+    if (guid.IsItem())
+    {
+        Item const* pItem = _player->GetItemByGuid(guid);
+        if (!pItem)
+            return false;
+
+        ItemPrototype const* pProto = pItem->GetProto();
+        return pProto && pProto->PageText == pageID;
+    }
+
+    if (guid.IsGameObject())
+    {
+        GameObject const* pGo = _player->GetMap()->GetGameObject(guid);
+        if (!pGo)
+            return false;
+
+        GameObjectInfo const* pInfo = pGo->GetGOInfo();
+        if (!pInfo)
+            return false;
+
+        if (pInfo->type == GAMEOBJECT_TYPE_TEXT)
+        {
+            if (pInfo->text.pageID != pageID)
+                return false;
+        }
+        else if (pInfo->type == GAMEOBJECT_TYPE_GOOBER)
+        {
+            if (pInfo->goober.pageId != pageID)
+                return false;
+        }
+        else
+            return false;
+
+        // Allow more than the interaction distance, the object may have been
+        // used a moment ago and the player has moved away since.
+        return _player->IsWithinDist(pGo, INTERACTION_DISTANCE * 2, true, SizeFactor::None);
+    }
+
+    return false;
+}
+
 void WorldSession::HandlePageTextQueryOpcode(WorldPackets::Query::QueryPageText const& packet)
 {
+    // Older clients do not tell us what the page was requested for,
+    // in which case there is nothing to check the page against.
+    if (!packet.guid.IsEmpty() && !CanQueryPageText(packet.guid, packet.pageID))
+    {
+        sLog.Out(LOG_BASIC, LOG_LVL_BASIC, "CMSG_PAGE_TEXT_QUERY: Player %s requested page %u for %s, which does not have it.",
+            _player->GetGuidStr().c_str(), packet.pageID, packet.guid.GetString().c_str());
+        return;
+    }
+
     uint32 pageID = packet.pageID;
     while (pageID)
     {

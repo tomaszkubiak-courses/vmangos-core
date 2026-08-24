@@ -43,6 +43,7 @@ namespace WorldPackets { namespace Query
     {
     public:
         uint32 pageID = 0;
+        ObjectGuid guid;
 
         explicit QueryPageText() : ClientPacket(CMSG_PAGE_TEXT_QUERY) {}
         void ReadFromWorldPacket(WorldPacket& recv_data) override;
