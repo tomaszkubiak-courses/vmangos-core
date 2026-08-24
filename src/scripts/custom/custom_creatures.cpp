@@ -1094,13 +1094,16 @@ enum RoleCheckSpells
     SPELL_LEADER_OF_THE_PACK = 17007,
 };
 
+// A paladin can only keep one blessing on a target, so every greater blessing
+// needs a caster of its own to sit alongside the others. The summon is hidden,
+// it only has to exist for long enough to own the aura it applies.
 void AddAuraFromDummy(Player* player, Creature* caster, uint32 spellId, uint32 creatureEntry)
 {
     Creature* dummy = caster->SummonCreature(creatureEntry, caster->GetPositionX(), caster->GetPositionY(), caster->GetPositionZ(), 0, TEMPSUMMON_TIMED_DESPAWN, 1000);
     if (dummy)
     {
-        player->AddAura(spellId, 0, dummy);   // or dummy->CastSpell(target, spellId, true);
-        // dummy->DespawnOrUnsummon();
+        dummy->SetVisibility(VISIBILITY_OFF);
+        player->AddAura(spellId, 0, dummy);
     }
 }
 
@@ -1134,7 +1137,9 @@ void ApplyWorldBuffsToPlayer(Player* player, Creature* caster)
             player->AddAura(24799, 0, nullptr);   // Smoked Desert Dumplings
             AddAuraFromDummy(player, caster, 25916, 90032); //Greater Blessing of Might
             
-            if (player->HasSpell(SPELL_SHIELD_SLAM)||player->HasSpell(SPELL_BLOODTHIRST) && player->HasSpell(SPELL_LAST_STAND)) //Tank
+            // Shield Slam and Last Stand are both protection talents, and a warrior
+            // deep enough into fury for Bloodthirst cannot afford either of them.
+            if (player->HasSpell(SPELL_SHIELD_SLAM) || player->HasSpell(SPELL_LAST_STAND)) //Tank
             {
                 player->AddAura(17540, 0, nullptr);   // Greater Stoneshield Potion
                 AddAuraFromDummy(player, caster, 25890, 90032); //Greater Blessing of Light
