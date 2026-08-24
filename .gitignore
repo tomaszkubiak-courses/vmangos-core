@@ -116,3 +116,6 @@ sql/migrations/world_db_updates.sql
 revision.h
 migrations_list.h
 Progression.h
+
+# Local world DB dumps (not distributed with the core)
+/sql/world_full_*.sql
