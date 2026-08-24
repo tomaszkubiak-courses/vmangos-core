@@ -21298,7 +21298,6 @@ bool Player::ChangeRace(uint8 newRace)
     uint8 oldRace = GetRace();
     uint8 pClass = GetClass();
     uint8 gender = GetGender();
-    uint8 team = GetTeam();
     Powers powertype = GetPowerType();
 
     if (IsSavingDisabled() || IsBot())
@@ -21320,19 +21319,20 @@ bool Player::ChangeRace(uint8 newRace)
         return false;
     }
 
-    ResetSpells();
-
-    // Change the race
+    // Change the race before learning spells, since the default spell list is looked up by race.
+    SetUInt32Value(UNIT_FIELD_BYTES_0, ((newRace) | (pClass << 8) | (gender << 16) | (powertype << 24)));
     LearnDefaultSpells();
 
     SetFactionForRace(newRace);
     SetFloatValue(OBJECT_FIELD_SCALE_X, ((newRace == RACE_TAUREN) ? 1.3f : 1.0f));
-    SetUInt32Value(UNIT_FIELD_BYTES_0, ((newRace) | (pClass << 8) | (gender << 16) | (powertype << 24)));
     SetUInt32Value(UNIT_FIELD_DISPLAYID, gender == GENDER_MALE ? info->displayId_m : info->displayId_f);
     SetUInt32Value(UNIT_FIELD_NATIVEDISPLAYID, gender == GENDER_MALE ? info->displayId_m : info->displayId_f);
+
+    // The old skin, face and hair are not valid for the new race, so reset them to
+    // the first available option. Only the facial style byte of PLAYER_BYTES_2 is
+    // part of the appearance, the rest of the field must be left alone.
     SetUInt32Value(PLAYER_BYTES, 1 | (1 << 8) | (1 << 16) | (1 << 24));
-    SetUInt32Value(PLAYER_BYTES_2, (1) | (0x02 << 24));
-    SetByteValue(PLAYER_BYTES_2, 2, 7); // keep bank tabs
+    SetByteValue(PLAYER_BYTES_2, PLAYER_BYTES_2_OFFSET_FACIAL_STYLE, 1);
 
     if (!ChangeReputationsForRace(oldRace, newRace))
     {
