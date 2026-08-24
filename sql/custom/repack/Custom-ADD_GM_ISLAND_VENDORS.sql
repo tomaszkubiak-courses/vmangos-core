@@ -34,7 +34,7 @@ INSERT INTO `creature_template` (`entry`, `patch`, `name`, `subname`, `level_min
 (90029, 0, 'Professions', '', 60, 60, 35, 1, 0, 7209, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1.14286, 18, 5, 0, 7, 0, 0, 1, 1, 65, 1, 1, 1, 0.14, 0, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, '', 0, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 'custom_professions_npc'),
 (90030, 0, 'Premade Gear', '', 60, 60, 35, 1, 0, 104, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1.14286, 18, 5, 0, 7, 0, 0, 1, 1, 65, 1, 1, 1, 0.14, 0, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, '', 0, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 'custom_premade_gear_npc'),
 (90031, 0, 'Premade Specs', '', 60, 60, 35, 1, 0, 18, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1.14286, 18, 5, 0, 7, 0, 0, 1, 1, 65, 1, 1, 1, 0.14, 0, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, '', 0, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 'custom_premade_spec_npc'),
-(90032, 0, 'World Buffs', '', 60, 60, 35, 1, 13500, 108, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1.14286, 18, 5, 0, 7, 0, 0, 1, 1, 65, 1, 1, 1, 0.14, 0, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, '', 0, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, '');
+(90032, 0, 'World Buffs', '', 60, 60, 35, 1, 0, 108, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 1.14286, 18, 5, 0, 7, 0, 0, 1, 1, 65, 1, 1, 1, 0.14, 0, 2000, 2000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, '', 0, 3, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 'custom_world_buffs_npc');
 -- NPC_TRAINER
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90000, 499, 0, 0, 0, 20);
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90000, 1151, 0, 0, 0, 26);
@@ -480,6 +480,7 @@ INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillv
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10056, 0, 0, 0, 58);
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10141, 0, 0, 0, 40);
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10142, 0, 0, 0, 50);
+INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10143, 0, 0, 0, 60);
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10146, 0, 0, 0, 42);
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10147, 0, 0, 0, 52);
 INSERT INTO `npc_trainer` (`entry`, `spell`, `spellcost`, `reqskill`, `reqskillvalue`, `reqlevel`) VALUES (90002, 10152, 0, 0, 0, 42);
@@ -2332,3 +2333,4 @@ INSERT INTO `npc_gossip` (`npc_guid`, `textid`) VALUES (2000029, 90001);
 INSERT INTO `npc_gossip` (`npc_guid`, `textid`) VALUES (2000030, 90002);
 INSERT INTO `npc_gossip` (`npc_guid`, `textid`) VALUES (2000031, 90003);
 INSERT INTO `npc_gossip` (`npc_guid`, `textid`) VALUES (2000032, 90004);
+INSERT INTO `npc_gossip` (`npc_guid`, `textid`) VALUES (2000033, 90005);
