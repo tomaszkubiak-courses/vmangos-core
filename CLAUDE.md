@@ -177,3 +177,17 @@ case the preferred fix is to extend `ScriptCommands` rather than hardcode the co
   `patch_min`/`patch_max` DB columns.
 - Accuracy to retail is the goal: any custom (non-Blizzlike) behaviour must sit behind a config
   option in `mangosd.conf.dist.in` and default to off.
+
+## Commits
+
+- **Never put a Claude session link in anything that leaves this machine.** No
+  `Claude-Session:` trailer, no `https://claude.ai/code/session_...` URL, and no session,
+  conversation, or transcript identifier in any form. This applies to commit messages, tags,
+  branch names, PR and issue text, code comments, documentation, and migration comments.
+  A session link is private to the account that owns it and is worthless to anyone reading
+  the history, so it is pure leaked metadata once pushed. Six commits in this repository
+  carried one before the rule existed; do not add a seventh.
+- `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` is the only Claude-related trailer
+  that belongs in a commit.
+- Follow the existing message style: an imperative subject line, then wrapped prose that
+  explains the problem before the fix.
