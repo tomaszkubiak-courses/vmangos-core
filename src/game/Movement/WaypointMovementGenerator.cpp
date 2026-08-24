@@ -31,7 +31,7 @@
 #include "Geometry.h"
 
 //-----------------------------------------------//
-float BuildIntPath(PointsArray& dstPath, PointsArray const& srcPath)
+static float BuildIntPath(PointsArray& dstPath, PointsArray const& srcPath)
 {
     Vector3 prevPoint = dstPath.back();
     float distance = 0;

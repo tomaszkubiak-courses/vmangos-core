@@ -29,15 +29,12 @@
 #include "WaypointManager.h"
 #include "CreatureGroups.h"
 #include "Player.h"
-#include "MoveSplineInitArgs.h"
 
 #include <vector>
 #include <set>
 
 #define FLIGHT_TRAVEL_UPDATE  100
 #define STOP_TIME_FOR_PLAYER  (30 * IN_MILLISECONDS)
-
-static float BuildIntPath(Movement::PointsArray& path, Movement::PointsArray const& genPath);
 
 template<class T, class P>
 class PathMovementBase
