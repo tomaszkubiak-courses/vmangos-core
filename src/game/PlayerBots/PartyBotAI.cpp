@@ -1010,12 +1010,10 @@ void PartyBotAI::UpdateInCombatAI()
 
             if (newVictim && (newVictim != pVictim))
             {
-                if (pVictim)
-                    me->AttackStop();
-                else
-                    AttackStart(newVictim);
-
-                return;
+                // Unit::Attack drops the previous victim itself when switching targets,
+                // so the swap happens in this update instead of the next one.
+                if (AttackStart(newVictim))
+                    return;
             }
         }
     }
