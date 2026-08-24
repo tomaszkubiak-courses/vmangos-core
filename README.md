@@ -30,6 +30,37 @@ This project is an independent continuation of the Elysium / LightsHope codebase
 - [Script Editor](https://github.com/brotalnia/scripteditor)
 - [Script Converter](https://github.com/vmangos/ScriptConverter)
 
+### Upstream
+
+This repository tracks [vmangos/core](https://github.com/vmangos/core). It is not a GitHub
+fork, so there is no "forked from" banner and no *Sync fork* button; the relationship lives
+in git history and in the `upstream` remote, not in GitHub metadata. Opening a pull request
+against VMaNGOS therefore needs a throwaway fork of their repository.
+
+Add the remote once, read-only so nothing is ever pushed to it by accident:
+
+```sh
+git remote add upstream https://github.com/vmangos/core.git
+git remote set-url --push upstream DISABLED
+```
+
+Then bring their `development` branch in as usual:
+
+```sh
+git fetch upstream
+git log --oneline development..upstream/development   # what is new
+git merge upstream/development
+```
+
+The pull requests listed under **Merged upstream pull requests** below are merged from their
+PR branches, which need an extra refspec:
+
+```sh
+git config --add remote.upstream.fetch "+refs/pull/*/head:refs/remotes/upstream/pr/*"
+git fetch upstream
+git merge upstream/pr/3540
+```
+
 ### Changes
 
 How this fork differs from upstream VMaNGOS.
