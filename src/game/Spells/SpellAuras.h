@@ -159,7 +159,7 @@ class SpellAuraHolder
         bool IsPositive() const;
         bool IsAreaAura() const;                            // if one from auras of holder applied as area aura
         bool IsWeaponBuffCoexistableWith(SpellAuraHolder const* ref) const;
-        bool IsNeedVisibleSlot(Unit const* caster) const;
+        bool IsNeedSlot(Unit const* caster) const;
         bool IsRemovedOnShapeLost() const { return m_isRemovedOnShapeLost; }
         void SetRemovedOnShapeLost(bool removed) { m_isRemovedOnShapeLost = removed; }
         bool IsInUse() const { return m_in_use;}
