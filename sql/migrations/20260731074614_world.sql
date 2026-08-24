@@ -9,9 +9,11 @@ INSERT INTO `migrations` VALUES ('20260731074614');
 -- Add your query below.
 
 -- Jadefire Run
-DELETE FROM `creature` WHERE `id` IN (7107, 7108, 7111, 10648);
+-- creature_movement is keyed by creature guid, so the waypoints have to go
+-- before the spawns they belong to, while those guids can still be looked up.
+DELETE FROM `creature_movement` WHERE `id` IN (SELECT `guid` FROM `creature` WHERE `id` IN (7107, 7108, 7111, 10648));
 
-DELETE FROM `creature_movement` WHERE (`id` IN (7107, 7108, 7111, 10648));
+DELETE FROM `creature` WHERE `id` IN (7107, 7108, 7111, 10648);
 
 SET @CGUID := 17221;
 
