@@ -831,7 +831,16 @@ void WorldSession::HandleUpdateAccountData(WorldPackets::Misc::UpdateAccountData
 
     if (!uncompressedData)
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "UAD: Failed to decompress account data");
+        // The client compresses account data into an output buffer sized to the uncompressed
+        // length, so a blob that does not shrink gets cut off at exactly that many bytes. The
+        // deflate stream then has no final block and no ADLER32, and the missing tail never
+        // left the client, so the data is unrecoverable. Nothing is wrong on our side and it
+        // stops happening as soon as the cache grows enough to compress, so do not shout.
+        if (packet.compressedData.size() >= packet.decompressedSize)
+            sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "UAD: Client failed to compress account data of type %u and sent a truncated stream of %u bytes.", packet.type, uint32(packet.compressedData.size()));
+        else
+            sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "UAD: Failed to decompress account data");
+
         return;
     }
 
