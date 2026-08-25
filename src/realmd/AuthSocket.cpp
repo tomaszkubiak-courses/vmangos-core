@@ -994,17 +994,25 @@ void AuthSocket::_HandleRealmList()
             return;
         }
 
-        // check for too frequent requests
+        // Check for too frequent requests. Clients do send a second CMD_REALM_LIST right
+        // after the first one, so such a request is answered from the previously built
+        // packet instead of rebuilding the list. Closing the socket is not an option: the
+        // client is waiting for a reply and would sit on the realm list screen forever.
         auto const minDelay = sConfig.GetIntDefault("MinRealmListDelay", 1);
         auto const now = std::chrono::steady_clock::now();
-        if (minDelay > 0 && self->m_lastRealmListRequest.has_value())
+        if (minDelay > 0 && self->m_lastRealmListRequest.has_value() && self->m_lastRealmListResponse)
         {
             auto const delay = std::chrono::duration_cast<std::chrono::seconds>(now - self->m_lastRealmListRequest.value()).count();
             if (delay < minDelay)
             {
-                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "user %s IP %s is sending CMD_REALM_LIST too frequently. Delay = %lld seconds", self->m_login.c_str(), self->GetRemoteIpString().c_str(), static_cast<long long>(delay));
+                sLog.Out(LOG_BASIC, LOG_LVL_DETAIL, "user %s IP %s is sending CMD_REALM_LIST too frequently. Delay = %lld seconds. Repeating the last response.", self->m_login.c_str(), self->GetRemoteIpString().c_str(), static_cast<long long>(delay));
 
-                self->CloseSocket(); // TODO: Remove me. Closing the socket will be done implicitly if all references to this socket are deleted (when there is no IO anymore)
+                // The timestamp is deliberately not refreshed here, so a client spamming
+                // the opcode still gets a freshly built list once the delay has elapsed.
+                self->m_socket.Write(self->m_lastRealmListResponse, [self](IO::NetworkError const& error)
+                {
+                    self->DoRecvIncomingData();
+                });
                 return;
             }
         }
@@ -1023,7 +1031,9 @@ void AuthSocket::_HandleRealmList()
         *pkt << (uint16)realmlistBuffer.size();
         pkt->append(realmlistBuffer);
 
-        self->m_socket.Write(std::move(pkt), [self](IO::NetworkError const& error)
+        self->m_lastRealmListResponse = std::move(pkt);
+
+        self->m_socket.Write(self->m_lastRealmListResponse, [self](IO::NetworkError const& error)
         {
             self->DoRecvIncomingData();
         });
