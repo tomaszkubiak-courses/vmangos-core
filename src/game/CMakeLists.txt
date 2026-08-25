@@ -446,6 +446,8 @@ set (game_SRCS
     PlayerBots/BattleBotWaypoints.h
     PlayerBots/PlayerBotAI.h
     PlayerBots/PlayerBotMgr.h
+    ModuleSlots.h
+    PlayerbotHooks.h
     Server/Protocol/Opcodes.h
     Server/Protocol/Opcodes_active.h
     Server/Packet.h
@@ -509,6 +511,13 @@ set (game_SRCS
     vmap/WorldModel.h
 
 )
+
+# The playerbots module supplies the bodies for the hooks declared in
+# PlayerbotHooks.h. Without the module, the empty ones in PlayerbotStubs.cpp keep the
+# unconditional calls in the core linkable.
+if(NOT BUILD_PLAYERBOTS)
+  list(APPEND game_SRCS PlayerbotStubs.cpp)
+endif()
 
 if((${CMAKE_VERSION} VERSION_LESS "3.16") OR USE_PCH_OLD)
   list(APPEND game_SRCS

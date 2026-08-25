@@ -39,6 +39,7 @@
 #include "HonorMgr.h"
 #include "PlayerTaxi.h"
 #include "MirrorTimer.h"
+#include "ModuleSlots.h"
 
 #include <string>
 #include <utility>
@@ -2490,6 +2491,19 @@ class Player final: public Unit
         static uint32 GetRankFromDB(ObjectGuid guid);
         int GetGuildIdInvited() const { return m_guildIdInvited; }
         static void RemovePetitionsAndSigns(ObjectGuid guid, uint32 exceptPetitionId = 0);
+
+        /*********************************************************/
+        /***                  MODULE STORAGE                   ***/
+        /*********************************************************/
+
+        // Storage an optional module hangs its own per character state off. The core
+        // allocates the pointers and never dereferences them; see ModuleSlots.h.
+    public:
+        void* GetModuleSlot(uint8 slot) const { return slot < MODULE_SLOT_MAX ? m_moduleSlots[slot] : nullptr; }
+        void SetModuleSlot(uint8 slot, void* value) { if (slot < MODULE_SLOT_MAX) m_moduleSlots[slot] = value; }
+        template<class T> T* GetModuleSlotAs(uint8 slot) const { return static_cast<T*>(GetModuleSlot(slot)); }
+    private:
+        void* m_moduleSlots[MODULE_SLOT_MAX] = {};
 };
 
 inline Player* Object::ToPlayer()

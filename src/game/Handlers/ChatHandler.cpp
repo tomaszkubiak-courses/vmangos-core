@@ -33,6 +33,7 @@
 #include "Guild.h"
 #include "GuildMgr.h"
 #include "Player.h"
+#include "PlayerbotHooks.h"
 #include "SpellAuras.h"
 #include "Language.h"
 #include "Util.h"
@@ -248,6 +249,11 @@ void WorldSession::HandleChatMessageOpcode(WorldPackets::Chat::ChatMessage const
             if (a->isMuted(GetAccountId(), true, packet.type))
                 return;
     }
+
+    // Offer the message to any bots this player commands. Placed after sanitizing and
+    // the antispam checks, so what the bots see is what the rest of the server sees.
+    if (_player)
+        Playerbot_OnChatCommand(_player, packet.type, packet.message, packet.lang, packet.whisperTargetOrChannel);
 
     // Message handling
     switch (packet.type)

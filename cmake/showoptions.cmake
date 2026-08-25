@@ -55,6 +55,12 @@ else()
   message(STATUS "Build extractors      : No (default)")
 endif()
 
+if(BUILD_PLAYERBOTS)
+  message(STATUS "Build playerbots      : Yes")
+else()
+  message(STATUS "Build playerbots      : No (default)")
+endif()
+
 if(BUILD_REALMMERGE)
   message(STATUS "Build realm merge     : Yes")
 else()

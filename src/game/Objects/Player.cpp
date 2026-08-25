@@ -73,6 +73,7 @@
 #include "ZoneScript.h"
 #include "ZoneScriptMgr.h"
 #include "PlayerBotMgr.h"
+#include "PlayerbotHooks.h"
 #include "PlayerBotAI.h"
 #include "AccountMgr.h"
 #include "Anticheat.h"
@@ -1243,6 +1244,9 @@ void Player::Update(uint32 update_diff, uint32 p_time)
     Unit::Update(update_diff, p_time);
     if (m_AI)
         m_AI->UpdateAI(p_time);
+    // Inside the delay-teleport window, so a teleport a module starts is deferred the
+    // same way one from PlayerAI is.
+    Playerbot_OnPlayerUpdate(this, update_diff);
     SetCanDelayTeleport(false);
 
     time_t now = time(nullptr);

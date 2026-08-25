@@ -41,6 +41,7 @@
 #include "MasterPlayer.h"
 #include "PlayerBroadcaster.h"
 #include "PlayerBotMgr.h"
+#include "PlayerbotHooks.h"
 #include "MapManager.h"
 #include "AccountMgr.h"
 
@@ -444,6 +445,12 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
         }
 
         alreadyOnline = true;
+
+        // A person is taking over a character a module was driving. Hand it back before
+        // the session is swapped, or the module keeps ticking on the new owner and fights
+        // the login handshake.
+        Playerbot_OnReleaseToClient(pCurrChar);
+
         pCurrChar->GetSession()->SetPlayer(nullptr);
         pCurrChar->SetSession(this);
 
@@ -686,6 +693,8 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
 
     m_playerLoading = false;
     delete holder;
+
+    Playerbot_OnPlayerLogin(pCurrChar);
 
     if (alreadyOnline)
     {
