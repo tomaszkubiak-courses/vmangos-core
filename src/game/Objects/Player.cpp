@@ -3895,7 +3895,11 @@ bool Player::AddSpell(uint32 spellId, bool active, bool learning, bool dependent
         CastSpell(this, spellId, true);
     }
     // also cast passive (and passive like) spells (including all talents without SPELL_EFFECT_LEARN_SPELL) with additional checks
-    else if (IsNeedCastPassiveLikeSpellAtLearn(spellInfo))
+    // the aura can already be active here, in which case casting the spell again would only add the
+    // cooldown a second time. A warrior is the case that shows it: _LoadAuras casts Battle Stance to
+    // guarantee a stance before any spell is loaded, and the stance is then learned a few lines later
+    // because it is auto learned from the class skill and _SaveSpells never stores dependent spells.
+    else if (IsNeedCastPassiveLikeSpellAtLearn(spellInfo) && !HasAura(spellId))
         CastSpell(this, spellId, true);
     else if (spellInfo->HasEffect(SPELL_EFFECT_SKILL_STEP))
     {
