@@ -269,6 +269,21 @@ void CreatureAI::SetMeleeAttack(bool enabled)
     }
 }
 
+void CreatureAI::SetReactState(ReactStates state)
+{
+    m_creature->SetCreatureReactState(state);
+}
+
+ReactStates CreatureAI::GetReactState() const
+{
+    return m_creature->GetCreatureReactState();
+}
+
+bool CreatureAI::HasReactState(ReactStates state) const
+{
+    return m_creature->HasCreatureReactState(state);
+}
+
 void CreatureAI::SetCombatMovement(bool enabled)
 {
     if (m_bCombatMovement == enabled)

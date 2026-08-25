@@ -550,8 +550,24 @@ bool WorldSession::Update(PacketFilter& updater)
 
 bool WorldSession::CanProcessPackets() const
 {
+#ifdef BUILD_PLAYERBOTS
+    if (_player && m_playerbotSession)
+        return true;
+#endif
+
     return ((m_socket && !m_socket->IsClosing()) || (_player && (m_bot || sPlayerBotMgr.IsChatBot(_player->GetGUIDLow()))));
 }
+
+#ifdef BUILD_PLAYERBOTS
+void WorldSession::ProcessQueuedPacketsNow()
+{
+    MapSessionFilter mapUpdater(this);
+    ProcessPackets(mapUpdater);
+
+    WorldSessionFilter worldUpdater(this);
+    ProcessPackets(worldUpdater);
+}
+#endif
 
 void WorldSession::ProcessPackets(PacketFilter& updater)
 {

@@ -233,6 +233,18 @@ bool LFGQueue::IsGroupInQueue(uint32 groupId) const
     return m_queuedGroups.find(groupId) != m_queuedGroups.end();
 }
 
+LFGPlayerQueueInfo const* LFGQueue::GetPlayerQueueInfo(ObjectGuid const& plrGuid) const
+{
+    auto itr = m_queuedPlayers.find(plrGuid);
+    return itr != m_queuedPlayers.end() ? &itr->second : nullptr;
+}
+
+LFGGroupQueueInfo const* LFGQueue::GetGroupQueueInfo(uint32 groupId) const
+{
+    auto itr = m_queuedGroups.find(groupId);
+    return itr != m_queuedGroups.end() ? &itr->second : nullptr;
+}
+
 void LFGQueue::UpdateGroup(LFGGroupQueueInfo const& groupInfo, bool join, ObjectGuid playerGuid, uint32 groupId)
 {
     auto itr = m_queuedGroups.find(groupId);

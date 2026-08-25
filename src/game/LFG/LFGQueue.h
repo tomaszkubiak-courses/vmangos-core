@@ -61,6 +61,12 @@ class LFGQueue
         bool IsPlayerInQueue(ObjectGuid const& plrGuid) const;
         bool IsGroupInQueue(uint32 groupId) const;
 
+        // What a queued player or group is waiting for, or nullptr when not queued. Read by
+        // the playerbots module, which fills out the queue with bots for the dungeon real
+        // players are waiting on.
+        LFGPlayerQueueInfo const* GetPlayerQueueInfo(ObjectGuid const& plrGuid) const;
+        LFGGroupQueueInfo const* GetGroupQueueInfo(uint32 groupId) const;
+
         void UpdateGroup(LFGGroupQueueInfo const& groupInfo, bool join, ObjectGuid playerGuid, uint32 groupId);
         void RestoreOfflinePlayer(ObjectGuid playerGuid);
 

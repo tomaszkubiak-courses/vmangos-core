@@ -366,6 +366,10 @@ class Group
         void NeedBeforeGreed(Creature* creature, Loot* loot);
         void MasterLoot(Creature* creature, Loot* loot, Player* player);
         bool CountRollVote(Player* player, ObjectGuid const& lootedTarget, uint32 itemSlot, RollVote vote);
+        // The roll running for one item of one loot, if there is one. The playerbots
+        // module reads what is being rolled on from here: its own view of the loot is
+        // gone by then, but the roll lasts the whole countdown.
+        Roll const* GetActiveRoll(ObjectGuid const& lootedTarget, uint32 itemSlot) const;
         void StartLootRoll(Creature* lootTarget, LootMethod method, Loot* loot, uint8 itemSlot);
         void EndRoll(Loot* loot);
 

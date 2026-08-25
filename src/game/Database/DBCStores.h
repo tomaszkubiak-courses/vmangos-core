@@ -27,6 +27,7 @@
 #include "DBCStructure.h"
 
 #include <list>
+#include <map>
 
 bool IsAcceptableClientBuild(uint32 build);
 std::string AcceptableClientBuildsListStr();
@@ -59,6 +60,10 @@ extern DBCStorage <BankBagSlotPricesEntry>       sBankBagSlotPricesStore;
 //extern DBCStorage <ChatChannelsEntry>           sChatChannelsStore; -- accessed using function, no usable index
 extern DBCStorage <CharacterFacialHairStylesEntry>  sCharacterFacialHairStylesStore;
 extern DBCStorage <CharSectionsEntry>            sCharSectionsStore;
+// The same rows keyed by section type, gender and race, which is how anything that
+// picks an appearance wants to read them. Built once, next to the DBC load.
+typedef std::multimap<uint32, CharSectionsEntry const*> CharSectionsMap;
+extern CharSectionsMap sCharSectionMap;
 extern DBCStorage <ChrClassesEntry>              sChrClassesStore;
 extern DBCStorage <ChrRacesEntry>                sChrRacesStore;
 extern DBCStorage <CinematicSequencesEntry>      sCinematicSequencesStore;

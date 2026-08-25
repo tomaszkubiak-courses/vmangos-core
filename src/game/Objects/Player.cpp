@@ -3096,6 +3096,24 @@ bool Player::IsGroupVisibleFor(Player const* p) const
     }
 }
 
+bool Player::IsInGroup(Unit const* other, bool raid) const
+{
+    if (!other)
+        return false;
+
+    Player const* player = other->ToPlayer();
+    if (!player)
+    {
+        if (Unit const* owner = other->GetCharmerOrOwner())
+            player = owner->ToPlayer();
+    }
+
+    if (!player)
+        return false;
+
+    return raid ? IsInSameRaidWith(player) : IsInSameGroupWith(player);
+}
+
 bool Player::IsInSameGroupWith(Player const* p) const
 {
     return (p == this || (GetGroup() != nullptr &&
@@ -17521,6 +17539,20 @@ void Player::Say(char const* text, uint32 const language) const
     ChatHandler::BuildChatPacket(data, CHAT_MSG_SAY, text, Language(language), GetChatTag(), GetObjectGuid(), GetName());
     float range = std::min(sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY), GetYellRange());
     SendMessageToSetInRange(&data, range, true);
+}
+
+void Player::Whisper(char const* text, uint32 const language, ObjectGuid receiver) const
+{
+    Player* target = ObjectAccessor::FindPlayer(receiver);
+    if (!target || !target->GetSession())
+        return;
+
+    // Whispers are always readable, addon traffic aside.
+    uint32 lang = (language != LANG_ADDON) ? uint32(LANG_UNIVERSAL) : language;
+
+    WorldPacket data;
+    ChatHandler::BuildChatPacket(data, CHAT_MSG_WHISPER, text, Language(lang), GetChatTag(), GetObjectGuid(), GetName());
+    target->GetSession()->SendPacket(&data);
 }
 
 float Player::GetYellRange() const

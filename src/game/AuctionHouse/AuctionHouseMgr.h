@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <memory>
+#include <mutex>
 
 #include "Common.h"
 #include "SharedDefines.h"
@@ -82,6 +83,10 @@ struct AuctionEntry
     AuctionHouseEntry const* auctionHouseEntry;             // in AuctionHouse.dbc
 
     // helpers
+    // Stack size and random property of what is being auctioned. Both live on the Item,
+    // which the auction refers to by guid, so they are lookups rather than fields.
+    uint32 GetItemCount() const;
+    int32 GetItemRandomPropertyId() const;
     uint32 GetHouseId() const { return auctionHouseEntry->houseId; }
     uint32 GetHouseFaction() const { return auctionHouseEntry->faction; }
     uint32 GetAuctionCut() const;
@@ -90,6 +95,29 @@ struct AuctionEntry
     void DeleteFromDB() const;
     void SaveToDB() const;
     bool IsAvailableFor(Player* player);
+};
+
+// A plain copy of the fields of an auction, taken while the auction house is locked.
+// The playerbots module's auction house bot runs on a thread of its own: it cannot hold a
+// pointer into AuctionsMap across a world tick, because the world thread deletes expired
+// entries out from under it. It reads a snapshot instead. itemCount is resolved here
+// because it lives on the auctioned Item, not on the auction.
+struct AuctionSnapshot
+{
+    uint32 Id = 0;
+    uint32 itemGuidLow = 0;
+    uint32 itemTemplate = 0;
+    uint32 itemCount = 0;
+    uint32 owner = 0;
+    uint32 ownerAccount = 0;
+    uint32 bidder = 0;
+    uint32 startbid = 0;
+    uint32 bid = 0;
+    uint32 buyout = 0;
+    uint32 deposit = 0;
+    uint32 houseId = 0;
+    time_t depositTime = 0;
+    time_t expireTime = 0;
 };
 
 struct AuctionHouseClientQuery
@@ -116,8 +144,24 @@ class AuctionHouseObject
 
         typedef std::map<uint32, AuctionEntry*> AuctionEntryMap;
         typedef std::multimap<uint32, AuctionEntry*> AuctionMultiMap;
+        typedef std::pair<AuctionEntryMap::const_iterator, AuctionEntryMap::const_iterator> AuctionEntryMapBounds;
 
-        uint32 GetCount() { return AuctionsMap.size(); }
+        // The auction map is read from more than the world thread - the playerbots module's
+        // auction house bot has its own - so every walk of it happens under this lock. It is
+        // recursive because Update() holds it across RemoveAuction().
+        typedef std::recursive_mutex LockType;
+        typedef std::lock_guard<LockType> Guard;
+        LockType& GetLock() const { return m_lock; }
+
+        // Iteration over the live entries. The caller must hold GetLock() for as long as it
+        // uses the pair, and must not keep a pointer past that.
+        AuctionEntryMapBounds GetAuctionsBounds_locked() const { return AuctionEntryMapBounds(AuctionsMap.begin(), AuctionsMap.end()); }
+
+        // Copies every live auction out under the lock. The way to read the auction house
+        // from another thread without holding it up.
+        std::vector<AuctionSnapshot> GetAuctionsSnapshot() const;
+
+        uint32 GetCount() { Guard guard(m_lock); return AuctionsMap.size(); }
 
         AuctionEntryMap *GetAuctions() { return &AuctionsMap; }
 
@@ -125,6 +169,7 @@ class AuctionHouseObject
 
         AuctionEntry* GetAuction(uint32 id) const
         {
+            Guard guard(m_lock);
             AuctionEntryMap::const_iterator itr = AuctionsMap.find(id);
             return itr != AuctionsMap.end() ? itr->second : nullptr;
         }
@@ -138,8 +183,10 @@ class AuctionHouseObject
         void BuildListAuctionItems(WorldPacket& data, Player* player,
                 AuctionHouseClientQuery const& query,
             uint32& count, uint32& totalcount);
-        uint32 GetAccountAuctionCount(uint32 accountId) { return AccountAuctionMap.count(accountId); }
+        uint32 GetAccountAuctionCount(uint32 accountId) { Guard guard(m_lock); return AccountAuctionMap.count(accountId); }
     private:
+        mutable LockType m_lock;
+
         // Map BUYOUT prices to entry for pre-sorted results. We maintain it in
         // a map rather than build the list on query for performance reasons.
         // Similarly, maintain a map of account ID -> auction entry

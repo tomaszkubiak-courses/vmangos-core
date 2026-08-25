@@ -46,6 +46,9 @@ class ChannelMgr
         void LeftChannel(std::string const& name);
         void CreateDefaultChannels();
         static void AnnounceBothFactionsChannel(std::string const& channelName, ObjectGuid playerGuid, char const* message);
+        // The channels this faction has open, keyed by lowercased name. Read by the
+        // playerbots module, which picks the zone channel a bot should talk in.
+        ChannelMap const& GetChannels() const { return channels; }
     private:
         ChannelMap channels;
 };

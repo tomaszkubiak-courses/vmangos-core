@@ -515,7 +515,9 @@ set (game_SRCS
 # The playerbots module supplies the bodies for the hooks declared in
 # PlayerbotHooks.h. Without the module, the empty ones in PlayerbotStubs.cpp keep the
 # unconditional calls in the core linkable.
-if(NOT BUILD_PLAYERBOTS)
+if(BUILD_PLAYERBOTS)
+  list(APPEND game_SRCS Server/PlayerbotPacketAdapter.cpp)
+else()
   list(APPEND game_SRCS PlayerbotStubs.cpp)
 endif()
 
@@ -628,6 +630,12 @@ source_group("Anticheat"
 add_library(game STATIC
   ${game_SRCS}
 )
+
+if(BUILD_PLAYERBOTS)
+  # PUBLIC: the raw packet entry points are declared in WorldSession.h behind this,
+  # and the module has to see the same declarations the library was built with.
+  target_compile_definitions(game PUBLIC BUILD_PLAYERBOTS)
+endif()
 mangos_target_flags(game)
 if(GAME_EXTRA_CXX_FLAGS)
   target_compile_options(game PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${GAME_EXTRA_CXX_FLAGS}>)

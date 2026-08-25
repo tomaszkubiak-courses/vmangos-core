@@ -286,7 +286,7 @@ it faced.
 | Step | Work | Size |
 |---|---|---|
 | 1 | `ModuleSlots.h`, per-`Player` slot storage, and thirteen direct call sites into the module. The calls are unconditional and `PlayerbotStubs.cpp` carries the `BUILD_PLAYERBOTS=OFF` build, which keeps `#ifdef` noise out of the core — same arrangement as the donor. **Done**, `game.lib` and `mangosd.exe` both build | ~250 lines |
-| 2 | Handler adapter: 58 raw-`WorldPacket` overloads on `WorldSession` behind `#ifdef BUILD_PLAYERBOTS` | 150–300 lines, mechanical |
+| 2 | Handler adapter: 59 raw-`WorldPacket` entry points on `WorldSession` behind `#ifdef BUILD_PLAYERBOTS`. **Done** — `src/game/Server/PlayerbotPacketAdapter.cpp`. They are `BotHandleXOpcode` twins rather than overloads of `HandleXOpcode`, because `Opcodes.cpp` reads each handler's packet class off `decltype(&WorldSession::HandleXOpcode)` and a second overload makes that name ambiguous, which breaks the entire opcode table. Cost of the rename: the module's 136 call sites need `->HandleX(` rewritten to `->BotHandleX(` when it is vendored, which is one substitution | 470 lines, generated |
 | 2b | The module's `HandleMasterIncomingPacket` reads raw packet bytes. Our receive path parses a `WorldPacket` into a `ClientPacket` before queueing, so those bytes are gone by the time a handler has run and the `Playerbot_OnPacketHandled` hook fires with the parsed packet instead. The module side has to read the typed packet's fields rather than re-parse a buffer | unknown until the module is in |
 | 3 | vmangos compat shim: 60 absent methods as one-line wrappers, ~15 enum renames, ~20 real signature fixes | 600–900 lines |
 | 4 | Vendor the module, wire `BUILD_PLAYERBOTS`, add `PlayerbotStubs.cpp` and `HostHooks.cpp` equivalents | ~1 day |
@@ -296,6 +296,138 @@ it faced.
 
 The existing `src/game/PlayerBots/` (PartyBot, BattleBot) is expected to be removed or left
 disabled, following what tortoise did. That decision can wait until step 4.
+
+## Progress
+
+State as of 2026-08-25, all of it uncommitted except step 1.
+
+### Done
+
+**Step 1 — hooks and module slots.** Committed as `3bc9f2f91` on `feat/playerbots-port`.
+`ModuleSlots.h`, `PlayerbotHooks.h`, `PlayerbotStubs.cpp`, per-`Player` slot storage, thirteen
+call sites, the `BUILD_PLAYERBOTS` option. `game.lib` and `mangosd.exe` both build with it off,
+which is the default.
+
+**Step 2 — packet adapter.** `src/game/Server/PlayerbotPacketAdapter.cpp`, 59 `BotHandleXOpcode`
+entry points generated from `WorldSession.h`. Not overloads: `Opcodes.cpp` reads each handler's
+packet class off `decltype(&WorldSession::HandleXOpcode)`, and a second overload makes that
+ambiguous, which breaks the whole opcode table. The module's 99 call sites were rewritten to the
+prefixed names.
+
+**Step 4 — module vendored.** `src/modules/PlayerBots/`, 1021 files, 44 MB, wired into CMake
+behind `BUILD_PLAYERBOTS` (off by default). Its build file was rewritten for this tree.
+
+**Boost removed** from the vendored code, since this tree ships none and deliberately wrote its
+own replacements (`src/shared/IO/README.md`). `playerbot/BotStringAlgo.h` replaces the five
+`boost::algorithm` functions; `std::thread` replaces `boost::thread`; `cpptrace` replaces
+`boost::stacktrace`; `IO::Filesystem::GetAllFilesInFolder` replaces
+`boost::filesystem::directory_iterator`; a five-line hasher replaces `boost::hash`;
+`boost::bimap` was included but never used. `PlayerbotCommandServer` - an external TCP port for
+driving bots from outside the game, and the only user of `boost::asio` - was dropped, which
+leaves `AiPlayerbot.CommandServerPort` inert.
+
+**The hook glue.** The donor's three AzerothCore script classes became the `Playerbot_*` free
+functions at the end of `playerbot/HostHooks.cpp`; `PlayerbotScripts.cpp` is gone.
+
+**The module builds at C++17** while the core stays at C++14 - the vendored tree assumes 17
+(`std::string_view` in ten files, inline variables). Mixing standard levels per target is
+supported within one toolset.
+
+### The donor's shim, adapted
+
+Much of `cmangos-compat-shim.h` turned out to be working around gaps in Turtle's core that this
+one does not have:
+
+| The donor stubbed | Reality here |
+|---|---|
+| A hand-written `CharSections.dbc` parser, ~90 lines of `fopen`/`fread` | `DBCStores.cpp` loads it and publishes `sCharSectionMap` in the same shape |
+| `ChatChannelsEntry` rebuilt from a DB table, with `pattern[]` rewired to owned strings | The DBC struct here already carries `pattern[8]`, which is what cmangos reads |
+| `BarGoLink` | Real: `src/shared/ProgressBar.h` |
+| `TimePoint` | Real: `Common.h`, at millisecond precision |
+| `GenericTransport` as an alias for `Transport` | A real base class here |
+| `TransportAnimation` and friends | Real: `Transports/TransportMgr.h` |
+| `LfgRoles`, `LfgRolePriority` | Real enums: `src/game/LFG/LFGDefines.h` |
+| `GetApplicationStartTime` | Real: `src/shared/Timer.h` |
+
+### Core changes the port has needed so far
+
+Beyond step 1 and step 2. Every one of them is a seam the module needs, written so a reader who
+has never heard of the module can still tell what the method is for:
+
+| Where | What | Why |
+|---|---|---|
+| `Handlers/LoginQueryHolder.h` | `LoginQueryHolder` extracted from `CharacterHandler.cpp` | the module logs bots in through `HandlePlayerLogin`, which takes one |
+| `Player` | `CalculateTalentsPoints`, `GetQuestSlotQuestId`, `SetQuestSlot`, `SetVisibleItemSlot`, `UpdateSkillsForLevel` moved to public | all side-effect-free or field-level; the module walks the quest log and rerolls item properties the way the client would |
+| `Player` | `Say(std::string const&, uint32)`, `Yell(std::string const&, uint32)` overloads | the module builds every line as a `std::string` |
+| `Player` | `IsInGroup(Unit const*, bool raid)` | asked of whatever a bot is about to buff or heal, which is a `Unit*` far more often than a `Player*` |
+| `Player` | `Whisper(char const*/std::string const&, uint32, ObjectGuid)` | whispers run through `MasterPlayer` here; a bot has no client and whispers a `Player` already in the world |
+| `Unit` | `GetTarget()` | the selection (`UNIT_FIELD_TARGET`), which is not the same question as `GetVictim()` |
+| `CreatureAI` | `SetReactState` / `GetReactState` / `HasReactState` forwarders | react state lives on `Creature` here; the module drives a bot's pet through its AI |
+| `Group` | `GetActiveRoll(lootedTarget, itemSlot)` | the module reads what is being rolled on after its own view of the loot is gone |
+| `Loot` | `GetLootingPlayers()` | so a bot does not release loot it never opened |
+| `BattleGroundWS` | `GetFlagCarrierGuid(teamIndex)` | the same two guids by index rather than by side |
+| `AuctionHouseMgr` | `AuctionSnapshot`, a recursive lock on `AuctionHouseObject` with `GetLock()` / `GetAuctionsBounds_locked()` / `GetAuctionsSnapshot()`, and `AuctionEntry::GetItemCount()` / `GetItemRandomPropertyId()` | ahbot runs on its own thread and cannot hold a pointer into `AuctionsMap` across a tick. Every mutator now takes the lock |
+| `DBCStores` | `CharSectionsMap` typedef and `sCharSectionMap` published | the module rolls a random appearance out of it |
+| `LFGQueue` | `GetPlayerQueueInfo` / `GetGroupQueueInfo` | the module fills the queue out with bots for what real players are waiting on |
+| `ChannelMgr` | `GetChannels()` | the module picks the zone channel a bot should talk in |
+| `WorldSession` | `SetPlayerbotSession` / `IsPlayerbotSession`, `ProcessQueuedPacketsNow()`, `SetPlayerLoading` | a driven character has no socket, so `CanProcessPackets()` would drop everything it queues for itself. Without this the queue is a silent no-op at runtime |
+
+### Deliberately not ported
+
+Each of these is a cmangos extension with no counterpart here. The call sites are stubbed with a
+comment pointing back at this section rather than left to rot:
+
+- **Navmesh avoid-areas.** `PathFinder::setArea` / `getArea` / `setAreaCost` paint and price
+  navmesh polygons in cmangos. This core's `PathInfo` only queries the mesh. `SetAvoidAreaAction`
+  and the `avoid add` / `avoid scan` debug commands return false; the RTSC debug line prints the
+  position without area flags. Restoring it means a real pathfinder feature, not a shim.
+- **`MotionMaster::MoveFall`.** No such generator here; a fall runs on its own movement flags.
+- **`MotionMaster::MovePath`.** Replaced by launching a spline directly (`BotMovePath` in the
+  shim), which is what this core's own debug movement does.
+- **High Elf.** A Turtle-only playable race. Its entries were removed from the bot's race lists
+  rather than mapped onto something else.
+- **Per-map active zones.** cmangos's `Map` records which zones hold a player. Asking this core's
+  map would count bots as players and defeat the purpose, so `RandomPlayerbotMgr` answers it from
+  the real players it already tracks (`HasRealPlayerInZone` / `HasRealPlayerOnMap`).
+- **Consumable subclasses.** `ITEM_SUBCLASS_POTION`/`FOOD`/... are commented out in
+  `ItemPrototype.h` because pre-BC `item_template` only ever uses subclass 0. The shim declares
+  them so the bot's classification compiles; on vanilla data those branches never match and the
+  spell-effect checks beside them decide instead.
+- **`PlayerbotCommandServer`** (dropped with boost::asio, see above) and the perf-mon GM command,
+  which the donor's core declared on `ChatHandler`. This tree's command table is
+  `ChatHandler::getCommandTable()` and the module does not extend it yet.
+
+### Where it stands
+
+The module compiles its PCH and shim and the build reaches all 400-odd bot translation units.
+Distinct compile errors across passes: **1400 → 902 → 687 → 412 → 423**, and `game.lib` builds
+clean after every core change.
+
+The count is not monotonic on purpose: a file that used to die on line 50 now compiles to line
+900, so each pass both clears a family and uncovers the next one behind it. What is left is a
+flat tail of small decisions - no cluster is larger than about a dozen - spread over
+`PlayerbotAI.cpp`, `DebugAction.cpp`, `RandomPlayerbotMgr.cpp`, `TravelNode.cpp` and
+`MovementActions.cpp`.
+
+Families cleared so far, as a record of what the work looks like: spell casting entry points
+(`SpellStart`→`prepare`, `IsSpellReady`, `AddCooldown`, `RemoveSpellCooldown`, `CastCustomSpell`
+base points), quest log and quest sharing, trainer spells (`learnedSpell` resolved from the
+spell's `SPELL_EFFECT_LEARN_SPELL` effects), mail (which lives on `MasterPlayer` here), loot
+(fields, slots, release through the handler), auctions (snapshots, buyout through
+`BotHandleAuctionPlaceBid`), gossip text (npc_text ids into `broadcast_text`), chat channels,
+distances (`SizeFactor` rather than `DistanceCalculation` - note cmangos returns the *square* for
+`DIST_CALC_NONE` and this core does not), creature template fields, area entries, taxi paths
+(`Path<>` is indexable but not iterable), config keys, and the logger.
+
+### Not yet started
+
+- Step 2b, the master-packet path. `Playerbot_OnPacketHandled` is currently an empty body: the
+  module's `HandleMasterIncomingPacket` reads raw bytes and this core has only the parsed packet
+  by then. Bots will not mirror their owner's actions until it is done.
+- LFG. `MeetingStoneInfo` is defined in the shim so the code compiles, but nothing fills a set,
+  and `LfgActions.cpp` still calls handlers this core does not have.
+- Step 6, the SQL import.
+- Step 7, first boot.
 
 ## Two fixes worth taking regardless
 

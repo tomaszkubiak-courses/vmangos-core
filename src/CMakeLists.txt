@@ -26,6 +26,12 @@ add_subdirectory(shared)
 add_subdirectory(framework)
 add_subdirectory(realmd)
 add_subdirectory(game)
+
+# After game: the module compiles against its headers. Before mangosd: that links it.
+if(BUILD_PLAYERBOTS)
+  add_subdirectory(modules/PlayerBots)
+endif()
+
 add_subdirectory(mangosd)
 
 if(USE_SCRIPTS)
