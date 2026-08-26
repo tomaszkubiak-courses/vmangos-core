@@ -299,7 +299,8 @@ disabled, following what tortoise did. That decision can wait until step 4.
 
 ## Progress
 
-State as of 2026-08-25, all of it uncommitted except step 1.
+State as of 2026-08-26. Steps 1 through 6 are committed on `feat/playerbots-port`; step 7,
+first boot, is underway.
 
 ### Done
 
@@ -491,8 +492,44 @@ to 0.
   by then. Bots will not mirror their owner's actions until it is done.
 - LFG. `MeetingStoneInfo` is defined in the shim so the code compiles, but nothing fills a set,
   and `LfgActions.cpp` still calls handlers this core does not have.
-- Step 6, the SQL import.
-- Step 7, first boot.
+
+### Step 7 - first boot
+
+The first boot with `AiPlayerbot.Enabled = 1` found two classes of problem, both of them the
+kind that only runtime can find.
+
+**The module's raw SQL is written against other cores' column names.** It talks to core tables
+by hand, and VMaNGOS renamed most of them at some point: `characters.totaltime` is
+`played_time_total` here, `guild.guildid` is `guild_id`, `character_pet.owner` is `owner_guid`,
+`character_inventory.item` is `item_guid`, `item_instance.itemEntry` is `item_id`,
+`mail.receiver` is `receiver_guid`, and `creature_template` has no `unit_flags` at all - the
+spawn unit flags live in `static_flags1`. That last one killed the boot outright:
+`PrepareTeleportCache` runs its query through `Database::PQuery`, a failed query reaches
+`MySQLConnection::HandleMySQLError`, and that asserts.
+
+Nothing checks these strings at build time, so the whole module was swept at once: extract every
+SQL literal from the sources, substitute the printf placeholders, and run each through `EXPLAIN`
+against the live schema. 273 statements, thirteen of them wrong. Worth repeating after any large
+merge from the donor.
+
+**The first boot builds three item caches, and they were slow enough to look hung.** The
+equipment cache is 9 classes x 60 levels x 19 slots x 7 qualities, and each cached item was its
+own `INSERT`. Outside a transaction `Database::PExecute` hands every statement to the async
+connection separately, so each row was its own commit and its own disk flush - about 170 rows a
+second, which put the equipment cache alone at three hours. The three builds now batch into
+transactions.
+
+Two things to know about these caches when a boot goes wrong:
+
+- They are built only when their table is **empty**, so an interrupted build leaves a partial
+  cache that the next boot happily loads and never completes. Truncate the table rather than
+  restarting into it.
+- Progress goes to `logs/bots.log` at DETAIL level, not to `Server.log`. `Server.log` stopping
+  at "Loading Race/Class probabilities" means the cache build is running, not that the server
+  is stuck.
+
+The tele cache (276k rows) and the item info cache are built the same way and survive across
+boots, so they are only paid for once.
 
 ## Two fixes worth taking regardless
 
