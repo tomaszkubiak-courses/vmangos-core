@@ -442,6 +442,48 @@ turned up only at link time:
   into `src/scripts/world/world_event_wareffort.cpp` unconditionally, so mangosd cannot link
   without it.
 
+### Step 6 - the SQL
+
+`src/modules/PlayerBots/sql/` splits by database, and that split matches which handle the
+module queries each table through:
+
+| Where | Files | Into |
+|---|---|---|
+| `sql/characters/` | ahbot, cache, custom_strategy, db_store, names, random_bots | the **characters** DB (`CharacterDatabase`) |
+| `sql/world/` + `sql/world/classic/` | rpg_races, texts, enchants, named_location, travel_nodes, weightscales, zone_level | the **world** DB (`WorldDatabase`) |
+| `sql/world/ai_playerbot_indexes.sql` | eight indexes on `*_loot_template(item)` | the world DB, after the rest |
+
+The travel node data is the bulk of it: 414k rows in `ai_playerbot_travelnode_path`, 54k in
+`ai_playerbot_named_location`. Import takes a couple of minutes and needs a `max_allowed_packet`
+of a few hundred MB (this server runs with 256M).
+
+**Twelve of those tables shipped as MyISAM, and were changed to InnoDB on the way in.** This
+tree requires InnoDB everywhere: the core wraps multi-table writes in transactions, and once
+`enforce_gtid_consistency` is on - the default from MySQL 8.4 - a transaction that touches a
+non-transactional table is rejected outright and the statement is dropped without stopping the
+save. The bot caches are written from inside such transactions, so as MyISAM they would have
+looked like they worked and quietly lost rows. `ROW_FORMAT=FIXED` went with them; it is a MyISAM
+row format.
+
+The index file is left as module SQL rather than turned into a core migration on purpose:
+`BUILD_PLAYERBOTS` is off by default, and a migration would make an index that only the bots
+need mandatory for every server, since `Database::CheckRequiredMigrations` refuses to start
+without it.
+
+### Step 5 - the config
+
+`aiplayerbot.conf` sits next to `mangosd.conf` and is found from it: the module takes the
+directory of whatever mangosd.conf is in use and looks for `aiplayerbot.conf` there, falling
+back to `AiPlayerbot.ConfigFile` in mangosd.conf and then to the compiled-in `SYSCONFDIR` path.
+So no mangosd.conf change is needed to enable bots.
+
+The shipped defaults are not first-boot settings: `RandomBotAutologin` and
+`RandomBotLoginAtStartup` are on, with `MinRandomBots = MaxRandomBots = 1000` over 500 accounts.
+A first run wants the subsystem on but nothing spawning by itself - autologin off, and the
+random-bot counts small enough that turning it on later is an experiment rather than five
+hundred account creations. `ahbot.conf` is a separate file and its own `AhBot.Enabled` defaults
+to 0.
+
 ### Not yet started
 
 - Step 2b, the master-packet path. `Playerbot_OnPacketHandled` is currently an empty body: the
