@@ -299,8 +299,9 @@ disabled, following what tortoise did. That decision can wait until step 4.
 
 ## Progress
 
-State as of 2026-08-26. Steps 1 through 6 are committed on `feat/playerbots-port`; step 7,
-first boot, is underway.
+State as of 2026-08-26. Steps 1 through 7 are committed on `feat/playerbots-port`. The server
+boots with the bot subsystem on, creates its bot characters, logs them in, and stays up with a
+few hundred of them playing.
 
 ### Done
 
@@ -529,7 +530,67 @@ Two things to know about these caches when a boot goes wrong:
   is stuck.
 
 The tele cache (276k rows) and the item info cache are built the same way and survive across
-boots, so they are only paid for once.
+boots, so they are only paid for once. The equipment cache settles at about a million rows;
+with the writes batched, a boot that reuses all of them takes under a minute.
+
+### Step 7 - the bots exist
+
+Three more faults stood between "the subsystem starts" and "there are bots in the world", and
+all three were silent - the run reported `30 random bot accounts with 270 characters available`
+while `characters` held nothing. That number is accounts times nine, computed rather than
+counted; do not trust it.
+
+**Nothing the factory created was saved.** `Player::Create` only builds a character in memory.
+This core writes new characters through `Player::SaveNewPlayer`, from the char-create handler,
+which the factory never goes near - and `Create` sets `m_saveDisabled`, because that path only
+ever built temporary bots here (`.partybot` and friends are memory-only). The donor's save is
+commented out, leaning instead on the cleanup pass at the end of `CreateRandomBots`, which
+calls `WorldSession::LogoutPlayer` - and *that* returns immediately, because the session's
+player pointer is never set. Starting items need no help: the core grants them on first login,
+when the character has no items and no played time.
+
+**Human hunters.** The donor's `availableRaces` table carries combinations this core does not
+have. Absent an explicit `AiPlayerbot.ClassRaceProb.<class>.<race>` the pair inherits the race
+default of 100, and the config loader's "ignore impossible combinations" pass consults that same
+table, so nothing filtered it. `isAvailableRace` asks `playercreateinfo` now - the same source
+`Player::Create` checks before rejecting a pair.
+
+**A deadlock that had not fired yet.** `CreateRandomBot` holds `nameMutex` for its whole body
+and called `CreateRandomBotName`, which locks the same non-recursive mutex - certain to hang the
+world thread the first time a race and gender ran out of names.
+
+### Step 7 - it stays up
+
+Bots in the world produced three crashes and two floods. What made them tractable was giving the
+process a crash handler at all: `Master::_OnSignal` prints a stack for `SIGSEGV`, but an access
+violation on Windows never raises `SIGSEGV`, so mangosd used to vanish with nothing logged. An
+unhandled exception filter in `Main.cpp` now logs the exception code, the faulting address and a
+symbolised stack before Windows takes the process. Three bugs were named from it within minutes.
+
+- **Never delete a bot from inside its own update.** `PlayerbotAI::UpdateAIInternal` logs a bot
+  out when its timer is ready, `LogoutPlayerBot` defaults `allowInstant` to true, and the instant
+  path deletes the Player - all of it under `Playerbot_OnPlayerUpdate`, inside `Player::Update`.
+  The core's next line then read freed memory. Such requests are queued now and performed by
+  `Playerbot_OnWorldUpdate`, which sits past `sMapMgr.Update` in `World::Update` and so runs when
+  no map thread is touching the player.
+- **A spell this client does not have is not ready.** `SpellCaster::IsSpellReady` opens with
+  `spellEntry->Category`, and ten call sites in the module hand it `GetSpellEntry(id)` straight
+  from a lookup. The module names spell ids from all three expansions. Guarded in the core.
+- **`~TravelMgr` aborted every clean shutdown.** Its destructor called `Clear()`, which walks the
+  players through `sObjectAccessor`; at process exit that singleton may already be destroyed, and
+  reaching a dead one throws, which during static destruction is an instant terminate. The
+  destructor frees only its own memory now.
+- **Two log floods**, both harmless and both loud: `BotMovePath` launching a one-point spline
+  (891 errors in seven minutes) and Judgement with no seal casting spell id 0 (122). Fixed at the
+  source in each case.
+
+What is left is noise worth knowing but not worth chasing: a warrior occasionally re-casting a
+stance inside its one-second cooldown (about one line per warrior per run), and the module's
+multi-expansion pet spell list asking for ids 1.12 never had.
+
+**Diagnosing a bot crash here:** turn on `AiPlayerbot.EnableActionLog`, reproduce, and read the
+tail of `bots.log` - it names the bot and the phase it was in. It costs a line per bot update, so
+turn it off again afterwards.
 
 ## Two fixes worth taking regardless
 
