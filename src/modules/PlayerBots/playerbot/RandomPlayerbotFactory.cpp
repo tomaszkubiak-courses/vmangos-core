@@ -1175,7 +1175,7 @@ std::string RandomPlayerbotFactory::CreateRandomGuildName()
     uint32 id = urand(0, maxId);
     result = CharacterDatabase.PQuery("SELECT n.name FROM ai_playerbot_guild_names n "
             "LEFT OUTER JOIN guild e ON e.name = n.name "
-            "WHERE e.guildid IS NULL AND n.name_id >= '%u' LIMIT 1", id);
+            "WHERE e.guild_id IS NULL AND n.name_id >= '%u' LIMIT 1", id);
     if (!result)
     {
         sLog.outError("No more names left for random guilds");

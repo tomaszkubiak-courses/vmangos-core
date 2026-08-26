@@ -300,8 +300,8 @@ static uint32 GetEquippedItemLevel(uint32 botGuid, uint8 slot, uint32& outGuid)
 {
     outGuid = 0;
     auto result = CharacterDatabase.PQuery(
-        "SELECT ci.item, ii.itemEntry FROM character_inventory ci "
-        "JOIN item_instance ii ON ci.item = ii.guid "
+        "SELECT ci.item_guid, ii.item_id FROM character_inventory ci "
+        "JOIN item_instance ii ON ci.item_guid = ii.guid "
         "WHERE ci.guid = '%u' AND ci.bag = 0 AND ci.slot = '%u'",
         botGuid, slot);
     if (!result)
@@ -368,12 +368,12 @@ bool AhBot::TryEquipItem(uint32 bidder, uint32 itemGuidLow, ItemPrototype const*
     // A slot may have multiple rows if inventory was previously corrupted; clean them all.
     CharacterDatabase.PExecute(
         "DELETE ii FROM item_instance ii "
-        "JOIN character_inventory ci ON ci.item = ii.guid "
+        "JOIN character_inventory ci ON ci.item_guid = ii.guid "
         "WHERE ci.guid = '%u' AND ci.bag = 0 AND ci.slot = '%u'",
         bidder, slot);
     CharacterDatabase.PExecute("DELETE FROM character_inventory WHERE guid='%u' AND bag=0 AND slot='%u'", bidder, slot);
     CharacterDatabase.PExecute("UPDATE item_instance SET owner_guid='%u' WHERE guid='%u'", bidder, itemGuidLow);
-    CharacterDatabase.PExecute("INSERT INTO character_inventory (guid, bag, slot, item, item_template) VALUES ('%u', 0, '%u', '%u', '%u')",
+    CharacterDatabase.PExecute("INSERT INTO character_inventory (guid, bag, slot, item_guid, item_id) VALUES ('%u', 0, '%u', '%u', '%u')",
             bidder, slot, itemGuidLow, proto->ItemId);
     CharacterDatabase.CommitTransaction();
 
@@ -1461,7 +1461,7 @@ void AhBot::Dump()
 void AhBot::CleanupPropositions()
 {
     uint32 deliverTime = time(0) - 3600 * 24 * 2;
-    auto result = CharacterDatabase.PQuery("select id, receiver from mail where subject like 'AH Proposition%%' and deliver_time <= '%u'", deliverTime);
+    auto result = CharacterDatabase.PQuery("select id, receiver_guid from mail where subject like 'AH Proposition%%' and deliver_time <= '%u'", deliverTime);
     if (!result)
         return;
 

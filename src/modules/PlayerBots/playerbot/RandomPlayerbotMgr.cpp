@@ -1213,7 +1213,7 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
 
                 if (noCriteria == 2)
                 {
-                    result = CharacterDatabase.PQuery("SELECT guid, level, totaltime, race, class FROM characters WHERE account = '%u'", accountId);
+                    result = CharacterDatabase.PQuery("SELECT guid, level, played_time_total, race, class FROM characters WHERE account = '%u'", accountId);
                 }
                 else
                 {
@@ -1222,8 +1222,8 @@ uint32 RandomPlayerbotMgr::AddRandomBots()
                     bool rndCanIncrease = !sPlayerbotAIConfig.disableRandomLevels && randomAvgLevel > currentAvgLevel;
                     bool rndCanLower = !sPlayerbotAIConfig.disableRandomLevels && randomAvgLevel < currentAvgLevel;
 
-                    std::string query = "SELECT guid, level, totaltime, race, class FROM characters WHERE account = '%u' AND level <= %u";
-                    std::string wasRand = sPlayerbotAIConfig.instantRandomize ? "totaltime" : "(level > 1)";
+                    std::string query = "SELECT guid, level, played_time_total, race, class FROM characters WHERE account = '%u' AND level <= %u";
+                    std::string wasRand = sPlayerbotAIConfig.instantRandomize ? "played_time_total" : "(level > 1)";
 
                     if (needToIncrease) //We need more higher level bots.
                     {
@@ -2949,10 +2949,17 @@ void RandomPlayerbotMgr::PrepareTeleportCache()
         BarGoLink bar(maxLevel);
         for (uint8 level = 1; level <= maxLevel; level++)
         {
+            // creature_template here has no unit_flags column - VMaNGOS keeps the
+            // spawn-time unit flags in static_flags1 instead, and its flags_extra
+            // bits do not line up with the ones this query was written against.
+            // The filter still means the same thing: ordinary lootable mobs, no
+            // triggers, guards, passive or unselectable creatures.
+            //   flags_extra   128 invisible (trigger), 1024 guard, 131072 no target
+            //   static_flags1 2 no xp, 32 immune to players, 256 sessile, 512 unselectable
             auto results = WorldDatabase.PQuery("SELECT `map`, `position_x`, `position_y`, `position_z` "
                 "FROM (SELECT `map`, `position_x`, `position_y`, `position_z`, t.level_max, t.level_min, "
                 "%u - (t.level_max + t.level_min) / 2 delta "
-                "FROM creature c INNER JOIN creature_template t ON c.id = t.entry WHERE t.type != 8 AND t.npc_flags = 0 AND t.rank = 0 AND NOT (t.flags_extra & 1024 OR t.flags_extra & 65536 OR t.flags_extra & 64 OR t.unit_flags & 256 OR t.unit_flags & 512) AND t.loot_id != 0) q "
+                "FROM creature c INNER JOIN creature_template t ON c.id = t.entry WHERE t.type != 8 AND t.npc_flags = 0 AND t.rank = 0 AND NOT (t.flags_extra & 128 OR t.flags_extra & 1024 OR t.flags_extra & 131072 OR t.static_flags1 & 2 OR t.static_flags1 & 32 OR t.static_flags1 & 256 OR t.static_flags1 & 512) AND t.loot_id != 0) q "
                 "WHERE delta >= 0 AND delta <= %u AND map in (%s)",
                 level,
                 sPlayerbotAIConfig.randomBotTeleLevel,

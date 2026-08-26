@@ -35,7 +35,7 @@ bool PetIsDeadValue::Calculate()
     if (!bot->GetPet())
     {
         uint32 ownerid = bot->GetGUIDLow();
-        auto result = CharacterDatabase.PQuery("SELECT id FROM character_pet WHERE owner = '%u'", ownerid);
+        auto result = CharacterDatabase.PQuery("SELECT id FROM character_pet WHERE owner_guid = '%u'", ownerid);
         return result != nullptr;
     }
     if (bot->GetPetGuid() && !bot->GetPet())

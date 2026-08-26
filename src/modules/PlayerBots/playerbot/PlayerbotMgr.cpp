@@ -990,7 +990,7 @@ std::list<std::string> PlayerbotHolder::HandlePlayerbotCommand(const std::string
             return messages;
         }
 
-        auto result = CharacterDatabase.PQuery("SELECT m.guid, (select name from characters c where c.guid = m.guid) FROM guild_member m WHERE guildid = '%u'", master->GetGuildId());
+        auto result = CharacterDatabase.PQuery("SELECT m.guid, (select name from characters c where c.guid = m.guid) FROM guild_member m WHERE guild_id = '%u'", master->GetGuildId());
 
         if (!result)
         {
