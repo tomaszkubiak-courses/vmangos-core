@@ -34,6 +34,7 @@
 #include "ArgparserForServer.h"
 
 #include "Crypto/InitializeCrypto.h"
+#include "Errors.h"
 
 #ifdef WIN32
 #include "ServiceWin32.h"
@@ -62,8 +63,30 @@ std::string realmName;                                      // Name of the realm
 char const* g_mainLogFileName = "Server.log";
 
 // Launch the mangos server
+#ifdef WIN32
+// An access violation on Windows does not raise SIGSEGV, so Master::_OnSignal
+// never sees it and the process disappears with nothing in the log - which is
+// exactly what a crash under bots looked like. Log the stack on the way out.
+static LONG WINAPI MangosUnhandledExceptionFilter(EXCEPTION_POINTERS* pException)
+{
+    if (pException && pException->ExceptionRecord)
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Unhandled exception 0x%08X at address 0x%p",
+            uint32(pException->ExceptionRecord->ExceptionCode), pException->ExceptionRecord->ExceptionAddress);
+    else
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Unhandled exception");
+
+    MaNGOS::Errors::PrintStacktrace(0, 64);
+
+    return EXCEPTION_CONTINUE_SEARCH; // let Windows report the crash as it would have
+}
+#endif
+
 extern int main(int argc, char **argv)
 {
+#ifdef WIN32
+    SetUnhandledExceptionFilter(&MangosUnhandledExceptionFilter);
+#endif
+
     ServerStartupArguments args;
     {
         // parseResult is std::expected, where the error is the return code, that might be present when invalid args or "--help" is given
