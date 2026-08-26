@@ -1676,7 +1676,15 @@ void Pet::_SaveSpells()
             break;
             case PETSPELL_NEW:
             {
-                SqlStatement stmt = CharacterDatabase.CreateStatement(insSpell, "INSERT INTO `pet_spell` (`guid`, `spell`, `active`) VALUES (?, ?, ?)");
+                // Delete first, like the changed case above: a spell can be marked
+                // new while its row is still in the table - the pet knows it, drops
+                // it from m_petSpells, and learns it again - and the bare insert
+                // then failed on the primary key, leaving the stale row and its
+                // stale active flag behind.
+                SqlStatement stmt = CharacterDatabase.CreateStatement(delSpell, "DELETE FROM `pet_spell` WHERE `guid` = ? and `spell` = ?");
+                stmt.PExecute(m_charmInfo->GetPetNumber(), itr->first);
+
+                stmt = CharacterDatabase.CreateStatement(insSpell, "INSERT INTO `pet_spell` (`guid`, `spell`, `active`) VALUES (?, ?, ?)");
                 stmt.PExecute(m_charmInfo->GetPetNumber(), itr->first, uint32(itr->second.active));
             }
             break;
