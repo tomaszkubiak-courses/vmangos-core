@@ -1283,13 +1283,16 @@ void PlayerbotAI::UpdateAIInternal(uint32 elapsed, bool minimal)
 
         if (logout && !bot->GetSession()->ShouldLogOut(time(nullptr)))
         {
+            // Queued rather than done here: this runs from Player::Update, and an
+            // instant logout deletes this very bot, leaving the core to finish
+            // updating freed memory the moment the AI hook returns.
             if (master && GetBotMgr(master))
             {
-                GetBotMgr(master)->LogoutPlayerBot(bot->GetObjectGuid().GetRawValue());
+                PlayerbotHolder::QueueLogout(GetBotMgr(master), bot->GetObjectGuid().GetRawValue());
             }
             else
             {
-                sRandomPlayerbotMgr.LogoutPlayerBot(bot->GetObjectGuid().GetRawValue());
+                PlayerbotHolder::QueueLogout(&sRandomPlayerbotMgr, bot->GetObjectGuid().GetRawValue());
             }
             return;
         }

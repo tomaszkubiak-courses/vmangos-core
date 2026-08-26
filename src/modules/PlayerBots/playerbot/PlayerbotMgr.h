@@ -7,6 +7,10 @@
 #include "Database/DatabaseEnv.h"
 #include "SharedDefines.h"
 
+#include <mutex>
+#include <utility>
+#include <vector>
+
 
 class WorldPacket;
 class Player;
@@ -27,6 +31,15 @@ public:
 	void HandlePlayerBotLoginCallback(std::unique_ptr<QueryResult> dummy, SqlQueryHolder * holder);
 
     void LogoutPlayerBot(uint32 guid, bool allowInstant = true, bool forDelete = false);
+
+    // An instant logout deletes the bot's Player object. Called from inside the
+    // bot's own AI update - which runs from Player::Update - that frees the very
+    // object the core is updating, and the world thread walks off the end of it
+    // as soon as the hook returns. Anything running under a bot's update asks for
+    // the logout here instead; the world tick performs it once every map has
+    // finished updating.
+    static void QueueLogout(PlayerbotHolder* holder, uint32 guid);
+    static void ProcessQueuedLogouts();
     void DisablePlayerBot(uint32 guid, bool logOutPlayer = true);
     Player* GetPlayerBot (uint32 guid) const;
 
@@ -63,6 +76,9 @@ protected:
     virtual uint32 GetOrCreateAccount(Player* master, std::string& error);
     void Cleanup();   
 private:
+    static std::mutex m_queuedLogoutsMutex;
+    static std::vector<std::pair<PlayerbotHolder*, uint32>> m_queuedLogouts;
+
     typedef std::list<std::string> (PlayerbotHolder::*HolderCommandHandler)(Player* master, const std::string param, AccountTypes security);
     typedef std::string (PlayerbotHolder::*BotCommandHandler)(Player* bot, Player* master, const std::string param);
 

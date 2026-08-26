@@ -118,6 +118,11 @@ void Playerbot_OnWorldUpdate(uint32 diff)
         return;
 
     sRandomPlayerbotMgr.UpdateAI(diff);
+
+    // Runs here, and only here: World::Update has already waited for every map
+    // thread by this point, so deleting a bot's Player cannot pull the object out
+    // from under a map that is still updating it.
+    PlayerbotHolder::ProcessQueuedLogouts();
     auctionbot.Update();
 }
 

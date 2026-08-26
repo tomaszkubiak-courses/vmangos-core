@@ -472,6 +472,38 @@ void PlayerbotMgr::CancelLogout()
     });
 }
 
+std::mutex PlayerbotHolder::m_queuedLogoutsMutex;
+std::vector<std::pair<PlayerbotHolder*, uint32>> PlayerbotHolder::m_queuedLogouts;
+
+void PlayerbotHolder::QueueLogout(PlayerbotHolder* holder, uint32 guid)
+{
+    if (!holder)
+        return;
+
+    std::lock_guard<std::mutex> lock(m_queuedLogoutsMutex);
+
+    for (auto const& queued : m_queuedLogouts)
+    {
+        if (queued.first == holder && queued.second == guid)
+            return;
+    }
+
+    m_queuedLogouts.emplace_back(holder, guid);
+}
+
+void PlayerbotHolder::ProcessQueuedLogouts()
+{
+    std::vector<std::pair<PlayerbotHolder*, uint32>> logouts;
+
+    {
+        std::lock_guard<std::mutex> lock(m_queuedLogoutsMutex);
+        logouts.swap(m_queuedLogouts);
+    }
+
+    for (auto const& queued : logouts)
+        queued.first->LogoutPlayerBot(queued.second);
+}
+
 void PlayerbotHolder::LogoutPlayerBot(uint32 guid, bool allowInstant, bool forDelete)
 {
     SC_LOG("LogoutPlayerBot entry guid=%u allowInstant=%d forDelete=%d",
