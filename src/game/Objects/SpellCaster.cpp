@@ -2222,6 +2222,12 @@ bool SpellCaster::GetExpireTime(SpellEntry const* spellEntry, TimePoint& expireT
 
 bool SpellCaster::IsSpellReady(SpellEntry const* spellEntry, ItemPrototype const* itemProto /*= nullptr*/) const
 {
+    // Callers that resolve a spell id first can hand us nothing at all: the bot
+    // module asks about ids that exist in later expansions but not in this
+    // client's DBCs. A spell that does not exist is never ready.
+    if (!spellEntry)
+        return false;
+
     uint32 spellCategory = spellEntry->Category;
 
     // overwrite category by provided category in item prototype during item cast if need

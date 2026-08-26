@@ -113,6 +113,12 @@ bool ServerFacade::IsHostileTo(WorldObject* bot, Unit* to)
 
 bool ServerFacade::IsSpellReady(Player* bot, uint32 spell, uint32 itemId)
 {
+    // Spell ids in the module's strategies span every expansion; the ones this
+    // client never had resolve to nothing, and asking whether they are ready used
+    // to dereference that nothing.
+    if (!bot || !sSpellMgr.GetSpellEntry(spell))
+        return false;
+
 #ifdef MANGOS
     return !bot->HasSpellCooldown(spell);
 #endif
