@@ -1018,7 +1018,10 @@ constexpr size_t countof(T const (&)[N]) { return N; }
 #include "Movement/spline/MoveSplineInit.h"
 inline void BotMovePath(Unit* unit, std::vector<G3D::Vector3> const& path, bool walk = false)
 {
-    if (!unit || path.empty())
+    // Two points minimum: MoveSplineInitArgs::Validate rejects a shorter path
+    // ('path.size() > 1' failed) and logs an error for it, and a one point path is
+    // the unit's own position anyway - there is no movement in it to launch.
+    if (!unit || path.size() < 2)
         return;
 
     Movement::MoveSplineInit init(*unit, "PlayerbotMovePath");
