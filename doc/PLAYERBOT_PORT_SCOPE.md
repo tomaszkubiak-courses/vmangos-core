@@ -422,6 +422,26 @@ One build-level change was needed: `/bigobj` on this module. The strategy and ac
 instantiate enough templates in a single translation unit to pass the 65,536-section limit of the
 normal object format (C1128).
 
+### It builds
+
+`mangosd.exe` links with `BUILD_PLAYERBOTS=ON`: the module compiles, `playerbots.lib`
+archives, and the executable comes out with the module and the scripts in it. Three things
+turned up only at link time:
+
+- The module carries its own battleground waypoint tables, a larger set than
+  `src/game/PlayerBots/BattleBotWaypoints.cpp` but under the same names, so every path
+  collided (LNK2005). The module's copies live in `namespace ai` now.
+- `BotLog` reached the core logger through `Log::Instance()`. `Log` derives from
+  `Singleton<Log, ClassLevelLockable<Log, std::mutex>>` but `Log.cpp` instantiates
+  `Singleton<Log>` with the default policy - which is what the `sLog` macro uses - so
+  `Log::Instance()` names a specialisation whose statics nothing defines, and would have
+  built a *second* Log if it had linked. It goes through the same instantiation the macro
+  does now.
+- `USE_SCRIPTS` was off in the playerbots build directory, which is a pre-existing trap
+  rather than anything to do with the module: `HardcodedEvents.cpp` and `Player.cpp` call
+  into `src/scripts/world/world_event_wareffort.cpp` unconditionally, so mangosd cannot link
+  without it.
+
 ### Not yet started
 
 - Step 2b, the master-packet path. `Playerbot_OnPacketHandled` is currently an empty body: the
