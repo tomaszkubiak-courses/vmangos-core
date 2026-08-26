@@ -15,3 +15,8 @@ bool SetAvoidAreaAction::Execute(Event& event)
     // doc/PLAYERBOT_PORT_SCOPE.md.
     return false;
 }
+
+bool SetAvoidAreaAction::isUseful()
+{
+    return false;
+}

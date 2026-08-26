@@ -6,7 +6,7 @@
 #include <ctime>
 #include <string>
 
-BotLog& BotLog::Instance()
+BotLog& BotMaNGOS::Singleton<Log>::Instance()
 {
     static BotLog s_instance;
     return s_instance;
@@ -15,7 +15,7 @@ BotLog& BotLog::Instance()
 void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnabled)
 {
     if (!logFile || logFile[0] == '\0')
-        return;  // empty → fall through to Log::Instance() on every call
+        return;  // empty → fall through to MaNGOS::Singleton<Log>::Instance() on every call
 
     std::string path;
     if (logsDir && logsDir[0] != '\0')
@@ -35,7 +35,7 @@ void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnab
     m_file = fopen(path.c_str(), "a");
     if (!m_file)
     {
-        Log::Instance().Out(LOG_BASIC, LOG_LVL_ERROR, "[BotLog] Failed to open bot log file: %s", path.c_str());
+        MaNGOS::Singleton<Log>::Instance().Out(LOG_BASIC, LOG_LVL_ERROR, "[BotLog] Failed to open bot log file: %s", path.c_str());
         return;
     }
 
@@ -72,7 +72,7 @@ void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnab
         fprintf(m_file, "[%s] %s%s\n", _ts, prefix, _msg); \
         fflush(m_file);                                 \
     } else {                                            \
-        Log::Instance().Out(log_type, log_level, "%s", _msg);            \
+        MaNGOS::Singleton<Log>::Instance().Out(log_type, log_level, "%s", _msg);            \
     }
 
 #ifdef _WIN32
@@ -94,7 +94,7 @@ void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnab
         fprintf(m_file, "[%s] %s%s\n", _ts, prefix, _msg); \
         fflush(m_file);                                 \
     } else {                                            \
-        Log::Instance().Out(log_type, log_level, "%s", _msg);            \
+        MaNGOS::Singleton<Log>::Instance().Out(log_type, log_level, "%s", _msg);            \
     }
 #endif
 
@@ -107,7 +107,7 @@ void BotLog::outString()
         fflush(m_file);
     }
     else
-        Log::Instance().Out(LOG_BASIC, LOG_LVL_MINIMAL, " ");
+        MaNGOS::Singleton<Log>::Instance().Out(LOG_BASIC, LOG_LVL_MINIMAL, " ");
 }
 
 void BotLog::outString(const char* fmt, ...)
@@ -143,7 +143,7 @@ void BotLog::outDebug(const char* fmt, ...)
             va_start(_ap, fmt);
             vsnprintf(_msg, sizeof(_msg), fmt, _ap);
             va_end(_ap);
-            Log::Instance().Out(LOG_BASIC, LOG_LVL_DEBUG, "%s", _msg);
+            MaNGOS::Singleton<Log>::Instance().Out(LOG_BASIC, LOG_LVL_DEBUG, "%s", _msg);
         }
         return;
     }
@@ -168,5 +168,5 @@ void BotLog::Out(LogType logType, LogLevel logLevel, const char* fmt, ...)
     vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
 
-    Log::Instance().Out(logType, logLevel, "%s", msg);
+    MaNGOS::Singleton<Log>::Instance().Out(logType, logLevel, "%s", msg);
 }

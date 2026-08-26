@@ -33,11 +33,15 @@ struct BattleBotWaypoint
 
 typedef std::vector<BattleBotWaypoint> BattleBotPath;
 
-extern std::vector<BattleBotPath*> const vPaths_WS;
-extern std::vector<BattleBotPath*> const vPaths_AB;
-extern std::vector<BattleBotPath*> const vPaths_AV;
-extern std::vector<BattleBotPath*> const vPaths_EY;
-extern std::vector<BattleBotPath*> const vPaths_IC;
+// In namespace ai: the core has its own battleground bot waypoints under the same names.
+namespace ai
+{
+    extern std::vector<BattleBotPath*> const vPaths_WS;
+    extern std::vector<BattleBotPath*> const vPaths_AB;
+    extern std::vector<BattleBotPath*> const vPaths_AV;
+    extern std::vector<BattleBotPath*> const vPaths_EY;
+    extern std::vector<BattleBotPath*> const vPaths_IC;
+}
 
 class BGTactics : public MovementAction
 {

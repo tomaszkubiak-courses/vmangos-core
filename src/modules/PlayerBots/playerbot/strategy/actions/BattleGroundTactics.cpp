@@ -117,6 +117,11 @@ static const IsleBanners isleBanners[] =
 };
 #endif
 
+// These tables carry the same names as the core's own battleground bot waypoints
+// (src/game/PlayerBots/BattleBotWaypoints.cpp) but are a different, larger set. They live
+// in namespace ai so the two can coexist in one binary.
+namespace ai
+{
 // BG Waypoints (vmangos)
 
 // Horde Flag Room to Horde Graveyard
@@ -2282,6 +2287,8 @@ std::vector<BattleBotPath*> const vPaths_HordeMine =
     &vPath_AV_Frostwolf_Graveyard_Flag_to_Coldtooth_Mine_Entrance,
     &vPath_AV_Coldtooth_Mine_Entrance_to_Coldtooth_Mine_Boss,
 };
+}
+
 
 static std::pair<uint32, uint32> AB_AttackObjectives[] =
 {
