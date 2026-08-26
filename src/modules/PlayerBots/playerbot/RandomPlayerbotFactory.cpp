@@ -141,6 +141,14 @@ bool RandomPlayerbotFactory::isAvailableRace(uint8 cls, uint8 race)
 #endif
         return false;
 
+    // The table above is the donor's, and it carries combinations this core does
+    // not have - a human hunter, a goblin of any class. Player::Create checks
+    // playercreateinfo and rejects those with "incorrect race/class pair", by
+    // which point the bot's name and account slot are already spent. Ask the same
+    // source Create does.
+    if (!sObjectMgr.GetPlayerInfo(race, cls))
+        return false;
+
     return std::find(availableRaces[cls].begin(), availableRaces[cls].end(), race) != availableRaces[cls].end();
 }
 
@@ -234,28 +242,50 @@ bool RandomPlayerbotFactory::isRaceForTeam(uint8 race, Team team)
 
 uint8 RandomPlayerbotFactory::GetRandomRace(uint8 cls, Team team)
 {
+    // Both loops skip what the class cannot be, so a zero left in the probability
+    // table cannot leak through, and the roll is over [0, total) - drawing total
+    // itself used to fall off the end of the second loop.
     uint32 totalClassProb = 0;
     for (uint32 race = 1; race < MAX_RACES; ++race)
     {
-        if (!isRaceForTeam(race,team))
+        if (!isRaceForTeam(race, team) || !isAvailableRace(cls, race))
             continue;
+
         totalClassProb += sPlayerbotAIConfig.classRaceProbability[cls][race];
     }
 
-    uint32 randomProb = urand(0, totalClassProb);
-
-    for (uint32 race = 1; race < MAX_RACES; ++race)
+    if (totalClassProb)
     {
-        if (!isRaceForTeam(race, team))
-            continue;
+        uint32 randomProb = urand(0, totalClassProb - 1);
 
-        if (sPlayerbotAIConfig.classRaceProbability[cls][race] > 0 && randomProb < sPlayerbotAIConfig.classRaceProbability[cls][race])
-            return race;
+        for (uint32 race = 1; race < MAX_RACES; ++race)
+        {
+            if (!isRaceForTeam(race, team) || !isAvailableRace(cls, race))
+                continue;
 
-        randomProb -= sPlayerbotAIConfig.classRaceProbability[cls][race];
+            uint32 const prob = sPlayerbotAIConfig.classRaceProbability[cls][race];
+
+            if (prob > 0 && randomProb < prob)
+                return race;
+
+            randomProb -= prob;
+        }
     }
 
-    return availableRaces[cls].front();
+    // Every race for this class is either off in the config or on the other team.
+    // The old fallback took the first entry of the donor's table, which is how a
+    // human hunter reached Player::Create.
+    std::vector<uint8> candidates;
+    for (uint8 const race : availableRaces[cls])
+    {
+        if (isRaceForTeam(race, team) && isAvailableRace(cls, race))
+            candidates.push_back(race);
+    }
+
+    if (candidates.empty())
+        return 0;
+
+    return candidates[urand(0, candidates.size() - 1)];
 }
 
 bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
@@ -269,6 +299,12 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
 
     uint8 race = inputRace == 0 ? GetRandomRace(cls) : inputRace;
 
+    if (!race || !isAvailableRace(cls, race))
+    {
+        sLog.outError("No race available for class %u - random bot not created.", cls);
+        return false;
+    }
+
     NameRaceAndGender raceAndGender = CombineRaceAndGender(gender, race);
 
     std::string name;
@@ -277,7 +313,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
     {
         // Try fallback: generate new name with suffix if all names exhausted
         // First try other gender
-        std::string baseName = CreateRandomBotName(raceAndGender);
+        std::string baseName = TakeFreeName(raceAndGender);
         if (baseName.empty())
             return false;
         name = baseName;
@@ -387,9 +423,6 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
                 accountId, name.c_str(), race, cls);
         return false;
     }
-    //player->SetSemaphoreTeleportFar(true); //Fake teleport to delay sql save
-    //player->SaveToDB();
-    //player->SetSemaphoreTeleportFar(false);
 
     // With DisableRandomLevels=1 nothing else in the automatic bot-population
     // path ever touches level (RandomPlayerbotMgr::ProcessBot/Randomize, which
@@ -407,8 +440,25 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
         player->SetLocationMapId(1);
         player->Relocate(-618.518f, -4251.67f, 38.718f, 0.0f);
         player->SetHomebindToLocation(WorldLocation(1, -618.518f, -4251.67f, 38.718f, 0.0f), 14);
-        player->SaveToDB();
     }
+
+    // Player::Create only builds the character in memory. This core writes a new
+    // character through Player::SaveNewPlayer, from the char-create handler, and
+    // nothing in the bot factory goes near it; the donor left the save here
+    // commented out and leaned on the cleanup pass at the end of CreateRandomBots,
+    // which calls WorldSession::LogoutPlayer. That saved nothing either, because
+    // the session's player pointer is never set here, so LogoutPlayer returns at
+    // once. Every bot the factory created was dropped when the loop deleted it and
+    // the run ended with no characters at all.
+    //
+    // Starting items are deliberately not added: the core hands them out on first
+    // login, when the character has no items and no played time.
+    //
+    // Player::Create switches saving off - that path is the core's temporary-bot
+    // path, and SaveToDB returns at once while the flag is set - so this bot has
+    // to ask for it back before it can be written.
+    player->SetSavingDisabled(false);
+    player->SaveToDB(false);
 
     sLog.outDebug( "Random bot created for account %d - name: \"%s\"; race: %u; class: %u",
             accountId, name.c_str(), race, cls);
@@ -419,6 +469,15 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
 std::string RandomPlayerbotFactory::CreateRandomBotName(NameRaceAndGender raceAndGender)
 {
     std::lock_guard<std::mutex> lock(nameMutex);
+    return TakeFreeName(raceAndGender);
+}
+
+// nameMutex is not recursive, so the body below cannot lock it: CreateRandomBot
+// holds the lock for its whole run and used to call the wrapper above from inside
+// it, which deadlocked the world thread the first time a race and gender ran out
+// of names.
+std::string RandomPlayerbotFactory::TakeFreeName(NameRaceAndGender raceAndGender)
+{
     EnsureNamesInitialized();
 
     auto it = freeNames.find(raceAndGender);

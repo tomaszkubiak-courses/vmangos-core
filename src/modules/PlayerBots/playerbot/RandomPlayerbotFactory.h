@@ -76,6 +76,9 @@ class RandomPlayerbotFactory
         static std::string CreateRandomBotName(NameRaceAndGender raceAndGender);
         static void EnsureNamesInitialized();
     private:
+        // Callers already holding nameMutex use this; CreateRandomBotName is the
+        // locking wrapper around it.
+        static std::string TakeFreeName(NameRaceAndGender raceAndGender);
         static std::string CreateRandomArenaTeamName();
         static std::unordered_map<NameRaceAndGender, std::vector<std::string>> freeNames;
         static std::unordered_map<NameRaceAndGender, std::vector<std::string>> allNames;

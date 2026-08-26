@@ -1289,6 +1289,10 @@ class Player final: public Unit
         uint32 GetSaveTimer() const { return m_nextSave; }
         void   SetSaveTimer(uint32 timer) { m_nextSave = timer; }
         bool   IsSavingDisabled() const { return m_saveDisabled; }
+        // Player::Create turns saving off, because in this core that path only ever
+        // built temporary bots. Anything creating a character that has to persist
+        // turns it back on.
+        void   SetSavingDisabled(bool disabled) { m_saveDisabled = disabled; }
 
         /*********************************************************/
         /***                    PET SYSTEM                     ***/
