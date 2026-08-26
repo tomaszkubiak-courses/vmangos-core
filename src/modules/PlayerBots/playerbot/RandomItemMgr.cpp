@@ -219,6 +219,11 @@ void RandomItemMgr::BuildRandomItemCache()
     else
     {
         sLog.outString("Building random item cache from %u items", sItemStorage.GetMaxEntry());
+
+        // One transaction for the whole build - see BuildEquipCache for why a
+        // row at a time is too slow to live with on first boot.
+        CharacterDatabase.BeginTransaction();
+
         for (uint32 itemId = 0; itemId < sItemStorage.GetMaxEntry(); ++itemId)
         {
             ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
@@ -249,6 +254,8 @@ void RandomItemMgr::BuildRandomItemCache()
                         level / 10, type, itemId);
             }
         }
+
+        CharacterDatabase.CommitTransaction();
 
         uint32 maxLevel = sPlayerbotAIConfig.randomBotMaxLevel;
         if (maxLevel > sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL))
@@ -3363,6 +3370,12 @@ void RandomItemMgr::BuildEquipCache()
 
             for (uint32 level = 1; level <= maxLevel; ++level)
             {
+                // Every cached item used to be its own INSERT, and each one reached
+                // the async connection as a separate transaction - one disk flush per
+                // row. That put the first boot at around three hours. One transaction
+                // per class and level is a few thousand rows and cuts it to minutes.
+                CharacterDatabase.BeginTransaction();
+
                 for (uint8 slot = 0; slot < EQUIPMENT_SLOT_END; ++slot)
                 {
                     for (uint32 spec = 1; spec <= MAX_STAT_SCALES; ++spec)
@@ -3469,6 +3482,8 @@ void RandomItemMgr::BuildEquipCache()
                         }
                     }
                 }
+
+                CharacterDatabase.CommitTransaction();
             }
 
             // The class loop is outermost, so once we leave a class body every spec
@@ -3862,6 +3877,11 @@ void RandomItemMgr::BuildRarityCache()
     {
         sLog.outBasic("Building item rarity cache from %u items", sItemStorage.GetMaxEntry());
         BarGoLink bar(sItemStorage.GetMaxEntry());
+
+        // One transaction for the whole build - see BuildEquipCache for why a
+        // row at a time is too slow to live with on first boot.
+        CharacterDatabase.BeginTransaction();
+
         for (uint32 itemId = 0; itemId < sItemStorage.GetMaxEntry(); ++itemId)
         {
             bar.step();
@@ -3974,6 +3994,9 @@ void RandomItemMgr::BuildRarityCache()
                 }
             }
         }
+
+        CharacterDatabase.CommitTransaction();
+
         sLog.outString("Item rarity cache built from %u items", sItemStorage.GetMaxEntry());
     }
 }
