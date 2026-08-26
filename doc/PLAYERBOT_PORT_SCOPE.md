@@ -584,9 +584,22 @@ symbolised stack before Windows takes the process. Three bugs were named from it
   (891 errors in seven minutes) and Judgement with no seal casting spell id 0 (122). Fixed at the
   source in each case.
 
-What is left is noise worth knowing but not worth chasing: a warrior occasionally re-casting a
-stance inside its one-second cooldown (about one line per warrior per run), and the module's
-multi-expansion pet spell list asking for ids 1.12 never had.
+One more surfaced only once bots were running for minutes at a time: `Pet::_SaveSpells` deleted
+the old row before writing a *changed* spell but used a bare insert for a *new* one, so a spell
+re-learned while its row still existed collided on the primary key and the save was dropped. Not
+bot-specific at all - bots just cycle pets far faster than a player does.
+
+**Where it stands after all that:** an eleven minute run with 270 bots created and ~90 online logs
+**35 error lines in total** - 30 `AddCooldown` (spell 2457 Battle Stance and 5019 Shoot, bots
+re-triggering inside the one second cooldown), 3 `FindScriptTargets` that predate the bots and come
+from the world DB, and nothing else. Startup is under a minute with the caches present, and
+shutdown is clean.
+
+The `AddCooldown` lines are the one accepted piece of noise. Roughly one per bot per run, the cast
+is refused, nothing is lost. Fixing it properly means arbitrating stance choice once per tick
+instead of letting three independent triggers race, which is bot tuning rather than port work;
+containment, if it ever turns into a spin, is an `IsSpellReady` check in those actions'
+`isUseful()`.
 
 **Diagnosing a bot crash here:** turn on `AiPlayerbot.EnableActionLog`, reproduce, and read the
 tail of `bots.log` - it names the bot and the phase it was in. It costs a line per bot update, so
