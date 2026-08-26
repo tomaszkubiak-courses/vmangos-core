@@ -1091,6 +1091,11 @@ void TravelMgr::Clear()
     for (HashMapHolder<Player>::MapType::iterator itr = m.begin(); itr != m.end(); ++itr)
         TravelMgr::SetNullTravelTarget(itr->second);
 #endif
+    ClearDestinations();
+}
+
+void TravelMgr::ClearDestinations()
+{
     for (auto& [purpose, entries] : destinationMap)
         for (auto& [id, dests] : entries)
             for (auto& dest : dests)

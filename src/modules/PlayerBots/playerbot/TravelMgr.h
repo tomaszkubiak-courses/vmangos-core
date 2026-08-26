@@ -416,7 +416,12 @@ namespace ai
 	{
 	public:
 		TravelMgr() {};
-        ~TravelMgr() { Clear(); };
+        // Not Clear(): that walks the players through sObjectAccessor, and this
+        // destructor runs at process exit, where the accessor's singleton may
+        // already be gone. Reaching a destroyed singleton throws Dead Reference,
+        // and a throw during static destruction is an instant terminate - which
+        // is what turned every clean shutdown into a crash.
+        ~TravelMgr() { ClearDestinations(); };
 		void LoadQuestTravelTable();
 
 		void GetPopulatedGrids();
@@ -453,6 +458,7 @@ namespace ai
 		void LoadAreaLevels();
 	private:
 		void Clear();
+		void ClearDestinations();
 		void SetMobAvoidAreaMap(uint32 mapId);
 
 		void SetNullTravelTarget(Player* player) const;
