@@ -6,7 +6,7 @@
 #include <ctime>
 #include <string>
 
-BotLog& BotMaNGOS::Singleton<Log>::Instance()
+BotLog& BotLog::Instance()
 {
     static BotLog s_instance;
     return s_instance;
