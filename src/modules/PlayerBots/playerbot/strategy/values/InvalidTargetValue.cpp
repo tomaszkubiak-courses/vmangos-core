@@ -24,7 +24,7 @@ bool InvalidTargetValue::Calculate()
 
     if (qualifier == "current target")
     {
-        if (target->GetObjectGuid() != bot->GetSelectionGuid())
+        if (target->GetObjectGuid() != bot->GetTargetGuid())
         {
             return true;
         }

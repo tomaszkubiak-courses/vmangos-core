@@ -540,3 +540,10 @@ void WorldSession::BotHandlePetAbandon(WorldPacket& recvPacket)
     packet.ReadFromWorldPacket(recvPacket);
     HandlePetAbandon(packet);
 }
+
+void WorldSession::BotHandleMoveKnockBackAck(WorldPacket& recvPacket)
+{
+    WorldPackets::Movement::MoveKnockBackAck packet;
+    packet.ReadFromWorldPacket(recvPacket);
+    HandleMoveKnockBackAck(packet);
+}

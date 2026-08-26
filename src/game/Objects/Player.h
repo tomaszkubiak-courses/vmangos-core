@@ -1116,7 +1116,11 @@ class Player final: public Unit
             val |= ((uint32)count << (counter * 6));
             SetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, val);
         }
+    public:
+        // Marks a quest log slot complete or failed, the same field the client reads. Public
+        // alongside GetQuestSlotQuestId / SetQuestSlot above, for the playerbots module.
         void SetQuestSlotState(uint16 slot, uint8 state) { SetByteFlag(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, 3, state); }
+    private:
         void RemoveQuestSlotState(uint16 slot, uint8 state) { RemoveByteFlag(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, 3, state); }
         void SetQuestSlotTimer(uint16 slot, uint32 timer) { SetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_TIME_OFFSET, timer); }
     public:
@@ -1552,8 +1556,11 @@ class Player final: public Unit
         /***                   SKILLS SYSTEM                   ***/
         /*********************************************************/
 
-    private:
+    public:
+        // Grants the two profession slots a new character starts with. Public because the
+        // playerbots module builds a character without the create-and-log-in path running.
         void InitPrimaryProfessions();
+    private:
         void UpdateSkillTrainedSpells(uint16 id, uint16 currVal);                                   // learns/unlearns spells dependent on a skill
         void UpdateSpellTrainedSkills(uint32 spellId, bool apply);                                  // learns/unlearns skills dependent on a spell
         void UpdateOldRidingSkillToNew(bool hasEpicMount);
@@ -1822,6 +1829,9 @@ class Player final: public Unit
         bool  m_undermapPosValid;
 
         uint32 GetHomeBindMap() const { return m_homebind.mapId; }
+        // Where the character's hearthstone sends it. The playerbots module walks a bot
+        // home rather than teleporting it, so it needs the position, not just the map.
+        WorldLocation const& GetHomeBindPosition() const { return m_homebind; }
         uint16 GetHomeBindAreaId() const { return m_homebindAreaId; }
 
         void SendSummonRequest(ObjectGuid summonerGuid, uint32 mapId, uint32 zoneId, float x, float y, float z);

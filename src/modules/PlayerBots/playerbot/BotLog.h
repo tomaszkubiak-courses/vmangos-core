@@ -37,6 +37,12 @@ public:
     void outBasic(const char* fmt, ...)   ATTR_PRINTF(2, 3);
     void outErrorDb(const char* fmt, ...) ATTR_PRINTF(2, 3);
 
+    // Core headers that the module includes log through sLog.Out() directly - the
+    // database templates do - and sLog is this class inside the module, so it needs
+    // the same entry point. It always goes to the core log: the type and level are
+    // the core's, and the line has nothing to do with a bot.
+    void Out(LogType logType, LogLevel logLevel, const char* fmt, ...) ATTR_PRINTF(4, 5);
+
     // The LOG macros in Log.h (DETAIL_LOG, BASIC_LOG, etc.) call these on
     // sLog before calling out*. Return permissive values so the macros
     // always forward to our out* methods.

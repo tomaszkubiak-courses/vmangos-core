@@ -775,6 +775,9 @@ class ObjectMgr
         void RemoveGraveYardLink(uint32 id, uint32 zone, Team team, bool inDB = false);
         void LoadGraveyardZones();
         GraveYardData const* FindGraveYardData(uint32 id, uint32 zone) const;
+        // Every graveyard, keyed by the zone it serves. The playerbots module walks it to
+        // pick which one a dead bot should run to.
+        GraveYardMap const& GetGraveYardMap() const { return m_GraveYardMap; }
         void LoadWorldSafeLocsFacing();
         float GetWorldSafeLocFacing(uint32 id) const;
 

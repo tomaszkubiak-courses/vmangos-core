@@ -24,10 +24,10 @@ bool UseMeetingStoneAction::Execute(Event& event)
     ObjectGuid guid;
     p >> guid;
 
-	if (requester->GetSelectionGuid() && requester->GetSelectionGuid() != bot->GetObjectGuid())
+	if (requester->GetTargetGuid() && requester->GetTargetGuid() != bot->GetObjectGuid())
 		return false;
 
-	if (!requester->GetSelectionGuid() && requester->GetGroup() != bot->GetGroup())
+	if (!requester->GetTargetGuid() && requester->GetGroup() != bot->GetGroup())
 		return false;
 
     if (requester->IsBeingTeleported())

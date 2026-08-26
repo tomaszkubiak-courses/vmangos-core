@@ -16,11 +16,11 @@ bool QuestAction::Execute(Event& event)
     {
         if (!master)
         {
-            guid = bot->GetSelectionGuid();
+            guid = bot->GetTargetGuid();
         }
         else
         {
-            guid = master->GetSelectionGuid();
+            guid = master->GetTargetGuid();
         }
     }
 

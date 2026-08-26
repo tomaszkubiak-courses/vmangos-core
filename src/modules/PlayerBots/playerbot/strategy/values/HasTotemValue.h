@@ -28,7 +28,7 @@ namespace ai
                 
                 if (!totemIsInRange) continue;
 
-                Unit* totemOwner = totem->GetCreator();
+                Unit* totemOwner = totem->GetMap()->GetUnit(totem->GetCreatorGuid());
                 if (!totemOwner)
                     continue;
 

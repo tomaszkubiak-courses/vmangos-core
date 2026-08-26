@@ -40,7 +40,7 @@ namespace ai
             if (index == -1)
                 return NULL;
 
-            ObjectGuid guid = group->GetTargetWithIcon(index);
+            ObjectGuid guid = group->GetTargetWithIcon(RaidTargetIcon(index));
             if (!guid)
                 return NULL;
 

@@ -1188,8 +1188,8 @@ bool DebugAction::HandleMount(Event& event, Player* requester, const std::string
     out << (bot->IsTaxiFlying() ? ", taxi flying" : ", not taxi flying");
     out << ", mount speed: " << AI_VALUE2(uint32, "current mount speed", "self target");
     out << ", mount id: " << bot->GetMountID();        
-    if(bot->GetMountInfo())
-        out << ", mount info: " << bot->GetMountInfo()->Name;
+    // cmangos keeps the spell that summoned the mount on the player; here only the display
+    // id is on the unit, so the id above is all there is to report.
     ai->TellPlayerNoFacing(requester, out, PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, true, false);
     return true;
 }
@@ -1206,7 +1206,7 @@ bool DebugAction::HandleArea(Event& event, Player* requester, const std::string&
     AreaTableEntry const* area = point.GetArea();
     std::ostringstream out;
     out << point.getAreaName(true, false); 
-    out << "," << area->team << " (" << (area->team != FACTION_GROUP_MASK_ALLIANCE ? (area->team != FACTION_GROUP_MASK_HORDE ? "neutral" : "horde") : "alliance") << ")";
+    out << "," << area->Team << " (" << (area->Team != FACTION_GROUP_MASK_ALLIANCE ? (area->Team != FACTION_GROUP_MASK_HORDE ? "neutral" : "horde") : "alliance") << ")";
     ai->TellPlayerNoFacing(requester, out, PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, true, false);
     return true;
 }
@@ -1236,7 +1236,7 @@ bool DebugAction::HandleChatReplyDo(Event& event, Player* requester, const std::
 
 bool DebugAction::HandleMonsterTalk(Event& event, Player* requester, const std::string& text)
 {
-    GuidPosition guidP = GuidPosition(requester->GetSelectionGuid(), requester);
+    GuidPosition guidP = GuidPosition(requester->GetTargetGuid(), requester);
     Player* player = requester;
     if (!guidP.IsUnit())
         return false;
@@ -1258,17 +1258,11 @@ bool DebugAction::HandleGY(Event& event, Player* requester, const std::string& t
         if (!sMapStore.LookupEntry(i))
             continue;
 
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
+        uint32 mapId = sMapStore.LookupEntry(i)->id;
 
         Map* map = sMapMgr.FindMap(mapId);
 
         if (!map)
-            continue;
-
-        // Penqle exposes GraveyardManagerStub on Map.
-        Map::GraveyardManagerStub* gy = &map->GetGraveyardManager();
-
-        if (!gy)
             continue;
 
         for (uint32 x = 0; x < TOTAL_NUMBER_OF_CELLS_PER_MAP; x++)
@@ -1293,8 +1287,8 @@ bool DebugAction::HandleGY(Event& event, Player* requester, const std::string& t
                 if (areaId != 0)
                 {
                     WorldSafeLocsEntry const* ClosestGrave;
-                    ClosestGrave = gy->GetClosestGraveYard(pos.getX(), pos.getY(), pos.getZ(), mapId, ALLIANCE);
-                    ClosestGrave = gy->GetClosestGraveYard(pos.getX(), pos.getY(), pos.getZ(), mapId, HORDE);
+                    ClosestGrave = sObjectMgr.GetClosestGraveYard(pos.getX(), pos.getY(), pos.getZ(), mapId, ALLIANCE);
+                    ClosestGrave = sObjectMgr.GetClosestGraveYard(pos.getX(), pos.getY(), pos.getZ(), mapId, HORDE);
                 }
             }
         }
@@ -1494,9 +1488,9 @@ bool DebugAction::HandlePOI(Event& event, Player* requester, const std::string& 
 bool DebugAction::HandleMotion(Event& event, Player* requester, const std::string& text)
 {
     Unit* requesterTarget = nullptr;
-    if (requester->GetSelectionGuid())
+    if (requester->GetTargetGuid())
     {
-        requesterTarget = ai->GetUnit(requester->GetSelectionGuid());
+        requesterTarget = ai->GetUnit(requester->GetTargetGuid());
     }
 
     Unit* motionBot = bot;
@@ -1551,22 +1545,15 @@ bool DebugAction::HandleMotion(Event& event, Player* requester, const std::strin
         else if (cmd == "flee")
             mm->MoveFleeing(motionTarget, 10);
         else if (cmd == "followmain")
-            mm->MoveFollow(motionTarget, 5, 0, true, true);
+            mm->MoveFollow(motionTarget, 5, 0);
         else if (cmd == "follow")
             mm->MoveFollow(motionTarget, 5, 0);
-        else if (cmd == "dist")
-            mm->DistanceYourself(10);
         else if (cmd == "update")
             mm->UpdateMotion(10);
         else if (cmd == "chase")
             mm->MoveChase(motionTarget, 5, 0);
-        else if (cmd == "fall")
-            mm->MoveFall();
-        else if (cmd == "formation")
-        {
-            FormationSlotDataSPtr form = std::make_shared<FormationSlotData>(0, bot->GetObjectGuid(), nullptr, SpawnGroupFormationSlotType::SPAWN_GROUP_FORMATION_SLOT_TYPE_STATIC);
-            mm->MoveInFormation(form);
-        }
+        // "dist", "fall" and "formation" drove cmangos-only generators (DistanceYourself,
+        // MoveFall, MoveInFormation). This core has none of them - see the port scope doc.
 
         std::string sType = "TODO"; // GetMoveTypeStr(type);
         ai->TellPlayer(requester, "new:" + sType);
@@ -1722,7 +1709,7 @@ bool DebugAction::HandlePointOnTrans(Event& event, Player* requester, const std:
             ai->AddAura(wpCreature, 246);
 
             bot->SetTransport(transport);
-            std::unique_ptr<PathFinder> pathfinder = std::make_unique<PathFinder>(bot, true);
+            std::unique_ptr<PathFinder> pathfinder = std::make_unique<PathFinder>(bot);
             WorldPosition tStart = bot, tEnd = pos;
             tStart.CalculatePassengerOffset(transport);
             tEnd.CalculatePassengerOffset(transport);
@@ -1993,9 +1980,9 @@ bool DebugAction::HandleRandomSpot(Event& event, Player* requester, const std::s
     if (bot->GetTransport())
         botPos.CalculatePassengerOffset(bot->GetTransport());
 
-    pathfinder.ComputePathToRandomPoint(botPos.getVector3(), radius);
-    PointsArray points = pathfinder.getPath();
-    std::vector<WorldPosition> path = botPos.fromPointsArray(points);
+    // PathFinder here computes a path to a point; picking the random point is the module's
+    // own WorldPosition::ComputePathToRandomPoint.
+    std::vector<WorldPosition> path = botPos.ComputePathToRandomPoint(bot, radius);
 
     if (path.empty())
         return false;
@@ -3215,7 +3202,7 @@ bool DebugAction::HandleNPC(Event& event, Player* requester, const std::string& 
 {
     std::ostringstream out;
 
-    GuidPosition guidP = GuidPosition(requester->GetSelectionGuid(), requester);
+    GuidPosition guidP = GuidPosition(requester->GetTargetGuid(), requester);
 
     if (text.size() > 4)
     {
@@ -3309,13 +3296,13 @@ bool DebugAction::HandleNPC(Event& event, Player* requester, const std::string& 
     if (guidP.HasNpcFlag(UNIT_NPC_FLAG_REPAIR))
         ai->TellPlayerNoFacing(requester, "UNIT_NPC_FLAG_REPAIR");
 #ifdef MANGOSBOT_ZERO
-    if (guidP.HasNpcFlag(UNIT_NPC_FLAG_OUTDOORPVP))
-        ai->TellPlayerNoFacing(requester, "UNIT_NPC_FLAG_OUTDOORPVP");
+    if (guidP.HasNpcFlag(UNIT_NPC_FLAG_NONE))
+        ai->TellPlayerNoFacing(requester, "UNIT_NPC_FLAG_NONE");
 #endif
 
 
     std::ostringstream out2;
-    FactionTemplateEntry const* requestFaction = sFactionTemplateStore.LookupEntry(requester->GetFaction());
+    FactionTemplateEntry const* requestFaction = sFactionTemplateStore.LookupEntry(requester->GetFactionTemplateId());
     FactionTemplateEntry const* objectFaction = nullptr;
     if(guidP.GetCreatureTemplate() && guidP.GetCreatureTemplate()->faction)
         objectFaction = sFactionTemplateStore.LookupEntry(guidP.GetCreatureTemplate()->faction);
@@ -3394,7 +3381,7 @@ bool DebugAction::HandleGO(Event& event, Player* requester, const std::string& t
 
     std::ostringstream out2;
     
-    FactionTemplateEntry const* requestFaction = sFactionTemplateStore.LookupEntry(requester->GetFaction());
+    FactionTemplateEntry const* requestFaction = sFactionTemplateStore.LookupEntry(requester->GetFactionTemplateId());
     FactionTemplateEntry const* objectFaction = sFactionTemplateStore.LookupEntry(guidP.GetGameObjectInfo()->faction);
     FactionTemplateEntry const* humanFaction = sFactionTemplateStore.LookupEntry(1);
     FactionTemplateEntry const* orcFaction = sFactionTemplateStore.LookupEntry(2);
@@ -3486,7 +3473,7 @@ bool DebugAction::HandleGO(Event& event, Player* requester, const std::string& t
 
         out << (BotGameObjectInUse(object) ? ", in use" : ", not in use");
 
-        LootState lootState = object->GetLootState();
+        LootState lootState = object->getLootState();
 
         out << " lootState:";
 
@@ -3523,7 +3510,9 @@ bool DebugAction::HandleFind(Event& event, Player* requester, const std::string&
     uint32 entry = stoi(link);
 
     Creature* creature = nullptr;
-    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck creature_check(*bot, entry, true, false, 1000.0f, true);
+    // The check here takes (object, entry, alive, range); there is no dead-or-alive pair
+    // and no "except" creature to skip.
+    MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck creature_check(*bot, entry, true, 1000.0f);
     MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(creature, creature_check);
     Cell::VisitGridObjects(bot, searcher, 1000.0f);
 
@@ -4435,7 +4424,7 @@ bool DebugAction::HandleFSpell(Event& event, Player* requester, const std::strin
         data << uint32(0);
         data << uint16(2);
         data << requester->GetObjectGuid();
-        bot->SendMessageToSet(data, true);
+        bot->SendMessageToSet(&data, true);
     }
 
     {
@@ -4449,7 +4438,7 @@ bool DebugAction::HandleFSpell(Event& event, Player* requester, const std::strin
         data << uint8(0);
         data << uint16(2);
         data << requester->GetObjectGuid();
-        bot->SendMessageToSet(data, true);
+        bot->SendMessageToSet(&data, true);
     }
 
     return true;
@@ -4568,12 +4557,12 @@ bool DebugAction::HandleVSpellMap(Event& event, Player* requester, const std::st
     for (auto dat : datMap)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        bot->SendMessageToSet(dat, true);
+        bot->SendMessageToSet(&dat, true);
     }
     for (auto dat : datMap)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        bot->SendMessageToSet(dat, true);
+        bot->SendMessageToSet(&dat, true);
     }
 
     return true;
@@ -4612,12 +4601,12 @@ bool DebugAction::HandleISpellMap(Event& event, Player* requester, const std::st
     for (auto dat : datMap)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        bot->SendMessageToSet(dat, true);
+        bot->SendMessageToSet(&dat, true);
     }
     for (auto dat : datMap)
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
-        bot->SendMessageToSet(dat, true);
+        bot->SendMessageToSet(&dat, true);
     }
 
     return true;
@@ -5125,7 +5114,7 @@ bool DebugAction::HandleCombat(Event& event, Player* requester, const std::strin
     bool hasAttackers = ai->GetAiObjectContext()->GetValue<bool>("has attackers")->Get();
     ai->TellPlayer(requester, std::string("has attackers: ") + (hasAttackers ? "true" : "false"));
 
-    ai->TellPlayer(requester, "Selection: " + std::to_string(bot->GetSelectionGuid().GetCounter()));
+    ai->TellPlayer(requester, "Selection: " + std::to_string(bot->GetTargetGuid().GetCounter()));
 
     return true;
 }
@@ -5464,7 +5453,6 @@ bool DebugAction::HandleTransanal(Event& event, Player* requester, const std::st
                         0,
                         0,
                         0, // hairColor,
-                        0,
                         0);
                     tempPlayer->AddToWorld();
                     tempPlayer->SetMap(map);
@@ -5498,7 +5486,7 @@ bool DebugAction::HandleTransanal(Event& event, Player* requester, const std::st
                             if (found[end])
                                 continue;
 
-                            std::unique_ptr<PathFinder> pathfinder = std::make_unique<PathFinder>(tempPlayer, true);
+                            std::unique_ptr<PathFinder> pathfinder = std::make_unique<PathFinder>(tempPlayer);
 
                             WorldPosition tStart = start, tEnd = end;
                             tStart.CalculatePassengerOffset(transport);

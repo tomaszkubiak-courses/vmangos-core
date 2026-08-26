@@ -576,7 +576,7 @@ private:
 
 public:
 	Player* GetBot() { return bot; }
-    Player* GetMaster() { return master; }
+    Player* GetMaster() const { return master; }
 
     // accessor for the active engine so
     // cpp can build heartbeat / debug payloads without being
@@ -766,7 +766,7 @@ public:
         uint8 GetForcedRole() const { return m_forcedRole; }
     void UpdateTalentSpec(PlayerTalentSpec spec = PlayerTalentSpec::TALENT_SPEC_INVALID);
 
-    bool CanEnterArea(const AreaTrigger* area);
+    bool CanEnterArea(const AreaTriggerTeleport* area);
     void Unmount();
 
     void QueuePacket(WorldPacket& pkt);

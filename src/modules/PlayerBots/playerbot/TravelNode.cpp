@@ -127,12 +127,12 @@ float TravelNodePath::getCost(Unit* unit, uint32 cGold)
         {
             uint32 triggerId = getPathObject();
             AreaTriggerEntry const* atEntry = sAreaTriggerStore.LookupEntry(pathObject);
-            AreaTrigger const* at = sObjectMgr.GetAreaTrigger(pathObject);
+            AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(pathObject);
             if (atEntry && at && atEntry->map_id == bot->GetMapId())
             {
                 Map* map = WorldPosition(atEntry->map_id, atEntry->box_x, atEntry->box_y, atEntry->box_z).getMap(bot->GetInstanceId());
                 if (map)
-                    if (at && at->conditionId && !sObjectMgr.IsConditionSatisfied(at->conditionId, bot, map, nullptr, (ConditionSource)CONDITION_FROM_AREATRIGGER_TELEPORT))
+                    if (at && at->requiredCondition && !IsConditionSatisfied(at->requiredCondition, bot, map, nullptr, (ConditionSource)CONDITION_FROM_AREATRIGGER_TELEPORT))
                         return -1;
             }
         }
@@ -268,7 +268,7 @@ bool TravelNode::isAreaTriggerTarget(uint32 areaTriggerId)
         if (!atEntry)
             continue;
 
-        AreaTrigger const* at = sObjectMgr.GetAreaTrigger(i);
+        AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(i);
         if (!at)
             continue;
 
@@ -1156,7 +1156,7 @@ void TravelPath::ClipPath(PlayerbotAI* ai, Unit* mover, bool ignoreEnemyTargets)
             if (WorldPosition(unit).sqDistance(p->point) > range * range)
                 continue;
 
-            if (!unit->CanInitiateAttack() || !unit->IsWithinLOSInMap(mover))
+            if (!(unit->IsCreature() && ((Creature*)unit)->CanInitiateAttack()) || !unit->IsWithinLOSInMap(mover))
                 continue;
 
             endP = p;
@@ -2067,26 +2067,10 @@ void TravelNodeMap::manageNodes(Unit* bot, bool mapFull)
 
 void TravelNodeMap::LoadMaps()
 {
-    sLog.outError("Trying to load all maps and tiles for node generation. Please ignore any maps that could not be loaded.");
-    for (uint32 i = 0; i < sMapStore.GetNumRows(); ++i)
-    {
-        if (!sMapStore.LookupEntry(i))
-            continue;
-
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
-        if (mapId == 0 || mapId == 1 || mapId == 530 || mapId == 571)
-        {
-#ifndef MANGOSBOT_TWO
-            MMAP::MMapFactory::createOrGetMMapManager()->loadAllMapTiles(sWorld.GetDataPath(), mapId);
-#else
-            MMAP::MMapFactory::createOrGetMMapManager()->loadAllMapTiles(sWorld.GetDataPath(), mapId, 0);
-#endif
-        }
-        else
-        {
-            MMAP::MMapFactory::createOrGetMMapManager()->loadMapInstance(sWorld.GetDataPath(), mapId, 0);
-        }
-    }
+    // cmangos preloads every tile of every map before generating nodes. This core has no such
+    // call - tiles load one at a time through MMapManager::loadMap - and the generator already
+    // pulls in the tile it needs through WorldPosition::loadMapAndVMap as it walks the grid,
+    // so there is nothing to do up front.
 
 #ifndef MANGOSBOT_TWO
     // Was boost::filesystem::directory_iterator. IO::Filesystem::GetAllFilesInFolder is
@@ -2105,7 +2089,7 @@ void TravelNodeMap::LoadMaps()
         if (!sMapStore.LookupEntry(i))
             continue;
 
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
+        uint32 mapId = sMapStore.LookupEntry(i)->id;
 
         for (std::string const& fileName : mmapFiles)
         {
@@ -2121,8 +2105,8 @@ void TravelNodeMap::LoadMaps()
             uint32 x = (fileNameString[3] - '0') * 10 + (fileNameString[4] - '0');
             uint32 y = (fileNameString[5] - '0') * 10 + (fileNameString[6] - '0');
 
-            if (!MMAP::MMapFactory::createOrGetMMapManager()->IsMMapIsLoaded(mapId, x, y))
-                MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), mapId, x, y);
+            if (!(MMAP::MMapFactory::createOrGetMMapManager()->GetNavMesh(mapId) != nullptr))
+                MMAP::MMapFactory::createOrGetMMapManager()->loadMap(mapId, x, y);
         }
     }
 #endif
@@ -2237,7 +2221,7 @@ void TravelNodeMap::generateAreaTriggerNodes()
         if (!atEntry)
             continue;
 
-        AreaTrigger const* at = sObjectMgr.GetAreaTrigger(i);
+        AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(i);
         if (!at)
             continue;
 
@@ -2265,7 +2249,7 @@ void TravelNodeMap::generateAreaTriggerNodes()
         if (!atEntry)
             continue;
 
-        AreaTrigger const* at = sObjectMgr.GetAreaTrigger(i);
+        AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(i);
         if (!at)
             continue;
 
@@ -3741,10 +3725,6 @@ TravelNodeMap::PathFindResult TravelNodeMap::testPathToLoop(const WorldPosition&
     }
 
     std::unique_ptr<PathFinder> pathfinder = std::make_unique<PathFinder>(bot);
-
-    pathfinder->setAreaCost(NAV_AREA_WATER, 10.0f);
-    pathfinder->setAreaCost(12, 5.0f);
-    pathfinder->setAreaCost(13, 20.0f);
 
     PointsArray points;
     PathType pathType;

@@ -357,7 +357,7 @@ namespace ai
             Guild* guild = sGuildMgr.GetGuildById(bot->GetGuildId());
             if (sPlayerbotAIConfig.inviteChat && (sRandomPlayerbotMgr.IsFreeBot(bot) || !ai->HasActivePlayerMaster()))
             {
-                if (guild && player && bot->IsInGuild(player->GetGuildId()))
+                if (guild && player && bot->GetGuildId() == player->GetGuildId())
                 {
                     BroadcastHelper::BroadcastGuildGroupOrRaidInvite(
                         ai,

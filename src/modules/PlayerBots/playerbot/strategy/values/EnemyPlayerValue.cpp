@@ -128,8 +128,8 @@ bool HasEnemyPlayersValue::Calculate()
 Unit* EnemyPlayerValue::Calculate()
 {
     // Prioritize the duel opponent
-    if (bot->m_duel && !bot->m_duel->opponent.IsEmpty()) {
-        if (Unit* opp = bot->GetMap()->GetUnit(bot->m_duel->opponent)) {
+    if (bot->m_duel && bot->m_duel->opponent) {
+        if (Unit* opp = bot->m_duel->opponent) {
             if (!sServerFacade.IsFriendlyTo(opp, bot))
                 return opp;
         }
@@ -147,7 +147,7 @@ Unit* EnemyPlayerValue::Calculate()
         Unit* firstTarget = ai->GetUnit(enemyPlayers.front());
         if (firstTarget)
         {
-            bestEnemyPlayerDistance = firstTarget->GetDistance(bot, false);
+            bestEnemyPlayerDistance = firstTarget->GetDistance2d(bot);
             bestEnemyPlayerHealth = firstTarget->GetHealth();
             bestEnemyPlayer = firstTarget;
         }
@@ -168,7 +168,7 @@ Unit* EnemyPlayerValue::Calculate()
                 if (isMelee)
                 {
                     // Score best enemy player based on lowest distance
-                    const float distanceToEnemyPlayer = target->GetDistance(bot, false);
+                    const float distanceToEnemyPlayer = target->GetDistance2d(bot);
                     if (distanceToEnemyPlayer < bestEnemyPlayerDistance)
                     {
                         bestEnemyPlayerDistance = distanceToEnemyPlayer;

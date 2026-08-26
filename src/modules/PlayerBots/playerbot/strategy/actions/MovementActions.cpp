@@ -163,7 +163,7 @@ bool MovementAction::FlyDirect(const WorldPosition &startPosition, const WorldPo
         {
             WorldPacket data(SMSG_SPLINE_MOVE_SET_FLYING, 9);
             data << bot->GetPackGUID();
-            bot->SendMessageToSet(data, true);
+            bot->SendMessageToSet(&data, true);
 
             if (!bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
                 bot->m_movementInfo.AddMovementFlag(MOVEFLAG_FLYING);
@@ -190,7 +190,7 @@ bool MovementAction::FlyDirect(const WorldPosition &startPosition, const WorldPo
         {
             WorldPacket data(SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
             data << bot->GetPackGUID();
-            bot->SendMessageToSet(data, true);
+            bot->SendMessageToSet(&data, true);
 
             if (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
                 bot->m_movementInfo.RemoveMovementFlag(MOVEFLAG_FLYING);
@@ -261,7 +261,7 @@ bool MovementAction::UseTaxi(PlayerbotAI* ai, uint32 entry, bool needNpc)
     if (!tEntry)
     {
 #ifdef MANGOSBOT_TWO
-        bot->OnTaxiFlightEject(true);
+        bot->GetTaxi().ClearTaxiDestinations();
         ai->Unmount();
 #endif
         bool goClick = ai->HandleSpellClick(entry); //Source gryphon of ebonhold.
@@ -299,7 +299,7 @@ bool MovementAction::UseTaxi(PlayerbotAI* ai, uint32 entry, bool needNpc)
         bot->SetMoney(botMoney + tEntry->price);
     }
 
-    bot->OnTaxiFlightEject(true);
+    bot->GetTaxi().ClearTaxiDestinations();
 
     ai->Unmount();
 
@@ -771,9 +771,13 @@ bool MovementAction::HandleSpecialMovement(TravelPath& path)
             if (!bot->GetGameObjectIfCanInteractWith(go->GetObjectGuid(), MAX_GAMEOBJECT_TYPE))
                 continue;
 
-            std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-            *packet << *i;
-            bot->GetSession()->QueuePacket(std::move(packet));
+            WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+            packet << *i;
+
+
+            bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
             return true;
         }
 
@@ -931,7 +935,7 @@ void MovementAction::UpdateFlyingState(
     {
         WorldPacket data(SMSG_SPLINE_MOVE_SET_FLYING, 9);
         data << bot->GetPackGUID();
-        bot->SendMessageToSet(data, true);
+        bot->SendMessageToSet(&data, true);
 
         if (!bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
             bot->m_movementInfo.AddMovementFlag(MOVEFLAG_FLYING);
@@ -948,7 +952,7 @@ void MovementAction::UpdateFlyingState(
     {
         WorldPacket data(SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
         data << bot->GetPackGUID();
-        bot->SendMessageToSet(data, true);
+        bot->SendMessageToSet(&data, true);
 
         if (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
             bot->m_movementInfo.RemoveMovementFlag(MOVEFLAG_FLYING);
@@ -1025,7 +1029,7 @@ void MovementAction::DispatchMovement(TravelPath movePath, bool generatePath, bo
         }
 
 #ifndef MANGOSBOT_TWO
-        mm.MovePath(pointPath, moveMode, false, false);
+        BotMovePath(bot, pointPath);
 #else
         mm.MovePath(pointPath, moveMode, false);
 #endif
@@ -1588,7 +1592,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
                 if (sPlayerbotAIConfig.hasLog("bot_movement.csv"))
                 {
                     WorldPosition telePos;
-                    AreaTrigger const* at = sObjectMgr.GetAreaTrigger(entry);
+                    AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(entry);
                     if (at)
                         telePos = WorldPosition(at->destination.mapId, at->destination.x, at->destination.y, at->destination.z, at->destination.o);
 
@@ -1643,9 +1647,13 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
                     if (!bot->GetGameObjectIfCanInteractWith(go->GetObjectGuid(), MAX_GAMEOBJECT_TYPE))
                         continue;
 
-                    std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-                    *packet << *i;
-                    bot->GetSession()->QueuePacket(std::move(packet));
+                    WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+                    packet << *i;
+
+
+                    bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
                     return true;
                 }
 
@@ -1660,7 +1668,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
                     WorldPosition telePos;
                     if (entry)
                     {
-                        AreaTrigger const* at = sObjectMgr.GetAreaTrigger(entry);
+                        AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(entry);
                         if (at)
                             telePos = WorldPosition(at->destination.mapId, at->destination.x, at->destination.y, at->destination.z, at->destination.o);
                     }
@@ -1957,7 +1965,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
                     if (WorldPosition(unit).sqDistance(point) > range * range)
                         continue;
 
-                    if (!unit->CanInitiateAttack())
+                    if (!(unit->IsCreature() && ((Creature*)unit)->CanInitiateAttack()))
                         continue;
 
                     if (!unit->IsWithinLOSInMap(bot))
@@ -2168,7 +2176,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
         {
             WorldPacket data(SMSG_SPLINE_MOVE_SET_FLYING, 9);
             data << bot->GetPackGUID();
-            bot->SendMessageToSet(data, true);
+            bot->SendMessageToSet(&data, true);
 
             if (!bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
                 bot->m_movementInfo.AddMovementFlag(MOVEFLAG_FLYING);
@@ -2193,7 +2201,7 @@ bool MovementAction::MoveTo(uint32 mapId, float x, float y, float z, bool idle, 
             {
                 WorldPacket data(SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
                 data << bot->GetPackGUID();
-                bot->SendMessageToSet(data, true);
+                bot->SendMessageToSet(&data, true);
 
                 if (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
                     bot->m_movementInfo.RemoveMovementFlag(MOVEFLAG_FLYING);
@@ -2399,14 +2407,8 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
 
             if (player->IsTaxiFlying()) //Move to where the player is flying to.
             {
-                const Taxi::Map tMap = player->GetTaxiPathSpline();
-                if (!tMap.empty())
-                {
-                    auto tEnd = tMap.back();
-
-                    if (tEnd)
-                        return MoveTo(tEnd->mapId, tEnd->x, tEnd->y, tEnd->z);
-                }
+                if (TaxiNodesEntry const* tEnd = BotTaxiDestinationNode(player))
+                    return MoveTo(tEnd->map_id, tEnd->x, tEnd->y, tEnd->z);
             }
         }
         if (!target->IsTaxiFlying()/* || bot->GetTransport()*/)
@@ -2470,7 +2472,7 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
 
     if (bot->IsNonMeleeSpellCasted(true))
     {
-        bot->CastStop();
+        bot->InterruptNonMeleeSpells(true);
         ai->InterruptSpell();
     }
 
@@ -2485,7 +2487,7 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
             //Take off
             WorldPacket data(SMSG_SPLINE_MOVE_SET_FLYING, 9);
             data << bot->GetPackGUID();
-            bot->SendMessageToSet(data, true);
+            bot->SendMessageToSet(&data, true);
 
             if (!bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
                 bot->m_movementInfo.AddMovementFlag(MOVEFLAG_FLYING);
@@ -2513,7 +2515,7 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
             {
                 WorldPacket data(SMSG_SPLINE_MOVE_UNSET_FLYING, 9);
                 data << bot->GetPackGUID();
-                bot->SendMessageToSet(data, true);
+                bot->SendMessageToSet(&data, true);
 
                 if (bot->m_movementInfo.HasMovementFlag(MOVEFLAG_FLYING))
                     bot->m_movementInfo.RemoveMovementFlag(MOVEFLAG_FLYING);
@@ -2550,7 +2552,7 @@ bool MovementAction::Follow(Unit* target, float distance, float angle)
             return false;
     }
 
-    mm.MoveFollow(target, distance, angle, true, sPlayerbotAIConfig.boostFollow);
+    mm.MoveFollow(target, distance, angle);
     return true;
 }
 
@@ -2674,7 +2676,7 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
 
             std::vector<G3D::Vector3> pointsArray = WorldPosition().toPointsArray(path);
 #ifndef MANGOSBOT_TWO
-            mm.MovePath(pointsArray, FORCED_MOVEMENT_RUN, false, false);
+            BotMovePath(bot, pointsArray);
 #else
             mm.MovePath(pointsArray, FORCED_MOVEMENT_RUN, false);
 #endif
@@ -2696,7 +2698,7 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
             sServerFacade.GetChaseTarget(bot) == obj && 
             sServerFacade.GetChaseOffset(bot) == distance)
         {
-            bot->SetTarget(obj); //Needed to keep chase going in combat.
+            bot->SetTargetGuid(obj->GetObjectGuid()); //Needed to keep chase going in combat.
             bot->Attack((Unit*)obj, false); //Needed to keep chase going in combat.
             return true;
         }
@@ -2721,7 +2723,7 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
     if (!endPosition.isValid()) return false;
     if (angle > 20) angle = 0;
 
-    bot->SetTarget(obj); //Needed to keep chase going in combat.
+    bot->SetTargetGuid(obj->GetObjectGuid()); //Needed to keep chase going in combat.
     bot->Attack((Unit*)obj, false); //Needed to keep chase going in combat.
 
     mm.MoveChase((Unit*)obj, distance, angle);
@@ -3367,10 +3369,10 @@ bool SetBehindTargetAction::isUseful()
         return false;
 
     Unit* target = AI_VALUE(Unit*, "current target");
-    if (target && !bot->IsFacingTargetsBack(target))
+    if (target && !bot->IsBehindTarget(target))
     {
         // Don't move behind if the target is too far away
-        const float distance = bot->GetDistance(target, false);
+        const float distance = bot->GetDistance2d(target);
         return distance <= 15.0f;
     }
 
@@ -3389,7 +3391,7 @@ bool SetBehindTargetAction::isPossible()
             Player* playerTarget = dynamic_cast<Player*>(target);
             if(playerTarget)
             {
-                return bot->GetObjectGuid() != playerTarget->GetSelectionGuid();
+                return bot->GetObjectGuid() != playerTarget->GetTargetGuid();
             }
             // If the target is a NPC
             else 
@@ -3417,7 +3419,7 @@ bool MoveOutOfCollisionAction::Execute(Event& event)
         gy = botPos.getY();
         gz = botPos.getZ();
 #ifndef MANGOSBOT_TWO  
-        if (bot->GetMap()->GetReachableRandomPointOnGround(gx, gy, gz, ai->GetRange("follow")))
+        if (bot->GetMap()->GetWalkRandomPosition(bot->GetTransport(), gx, gy, gz, ai->GetRange("follow")))
 #else
         if (bot->GetMap()->GetReachableRandomPointOnGround(bot->GetPhaseMask(), gx, gy, gz, ai->GetRange("follow")))
 #endif
@@ -3606,7 +3608,7 @@ bool JumpAction::Execute(ai::Event &event)
 
             if ((bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == FOLLOW_MOTION_TYPE ||
             bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE) &&
-            (bot->GetMotionMaster()->GetCurrent()->GetCurrentTarget() != followTarget ||
+            (sServerFacade.GetChaseTarget(bot) != followTarget ||
             /*bot->InBattleGround() ||*/
             bot->GetTransport()))
                 return false;
@@ -3636,7 +3638,7 @@ bool JumpAction::Execute(ai::Event &event)
 
             if ((bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE ||
             bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE) &&
-            (bot->GetMotionMaster()->GetCurrent()->GetCurrentTarget() != chaseTarget ||
+            (sServerFacade.GetChaseTarget(bot) != chaseTarget ||
             /*bot->InBattleGround() ||*/
             bot->GetTransport()))
                 return false;
@@ -4135,8 +4137,9 @@ bool JumpAction::IsNotMagmaSlime(const WorldPosition &dest, Unit *jumper)
 {
     if (const TerrainInfo* terrain = dest.getTerrain())
     {
-        if (!terrain->CanCheckLiquidLevel(dest.getX(), dest.getY()))
-            return true;
+        // No "is a liquid level even known here" pre-check in this core; getLiquidStatus
+        // answers LIQUID_MAP_NO_WATER for a position with no liquid data, which is what the
+        // check below already treats as "not magma".
 
         GridMapLiquidData data;
         if (terrain->getLiquidStatus(dest.getX(), dest.getY(), dest.getZ(), MAP_ALL_LIQUIDS, &data) == LIQUID_MAP_NO_WATER)
@@ -4469,7 +4472,7 @@ WorldPosition JumpAction::GetPossibleJumpStartForInRange(const WorldPosition& sr
         gy = src.getY();
         gz = src.getZ();
 #ifndef MANGOSBOT_TWO  
-        if (jumper->GetMap()->GetReachableRandomPointOnGround(gx, gy, gz, distanceTo))
+        if (jumper->GetMap()->GetWalkRandomPosition(jumper->GetTransport(), gx, gy, gz, distanceTo))
 #else
         if (jumper->GetMap()->GetReachableRandomPointOnGround(bot->GetPhaseMask(), gx, gy, gz, distanceTo))
 #endif

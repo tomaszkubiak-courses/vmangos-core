@@ -91,7 +91,9 @@ bool HealTargetFullHealthTrigger::IsActive()
                 bool hpFull = pTarget->GetHealth() == pTarget->GetMaxHealth();
                 if (!hpFull && (pTarget->GetHealthPercent() > 90.f))
                 {
-                    uint32 healValue = uint32(currentSpell->m_damage);
+                    // The heal a cast is computing is not readable from outside Spell here,
+                    // so the spell's base points are what the check goes on.
+                    uint32 healValue = uint32(currentSpell->m_spellInfo->CalculateSimpleValue(EFFECT_INDEX_0));
                     uint32 needHeal = pTarget->GetMaxHealth() - pTarget->GetHealth();
                     if (healValue > needHeal && float((needHeal * 100.0f) / healValue) < 50.0f)
                     {

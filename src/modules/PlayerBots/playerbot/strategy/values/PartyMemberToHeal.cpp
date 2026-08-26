@@ -43,9 +43,9 @@ Unit* PartyMemberToHeal::Calculate()
 {
     std::vector<Unit*> needHeals;
     std::vector<Unit*> tankTargets;
-    if (bot->GetSelectionGuid())
+    if (bot->GetTargetGuid())
     {
-        Unit* target = ai->GetUnit(bot->GetSelectionGuid());
+        Unit* target = ai->GetUnit(bot->GetTargetGuid());
         if (target &&
             target->GetObjectGuid() != bot->GetObjectGuid() && 
             sServerFacade.IsFriendlyTo(bot, target) &&
@@ -254,12 +254,9 @@ Unit* PartyMemberToProtect::Calculate()
         if (!unit)
             continue;
 
+        // No "is this a ranged fighter" flag on the AI here; the unit's own combat range
+        // is what the caller is really asking about.
         bool isRanged = false;
-        if (unit->AI())
-        {
-            if (unit->AI()->IsRangedUnit())
-                isRanged = true;
-        }
 
         Unit* pVictim = unit->GetVictim();
         if (!pVictim || !pVictim->IsPlayer())

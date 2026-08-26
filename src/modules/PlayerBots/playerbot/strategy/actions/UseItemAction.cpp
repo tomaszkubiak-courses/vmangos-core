@@ -44,13 +44,14 @@ SpellCastResult BotUseItemSpell::ForceSpellStart(SpellCastTargets const* targets
     if (triggeredByAura)
         m_triggeredByAuraSpell = triggeredByAura->GetSpellProto();
 
-    SpellCastResult result = PreCastCheck();
+    // cmangos splits the pre-cast checks into PreCastCheck(); here they are CheckCast(),
+    // and there is no separate "ignore cast time" flag - a triggered cast has none.
+    SpellCastResult result = CheckCast(true);
     bool failed = result != SPELL_CAST_OK;
     if (result == SPELL_FAILED_BAD_TARGETS && OpenLockCheck())
     {
         failed = false;
         m_IsTriggeredSpell = true;
-        m_ignoreCastTime = true;
     }
 
     if (result == SPELL_FAILED_REAGENTS && itemCheats)
@@ -359,9 +360,9 @@ bool UseAction::Execute(Event& event)
             else
             {
                 Unit* target = nullptr;
-                if (requester && ai->HasActivePlayerMaster() && requester->GetSelectionGuid())
+                if (requester && ai->HasActivePlayerMaster() && requester->GetTargetGuid())
                 {
-                    target = ai->GetUnit(requester->GetSelectionGuid());
+                    target = ai->GetUnit(requester->GetTargetGuid());
                 }
 
                 return UseItem(requester, itemID, target);
@@ -673,7 +674,8 @@ bool UseAction::UseItemInternal(Player* requester, uint32 itemId, Unit* unit, Ga
             if (itemUsed)
             {
                 spell->SetCastItem(itemUsed);
-                itemUsed->SetUsedInSpell(true);
+                // No "in use by a spell" flag on Item here; the cast holds the item and
+                // consumes it when it completes.
             }
 
             // Stop the movement for casted items
@@ -925,9 +927,13 @@ bool UseAction::UseGameObject(Player* requester, Event& event, GameObject* gameO
         }
     }
 
-    std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-    *packet << guid;
-    bot->GetSession()->QueuePacket(std::move(packet));
+    WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+    packet << guid;
+
+
+    bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
     
     std::ostringstream out; out << "Using " << chat->formatGameobject(gameObject);
     ai->TellPlayerNoFacing(requester, out.str(), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
@@ -1002,10 +1008,12 @@ bool UseAction::OpenItem(Player* requester, Item* item)
         return false;
 
         // Open quest item in inventory, containing related items (e.g Gnarlpine necklace, containing Tallonkai's Jewel)
-        std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_OPEN_ITEM, 2));
-        *packet << item->GetBagSlot();
-        *packet << item->GetSlot();
-        bot->GetSession()->QueuePacket(std::move(packet)); // queue the packet to get around race condition
+        // Queued rather than handled inline, to get around the race the donor hit here; the
+        // session queue holds parsed packets, so it is parsed on the way in.
+        WorldPacket packet(CMSG_OPEN_ITEM, 2);
+        packet << item->GetBagSlot();
+        packet << item->GetSlot();
+        BotQueuePacket<WorldPackets::Spell::OpenItem>(bot->GetSession(), packet);
         return true;
 }
 

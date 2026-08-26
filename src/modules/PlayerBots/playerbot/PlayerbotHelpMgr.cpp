@@ -825,7 +825,7 @@ void PlayerbotHelpMgr::GenerateHelp()
         0,
         0,
         0, // hairColor,
-        0, 0);
+        0);
 
     ai = new PlayerbotAI(bot);
 

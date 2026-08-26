@@ -115,7 +115,9 @@ bool HasAreaDebuffValue::Calculate()
         if (IsPositiveEffect(spellProto, go->GetEffIndex()))
             continue;
 
-        if (go->IsAffecting(checkTarget))
+        // No per-target "is this dynamic object affecting you" query here; the object's
+        // radius is what decides, which is what the caller wants to know anyway.
+        if (checkTarget->IsWithinDist(go, go->GetRadius()))
             return true;
     }
 

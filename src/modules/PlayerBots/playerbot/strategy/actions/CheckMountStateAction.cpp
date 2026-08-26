@@ -302,7 +302,7 @@ bool CheckMountStateAction::isUseful()
         }
     }
 
-    if (!bot->GetMap()->IsMountAllowed() && bot->GetMapId() != 531)
+    if (!bot->GetMap()->GetMapEntry()->IsMountAllowed() && bot->GetMapId() != 531)
         return false;
 
     if (AI_VALUE(std::vector<MountValue>, "mount list").empty())

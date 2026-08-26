@@ -75,7 +75,8 @@ bool SeeSpellAction::Execute(Event& event)
 
     SpellCastTargets targets;
 
-    p >> targets.ReadForCaster(requester);
+    // The reader here takes the buffer directly; there is no caster-bound proxy.
+    targets.read(p);
     // Penqle exposes getDestination() instead of m_destPos.
     float dx, dy, dz; targets.getDestination(dx, dy, dz);
     WorldPosition spellPosition(requester->GetMapId(), dx, dy, dz);

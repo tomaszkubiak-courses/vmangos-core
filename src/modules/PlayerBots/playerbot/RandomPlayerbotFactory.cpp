@@ -378,7 +378,7 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
 	        face.first,
 	        hair.first,
 	        hair.second, // hairColor,
-	        facialHair, 0))
+	        facialHair))
     {
         player->DeleteFromDB(player->GetObjectGuid(), accountId, true, true);
         delete session;
@@ -387,9 +387,6 @@ bool RandomPlayerbotFactory::CreateRandomBot(uint8 cls, uint8 inputRace)
                 accountId, name.c_str(), race, cls);
         return false;
     }
-
-    player->setCinematic(2);
-    player->SetAtLoginFlag(AT_LOGIN_NONE);
     //player->SetSemaphoreTeleportFar(true); //Fake teleport to delay sql save
     //player->SaveToDB();
     //player->SetSemaphoreTeleportFar(false);

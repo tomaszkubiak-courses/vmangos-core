@@ -242,7 +242,11 @@ class Channel
         void SendToAll(WorldPacket* data, ObjectGuid guid = ObjectGuid());
         void SendToOne(WorldPacket* data, ObjectGuid who);
 
+    public:
+        // Whether a character is in this channel. A query, and the playerbots module asks
+        // it before making a bot say anything in one.
         bool IsOn(ObjectGuid who) const { return m_players.find(who) != m_players.end(); }
+    private:
         bool IsBanned(ObjectGuid guid) const { return m_banned.find(guid) != m_banned.end(); }
 
         uint8 GetPlayerFlags(ObjectGuid guid) const

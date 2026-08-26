@@ -533,8 +533,7 @@ void PlayerbotHolder::LogoutPlayerBot(uint32 guid, bool allowInstant, bool forDe
                 ai->TellPlayer(ai->GetMaster(), BOT_TEXT("logout_start"));
 
                 WorldPacket p(CMSG_LOGOUT_REQUEST);
-                std::unique_ptr<WorldPacket> packet(new WorldPacket(p));
-                botWorldSessionPtr->QueuePacket(std::move(packet));
+                botWorldSessionPtr->BotHandleLogoutRequestOpcode(p);
                 SC_LOG("LogoutPlayerBot bot=%s — CMSG_LOGOUT_REQUEST queued, returning", bot->GetName());
 
                 //WorldPacket p;
@@ -560,7 +559,7 @@ void PlayerbotHolder::LogoutPlayerBot(uint32 guid, bool allowInstant, bool forDe
         {
             ai->TellPlayer(ai->GetMaster(), BOT_TEXT("goodbye"));
             playerBots[guid] = nullptr;    // deletes bot player ptr inside this WorldSession PlayerBotMap
-            botWorldSessionPtr->LogoutPlayer(); // this will delete the bot Player object and PlayerbotAI object
+            botWorldSessionPtr->LogoutPlayer(true); // this will delete the bot Player object and PlayerbotAI object
             //botWorldSessionPtr->LogoutPlayer(true); // this will delete the bot Player object and PlayerbotAI object
             if(!sWorld.FindSession(botWorldSessionPtr->GetAccountId())) //Real player sessions will get removed later.
                 delete botWorldSessionPtr;  // finally delete the bot's WorldSession
@@ -574,7 +573,7 @@ void PlayerbotHolder::DisablePlayerBot(uint32 guid, bool logOutPlayer)
     if (bot)
     {
         if (logOutPlayer && GetBotAI(bot)->IsRealPlayer() && bot->GetGroup() && sPlayerbotAIConfig.IsFreeAltBot(guid))
-            bot->GetSession()->SetOffline(); //Prevent groupkick
+            bot->GetSession()->SetDisconnectedSession(); //Prevent groupkick
         GetBotAI(bot)->TellPlayer(GetBotAI(bot)->GetMaster(), BOT_TEXT("goodbye"));
         GetBotAI(bot)->StopMoving();
         MotionMaster& mm = *bot->GetMotionMaster();
@@ -688,7 +687,7 @@ void PlayerbotHolder::JoinChatChannels(Player* bot)
                     break;
             }
             if (new_channel)
-                new_channel->Join(bot, "");
+                new_channel->Join(bot->GetObjectGuid(), "");
         }
     }
 }
@@ -708,7 +707,7 @@ void PlayerbotHolder::OnBotLogin(Player * const bot)
     // Clear intro cinematic state — bots never watch it but HandlePlayerLogin sets
     // watching_cinematic_entry for characters that haven't logged in via a real client,
     // which makes IsTargetable() return false and breaks combat entirely.
-    if (bot->watching_cinematic_entry != 0)
+    if (bot->GetCurrentCinematicEntry() != 0)
         bot->CinematicEnd();
 
     if(!ai->HasRealPlayerMaster())
@@ -1751,9 +1750,7 @@ std::string PlayerbotHolder::HandleConsoleWhisper(Player* bot, Player* master, c
     packet_template << reciever->GetName();
     packet_template << message;
 
-    std::unique_ptr<WorldPacket> packetPtr(new WorldPacket(packet_template));
-
-    sender->GetSession()->QueuePacket(std::move(packetPtr));
+    BotQueuePacket<WorldPackets::Chat::ChatMessage>(sender->GetSession(), packet_template);
 
     std::string msg = "Sending whisper " + message + " to player " + reciever->GetName() + " from " + sender->GetName();
 
@@ -1969,8 +1966,7 @@ std::list<std::string> PlayerbotHolder::HandleParty(Player* master, const std::s
     packet_template << LANG_UNIVERSAL;
     packet_template << message;
 
-    std::unique_ptr<WorldPacket> packetPtr(new WorldPacket(packet_template));
-    master->GetSession()->QueuePacket(std::move(packetPtr));
+    BotQueuePacket<WorldPackets::Chat::ChatMessage>(master->GetSession(), packet_template);
     return {"Sent party message \"" + message + "\" as " + master->GetName()};
 }
 
@@ -2015,8 +2011,7 @@ std::list<std::string> PlayerbotHolder::HandleGuild(Player* master, const std::s
     packet_template << LANG_UNIVERSAL;
     packet_template << message;
 
-    std::unique_ptr<WorldPacket> packetPtr(new WorldPacket(packet_template));
-    master->GetSession()->QueuePacket(std::move(packetPtr));
+    BotQueuePacket<WorldPackets::Chat::ChatMessage>(master->GetSession(), packet_template);
     return {"Sent guild message \"" + message + "\" as " + master->GetName()};
 }
 
@@ -2070,8 +2065,7 @@ std::list<std::string> PlayerbotHolder::HandleRaid(Player* master, const std::st
     packet_template << LANG_UNIVERSAL;
     packet_template << message;
 
-    std::unique_ptr<WorldPacket> packetPtr(new WorldPacket(packet_template));
-    master->GetSession()->QueuePacket(std::move(packetPtr));
+    BotQueuePacket<WorldPackets::Chat::ChatMessage>(master->GetSession(), packet_template);
     return {"Sent raid message \"" + message + "\" as " + master->GetName()};
 }
 
@@ -2099,8 +2093,7 @@ std::list<std::string> PlayerbotHolder::HandleRaidLeader(Player* master, const s
     packet_template << LANG_UNIVERSAL;
     packet_template << message;
 
-    std::unique_ptr<WorldPacket> packetPtr(new WorldPacket(packet_template));
-    master->GetSession()->QueuePacket(std::move(packetPtr));
+    BotQueuePacket<WorldPackets::Chat::ChatMessage>(master->GetSession(), packet_template);
     std::string result = "Sent raid leader transfer request as " + std::string(master->GetName());
     return {result};
 }
@@ -2388,16 +2381,13 @@ void PlayerbotHolder::CreateBot(Player* master, const std::string param, std::li
         0, LOCALE_enUS);
 #endif
         Player* newBot = new Player(botSession);
-        if (!newBot->Create(sObjectMgr.GeneratePlayerLowGuid(), name, race, cls, gender, skin, face, hairStyle, hairColor, facialHair, 0))
+        if (!newBot->Create(sObjectMgr.GeneratePlayerLowGuid(), name, race, cls, gender, skin, face, hairStyle, hairColor, facialHair))
         {
             delete botSession;
             delete newBot;
             messages.push_back("Failed to create character");
             return;
         }
-
-        newBot->setCinematic(2);
-        newBot->SetAtLoginFlag(AT_LOGIN_NONE);
         sObjectAccessor.AddObject(newBot);
 
         uint32 botGuid = newBot->GetGUIDLow();
@@ -2481,7 +2471,7 @@ void PlayerbotHolder::CreateBot(Player* master, const std::string param, std::li
 
         messages.push_back("Bot created: " + name);
 
-        botSession->LogoutPlayer();
+        botSession->LogoutPlayer(true);
         sObjectAccessor.RemoveObject(newBot);
         delete newBot;
         delete botSession;
@@ -2852,7 +2842,7 @@ bool PlayerbotHolder::DeleteBot(ObjectGuid guid, bool allowInstant)
 {
     uint32 botAccount = sObjectMgr.GetPlayerAccountIdByGUID(guid);
 
-    if (Player* player = sObjectMgr.GetPlayer(guid, true))
+    if (Player* player = sObjectMgr.GetPlayer(guid))
     {
         //Attempt instant logout.
         player->SetFlag(PLAYER_FLAGS, PLAYER_FLAGS_RESTING); 
@@ -2955,7 +2945,9 @@ std::string PlayerbotHolder::HandleBotGear(Player* bot, Player* master, const st
 std::string PlayerbotHolder::HandleBotTrainLearn(Player* bot, Player* master, const std::string param)
 {
 #ifndef MANGOSBOT_ONE
-    bot->learnClassLevelSpells();
+    // The starting spells of the character's class and level are what LearnDefaultSpells
+    // grants here; the rest come from a trainer.
+    bot->LearnDefaultSpells();
 #endif
     return "class level spells learned";
 }

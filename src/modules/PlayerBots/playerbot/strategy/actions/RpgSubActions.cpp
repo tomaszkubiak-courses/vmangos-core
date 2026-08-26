@@ -214,7 +214,7 @@ bool RpgTaxiAction::Execute(Event& event)
         return false;
     }
 #ifdef MANGOSBOT_TWO                
-    bot->OnTaxiFlightEject(true);
+    bot->GetTaxi().ClearTaxiDestinations();
 #endif
     if (!bot->ActivateTaxiPathTo({ entry->from, entry->to }, flightMaster, 0))
     {
@@ -298,7 +298,7 @@ bool RpgUseAction::isUseful()
 
             //Do not get in cart if miner is moving some other bot. (This is a core bug, minecart will head to other more distant miner if it exists).
             Creature* creature = nullptr;
-            MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck creature_check(*bot, 28841, true, false, 500.0f, true);
+            MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck creature_check(*bot, 28841, true, 500.0f);
             MaNGOS::CreatureLastSearcher<MaNGOS::NearestCreatureEntryWithLiveStateInObjectRangeCheck> searcher(creature, creature_check);
             Cell::VisitGridObjects(bot, searcher, 500.0f);
 
@@ -602,7 +602,7 @@ void RpgAIChatAction::ManualChat(GuidPosition target, const std::string& line)
     {
         llmContext.clear();
         SET_GAI_VALUE2(std::string, "global string", "llmcontext manual" + std::to_string(target.GetCounter()), llmContext);
-        bot->SendMessageToPlayer("<conversation restarted>");
+        bot->SendSysMessage("<conversation restarted>");
         return;
     }
     else if (line == "undo")
@@ -613,7 +613,7 @@ void RpgAIChatAction::ManualChat(GuidPosition target, const std::string& line)
 
         llmContext = llmContext.substr(0, std::max(lastBot,lastUnit));
         SET_GAI_VALUE2(std::string, "global string", "llmcontext manual" + std::to_string(target.GetCounter()), llmContext);
-        bot->SendMessageToPlayer("<last message remove>");
+        bot->SendSysMessage("<last message remove>");
         return;
     }
     else if (line == "impersonate")
@@ -649,7 +649,7 @@ void RpgAIChatAction::ManualChat(GuidPosition target, const std::string& line)
         SET_AI_VALUE2(int32, "manual int", "rpg ai chat line", 11);
 
         if (line.find("*") == 0)
-            bot->TextEmote(line);
+            bot->TextEmote(line.c_str());
         else
             bot->Say(line, LANG_UNIVERSAL);
 

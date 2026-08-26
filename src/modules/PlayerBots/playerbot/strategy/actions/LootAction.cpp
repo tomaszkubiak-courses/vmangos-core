@@ -159,7 +159,7 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
 
     if (creature)
     {
-        SkillType skill = (SkillType)creature->GetCreatureInfo()->GetRequiredLootSkill();
+        SkillType skill = SKILL_SKINNING;
         sLog.outDebug("[BOT LOOT] %s: gather/skin path skill=%u reqValue=%u", bot->GetName(), skill, lootObject.reqSkillValue);
         if (!CanOpenLock(skill, lootObject.reqSkillValue))
         {
@@ -199,7 +199,7 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
             if (go->ActivateToQuest(bot))
             {
                 std::list<uint32> lootItems = GAI_VALUE2(std::list<uint32>, "entry loot list", -1*int32(go->GetEntry()));
-                isForQuest = !lootItems.empty() || go->GetLootState() != GO_READY;
+                isForQuest = !lootItems.empty() || go->getLootState() != GO_READY;
             }
         }
 
@@ -415,11 +415,9 @@ bool StoreLootAction::Execute(Event& event)
 
         ItemQualifier itemQualifier(itemid, ((int32)randomPropertyId));
 
-		if (lootslot_type != LOOT_SLOT_NORMAL
-#ifndef MANGOSBOT_ZERO
-		        && lootslot_type != LOOT_SLOT_OWNER
-#endif
-            )
+		// The slot types here are the TrinityCore-style names: ALLOW_LOOT is the one a bot
+		// may take, OWNER is the single-player case that skips the binding confirmation.
+		if (lootslot_type != LOOT_SLOT_TYPE_ALLOW_LOOT && lootslot_type != LOOT_SLOT_TYPE_OWNER)
 		{
 			sLog.outDebug("[BOT LOOT] %s: skip item=%u slot_type=%u (not normal/owner)", bot->GetName(), itemid, lootslot_type);
 			continue;

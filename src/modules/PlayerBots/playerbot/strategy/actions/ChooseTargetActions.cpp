@@ -34,7 +34,13 @@ bool AttackAnythingAction::isUseful()
     if (ai->ContainsStrategy(STRATEGY_TYPE_HEAL) && !ai->HasStrategy("offdps", BotState::BOT_STATE_COMBAT))
         return false;
 
-    if(!target->IsPlayer() && bot->isInFront(target,BotGetAttackDistance(target, bot)*1.5f, M_PI_F*0.5f) && target->CanInitiateAttack() && target->GetLevel() < bot->GetLevel() + 3.0) //Attack before being attacked.
+    // Attack before being attacked: in front of the bot, within half again its aggro radius,
+    // and low enough level to be worth it.
+    if (!target->IsPlayer() &&
+        bot->HasInArc(target, M_PI_F * 0.5f) &&
+        bot->IsWithinDistInMap(target, BotGetAttackDistance(target, bot) * 1.5f) &&
+        (target->IsCreature() && ((Creature*)target)->CanInitiateAttack()) &&
+        target->GetLevel() < bot->GetLevel() + 3.0)
         return true;
 
     if (AI_VALUE(bool, "travel target traveling") && CanFreeMoveValue::CanFreeMoveTo(ai, *AI_VALUE(TravelTarget*,"travel target")->GetPosition())) //Bot is traveling

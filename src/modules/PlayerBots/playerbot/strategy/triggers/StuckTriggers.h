@@ -103,15 +103,16 @@ namespace ai
             }
 
 #ifdef MANGOSBOT_TWO
-            if (cell.GridX() > 0 && cell.GridY() > 0 && !MMAP::MMapFactory::createOrGetMMapManager()->IsMMapTileLoaded(botPos.getMapId(), 0, cell.GridX(), cell.GridY()) && !MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), botPos.getMapId(), 0, cell.GridX(), cell.GridY(), 0))
+            if (cell.GridX() > 0 && cell.GridY() > 0 && !MMAP::MMapFactory::createOrGetMMapManager()->IsMMapTileLoaded(botPos.getMapId(), 0, cell.GridX(), cell.GridY()) && !MMAP::MMapFactory::createOrGetMMapManager()->loadMap(botPos.getMapId(), 0, cell.GridX(), cell.GridY(), 0))
             {
                 ai->TellDebug(ai->GetMaster(), "Stuck: In unloaded grid" + std::to_string(grid.x_coord) + "," + std::to_string(grid.y_coord), "debug stuck");
 
                 return true;
             }
 #else
-            if (cell.GridX() > 0 && cell.GridY() > 0 && !MMAP::MMapFactory::createOrGetMMapManager()->IsMMapIsLoaded(botPos.getMapId(), cell.GridX(), cell.GridY()) 
-                && !MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), botPos.getMapId(), cell.GridX(), cell.GridY()))
+            if (cell.GridX() > 0 && cell.GridY() > 0
+                && !MMAP::MMapFactory::createOrGetMMapManager()->GetNavMesh(botPos.getMapId())
+                && !MMAP::MMapFactory::createOrGetMMapManager()->loadMap(botPos.getMapId(), cell.GridX(), cell.GridY()))
             {
                 ai->TellDebug(ai->GetMaster(), "Stuck: In unloaded grid" + std::to_string(grid.x_coord) + "," + std::to_string(grid.y_coord), "debug stuck");
 
@@ -240,7 +241,7 @@ namespace ai
 
             if (Group* group = bot->GetGroup())
             {
-                Player* leader = sObjectMgr.GetPlayer(group->GetLeaderGuid(), true);
+                Player* leader = sObjectMgr.GetPlayer(group->GetLeaderGuid());
                 if (!leader)
                     return false;
 

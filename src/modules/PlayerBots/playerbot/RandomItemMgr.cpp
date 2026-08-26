@@ -1211,7 +1211,7 @@ void RandomItemMgr::BuildItemInfoCache()
 
                 // check faction conditions
                 VendorItemData const* vItems = sObjectMgr.GetNpcVendorItemList(vendor);
-                VendorItemData const* tItems = sObjectMgr.GetNpcVendorTemplateItemList(cInfo->VendorTemplateId);
+                VendorItemData const* tItems = sObjectMgr.GetNpcVendorTemplateItemList(cInfo->vendor_id);
 
                 if (vItems || tItems)
                 {
@@ -2985,7 +2985,7 @@ bool RandomItemMgr::CanBuyFromVendor(Player *player, uint32 itemId, uint32 creat
 
     VendorItemList vendorItems;
     VendorItemData const* vItems = sObjectMgr.GetNpcVendorItemList(creatureId);
-    VendorItemData const* tItems = sObjectMgr.GetNpcVendorTemplateItemList(cInfo->VendorTemplateId);
+    VendorItemData const* tItems = sObjectMgr.GetNpcVendorTemplateItemList(cInfo->vendor_id);
 
     if (!vItems && !tItems)
     {
@@ -3009,7 +3009,7 @@ bool RandomItemMgr::CanBuyFromVendor(Player *player, uint32 itemId, uint32 creat
                     ReputationRank(pProto->RequiredReputationRank) > player->GetReputationRank(sFactionTemplateStore.LookupEntry(cInfo->faction)->faction))
                     return false;
 
-                if (crItem->conditionId && !sObjectMgr.IsConditionSatisfied(crItem->conditionId, player, player->GetMap(), nullptr, CONDITION_FROM_VENDOR))
+                if (crItem->conditionId && !IsConditionSatisfied(crItem->conditionId, player, player->GetMap(), nullptr, CONDITION_FROM_VENDOR))
                     return false;
             }
             return true;
@@ -3228,13 +3228,13 @@ uint32 RandomItemMgr::GetLiveStatWeight(Player* player, uint32 itemId, uint32 sp
 
 #ifdef MANGOSBOT_ZERO
     // skip missing pvp ranks
-    if (info->pvpRank && player->GetHonorHighestRankInfo().rank < info->pvpRank)
+    if (info->pvpRank && player->GetHonorMgr().GetHighestRank().rank < info->pvpRank)
         return 0;
-    if (info->pvpRank && info->pvpRank < 16 && player->GetHonorHighestRankInfo().rank == 18)
+    if (info->pvpRank && info->pvpRank < 16 && player->GetHonorMgr().GetHighestRank().rank == 18)
         return 0;
 
     // skip non pvp items for some specs
-    if (info->pvpRank < 16 && player->GetHonorHighestRankInfo().rank == 18)
+    if (info->pvpRank < 16 && player->GetHonorMgr().GetHighestRank().rank == 18)
     {
         ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
         if (proto && !(

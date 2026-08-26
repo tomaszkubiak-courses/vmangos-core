@@ -17,7 +17,7 @@ bool GossipHelloAction::Execute(Event& event)
 	if (p.empty())
 	{
 		if (requester)
-			guid = requester->GetSelectionGuid();
+			guid = requester->GetTargetGuid();
 	}
 	else
 	{
@@ -47,7 +47,7 @@ bool GossipHelloAction::Execute(Event& event)
 
         if (pCreature)
         {
-            if (!sScriptDevAIMgr.OnGossipHello(bot, pCreature))
+            if (!sScriptMgr.OnGossipHello(bot, pCreature))
             {
                 bot->PrepareGossipMenu(pCreature, pCreature->GetDefaultGossipMenuId());
             }
@@ -105,7 +105,7 @@ void GossipHelloAction::TellGossipMenus(Player* requester)
 
      if (requester)
      {
-         Creature* pCreature = bot->GetNPCIfCanInteractWith(requester->GetSelectionGuid(), UNIT_NPC_FLAG_NONE);
+         Creature* pCreature = bot->GetNPCIfCanInteractWith(requester->GetTargetGuid(), UNIT_NPC_FLAG_NONE);
 
          if (pCreature)
          {

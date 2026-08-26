@@ -8,14 +8,14 @@ using namespace ai;
 bool SetHomeAction::Execute(Event& event)
 {
     Player* requester = event.getOwner() ? event.getOwner() : GetMaster();
-    ObjectGuid selection = bot->GetSelectionGuid();
+    ObjectGuid selection = bot->GetTargetGuid();
     bool isRpgAction = AI_VALUE(GuidPosition, "rpg target") == selection;
 
     if (!isRpgAction)
     {
         if (requester)
         {
-            selection = requester->GetSelectionGuid();
+            selection = requester->GetTargetGuid();
         }
         else
         {

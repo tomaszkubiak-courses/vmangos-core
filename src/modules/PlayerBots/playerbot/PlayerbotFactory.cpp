@@ -673,7 +673,7 @@ void PlayerbotFactory::InitPet()
         return;
     }
 
-    for (PetSpellMap::const_iterator itr = pet->m_spells.begin(); itr != pet->m_spells.end(); ++itr)
+    for (PetSpellMap::const_iterator itr = pet->m_petSpells.begin(); itr != pet->m_petSpells.end(); ++itr)
     {
         if(itr->second.state == PETSPELL_REMOVED)
             continue;

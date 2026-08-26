@@ -147,7 +147,7 @@ bool UseFishingBobberAction::Execute(Event& event)
         if (obj->GetOwnerGuid() != bot->GetObjectGuid())
             continue;
 
-        if (obj->GetLootState() != GO_READY)
+        if (obj->getLootState() != GO_READY)
         {
             time_t bobberActiveTime = obj->GetRespawnTime() - FISHING_BOBBER_READY_TIME;
             if (bobberActiveTime > time(0))
@@ -157,9 +157,13 @@ bool UseFishingBobberAction::Execute(Event& event)
             return true;
         }
 
-        std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-        *packet << obj->GetObjectGuid();
-        bot->GetSession()->QueuePacket(std::move(packet));
+        WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+        packet << obj->GetObjectGuid();
+
+
+        bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
 
         std::ostringstream out; out << "Opening " << chat->formatGameobject(obj);
         ai->TellPlayerNoFacing(ai->GetMaster(), out.str(), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);

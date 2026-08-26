@@ -33,7 +33,7 @@ bool AttackMyTargetAction::Execute(Event& event)
 
     if(requester)
     {
-        const ObjectGuid guid = requester->GetSelectionGuid();
+        const ObjectGuid guid = requester->GetTargetGuid();
         SC_LOG("attack-cmd selection bot=%s requester=%s selGuid=0x%016llx",
                bot ? bot->GetName() : "(null)",
                requester->GetName(),

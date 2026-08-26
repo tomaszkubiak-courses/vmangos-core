@@ -177,9 +177,8 @@ bool MoveToRpgTargetAction::Execute(Event& event)
         Creature* creature = static_cast<Creature*>(unit);
 
 
-        if (creature)
-            if (uint32 pauseTimer = creature->GetInteractionPauseTimer())
-                creature->GetMotionMaster()->PauseWaypoints(pauseTimer);
+        // cmangos pauses a creature's waypoint route while a player is talking to it. This
+        // core has no such pause, and a bot talking to an npc does not stop it walking.
     }
         couldMove = MoveTo(mapId, x, y, z, false, false);
 

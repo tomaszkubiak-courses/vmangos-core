@@ -916,6 +916,7 @@ class WorldSession
         void BotHandleSelfResOpcode(WorldPacket& recvPacket);
         void BotHandleMovementOpcodes(WorldPacket& recvPacket);
         void BotHandlePetAction(WorldPacket& recvPacket);
+        void BotHandleMoveKnockBackAck(WorldPacket& recvPacket);
 
         // A character the module drives has no socket, so nothing would otherwise let
         // its queued packets through CanProcessPackets(). The module marks the session

@@ -125,11 +125,11 @@ bool PetitionOfferAction::Execute(Event& event)
     if (!master)
     {
         if (!guid)
-            guid = bot->GetSelectionGuid();
+            guid = bot->GetTargetGuid();
     }
     else {
         if (!guid)
-            guid = master->GetSelectionGuid();
+            guid = master->GetTargetGuid();
     }
 
     if (!guid)
@@ -157,7 +157,7 @@ bool PetitionOfferAction::Execute(Event& event)
 
     bot->GetSession()->BotHandleOfferPetitionOpcode(data);
 
-    result = CharacterDatabase.PQuery("SELECT playerguid FROM petition_sign WHERE petitionguid = '%u'", petitions.front()->GetObjectGuid().GetCounter();
+    result = CharacterDatabase.PQuery("SELECT playerguid FROM petition_sign WHERE petitionguid = '%u'", petitions.front()->GetObjectGuid().GetCounter());
     uint8 signs = result ? (uint8)result->GetRowCount() : 0;
 
     context->GetValue<uint8>("petition signs")->Set(signs);

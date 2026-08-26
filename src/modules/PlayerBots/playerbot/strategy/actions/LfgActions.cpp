@@ -94,7 +94,10 @@ bool LfgJoinAction::JoinLFG()
     //IterateItems(&visitor, ITERATE_ITEMS_IN_EQUIP);
     //bool raid = (urand(0, 100) < 50 && visitor.count[ITEM_QUALITY_EPIC] >= 5 && (bot->GetLevel() == 60 || bot->GetLevel() == 70 || bot->GetLevel() == 80));
 
-    MeetingStoneSet stones = sWorld.GetLFGQueue().GetDungeonsForPlayer(bot);
+    // The donor's core kept a per-player list of meeting-stone dungeons. This one does not,
+    // so the bot has nothing to pick from until the LFG side of the port is wired up -
+    // see doc/PLAYERBOT_PORT_SCOPE.md.
+    MeetingStoneSet stones;
     if (!stones.size())
         return false;
 
@@ -137,7 +140,7 @@ bool LfgJoinAction::JoinLFG()
 
         for (MeetingStoneSet::iterator i = stones.begin(); i != stones.end(); ++i)
         {
-            if (i->area == dungeonId)
+            if (i->areaId == dungeonId)
                 selected.push_back(*i);
         }
     }
@@ -177,7 +180,7 @@ bool LfgJoinAction::JoinLFG()
 
     sLog.outDetail("Bot #%d %s:%d <%s>: uses LFG, Dungeon - %s (%s)", bot->GetGUIDLow(), bot->GetTeam() == ALLIANCE ? "A" : "H", bot->GetLevel(), bot->GetName(), stoneInfo.name, _botRoles.c_str());
 
-    sLFGMgr.AddToQueue(bot, stoneInfo.area);
+    sLFGMgr.AddToQueue(bot, stoneInfo.areaId);
 #endif
 #ifdef MANGOSBOT_ONE
     uint32 zoneLFG = 0;
@@ -1060,8 +1063,8 @@ bool LfgLeaveAction::Execute(Event& event)
     //if (ai->HasStrategy("lfg", BotState::BOT_STATE_NON_COMBAT))
     //    return false;
 #ifdef MANGOSBOT_ZERO
-    LFGPlayerQueueInfo qInfo;
-    sWorld.GetLFGQueue().GetPlayerQueueInfo(&qInfo, bot->GetObjectGuid());
+    LFGPlayerQueueInfo const* qInfoPtr = sWorld.GetLFGQueue().GetPlayerQueueInfo(bot->GetObjectGuid());
+    LFGPlayerQueueInfo const qInfo = qInfoPtr ? *qInfoPtr : LFGPlayerQueueInfo();
     AreaTableEntry const* area = GetAreaEntryByAreaID(qInfo.areaId);
     if (area)
     {
@@ -1113,8 +1116,8 @@ bool LfgLeaveAction::isUseful()
         return false;
     else
     {
-        LFGPlayerQueueInfo qInfo;
-        sWorld.GetLFGQueue().GetPlayerQueueInfo(&qInfo, bot->GetObjectGuid());
+        LFGPlayerQueueInfo const* qInfoPtr = sWorld.GetLFGQueue().GetPlayerQueueInfo(bot->GetObjectGuid());
+        LFGPlayerQueueInfo const qInfo = qInfoPtr ? *qInfoPtr : LFGPlayerQueueInfo();
         if (qInfo.timeInLFG < (5 * MINUTE * IN_MILLISECONDS))
             return false;
     }

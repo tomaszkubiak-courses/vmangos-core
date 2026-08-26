@@ -83,9 +83,9 @@ bool CastCustomSpellAction::Execute(Event& event)
     
     if (!target)
     {
-        if (requester && requester->GetSelectionGuid())
+        if (requester && requester->GetTargetGuid())
         {
-            target = ai->GetUnit(requester->GetSelectionGuid());
+            target = ai->GetUnit(requester->GetTargetGuid());
         }
     }
 
@@ -331,9 +331,9 @@ bool CastCustomSpellAction::CastSummonPlayer(Player* requester, std::string comm
                 else
                 {
                     // Get target from requester target
-                    if (requester && requester->GetSelectionGuid())
+                    if (requester && requester->GetTargetGuid())
                     {
-                        const ObjectGuid& targetGuid = requester->GetSelectionGuid();
+                        const ObjectGuid& targetGuid = requester->GetTargetGuid();
                         if (targetGuid.IsPlayer())
                         {
                             const Group* group = bot->GetGroup();
@@ -440,17 +440,17 @@ bool CastRandomSpellAction::Execute(Event& event)
         }
     }    
 
-    if (!got && !target && bot->GetSelectionGuid())
+    if (!got && !target && bot->GetTargetGuid())
     {
-        target = ai->GetUnit(bot->GetSelectionGuid());
-        got = ai->GetGameObject(bot->GetSelectionGuid());
+        target = ai->GetUnit(bot->GetTargetGuid());
+        got = ai->GetGameObject(bot->GetTargetGuid());
     }
 
     if (!got && !target)
     {
-        if (requester && requester->GetSelectionGuid())
+        if (requester && requester->GetTargetGuid())
         {
-            target = ai->GetUnit(requester->GetSelectionGuid());
+            target = ai->GetUnit(requester->GetTargetGuid());
         }
     }
 

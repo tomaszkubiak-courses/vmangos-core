@@ -159,3 +159,14 @@ void BotLog::outErrorDb(const char* fmt, ...)
 {
     BOTLOG_IMPL("[ERROR_DB] ", LOG_DBERROR, LOG_LVL_ERROR)
 }
+
+void BotLog::Out(LogType logType, LogLevel logLevel, const char* fmt, ...)
+{
+    char msg[4096];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+
+    Log::Instance().Out(logType, logLevel, "%s", msg);
+}

@@ -354,7 +354,7 @@ bool AhBidAction::ExecuteCommand(Player* requester, std::string text, Unit* auct
         if (!proto)
             continue;
 
-        if(proto->Name1.empty())
+        if((!proto->Name1 || !*proto->Name1))
             continue;
 
         if (!strstri(proto->Name1, text.c_str()))

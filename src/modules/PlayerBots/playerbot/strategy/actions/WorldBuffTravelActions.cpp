@@ -771,9 +771,13 @@ bool WorldBuffTravelDMTakePortalAction::Execute(Event& event)
             return MoveTo(portalGO->GetMapId(), portalGO->GetPositionX(),
                 portalGO->GetPositionY(), portalGO->GetPositionZ());
 
-        std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-        *packet << portalGO->GetObjectGuid();
-        bot->GetSession()->QueuePacket(std::move(packet));
+        WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+        packet << portalGO->GetObjectGuid();
+
+
+        bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
 
         ai->TellPlayer(GetMaster(), std::string("Taking the portal to ") + keyword + "!");
         context->GetValue<uint8>("world buff travel step")->Set(
@@ -840,9 +844,13 @@ bool WorldBuffTravelTakePortalAction::Execute(Event& event)
             return MoveTo(portalGO->GetMapId(), portalGO->GetPositionX(),
                 portalGO->GetPositionY(), portalGO->GetPositionZ());
 
-        std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-        *packet << portalGO->GetObjectGuid();
-        bot->GetSession()->QueuePacket(std::move(packet));
+        WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+        packet << portalGO->GetObjectGuid();
+
+
+        bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
 
         ai->TellPlayer(GetMaster(), "Taking the portal home!");
         context->GetValue<uint8>("world buff travel step")->Set(

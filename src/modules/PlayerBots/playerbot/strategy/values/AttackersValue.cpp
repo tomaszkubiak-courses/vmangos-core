@@ -258,7 +258,7 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
         if (bot == player && bot->m_duel && bot->m_duel->opponent)
         {
             // Penqle's DuelInfo::opponent is an ObjectGuid; resolve to Unit*.
-            if (Unit* opp = bot->GetMap()->GetUnit(bot->m_duel->opponent))
+            if (Unit* opp = bot->m_duel->opponent)
                 units.insert(opp);
         }
 
@@ -362,7 +362,7 @@ bool AttackersValue::IsValid(Unit* target, Player* player, Player* owner, bool c
             return false;
         }
 
-        const bool isDuelOpponent = player->m_duel && player->m_duel->opponent == target->GetObjectGuid();
+        const bool isDuelOpponent = player->m_duel && player->m_duel->opponent == target;
 
         // Don't check distance on duel opponents
         if (!isDuelOpponent)
@@ -432,7 +432,7 @@ bool AttackersValue::IsValid(Unit* target, Player* player, Player* owner, bool c
         const Creature* creature = dynamic_cast<Creature*>(target);
         if (creature)
         {
-            if (creature->GetCombatManager().IsInEvadeMode())
+            if (creature->IsInEvadeMode())
             {
                 return false;
             }
@@ -483,7 +483,9 @@ bool AttackersValue::IgnoreTarget(Unit* target, Player* playerToCheckAgainst)
         bool isDummy = false;
 
 
-        if (WorldPosition(playerToCheckAgainst).isOverworld() && target->AI() && target->AI()->IsPreventingDeath())
+        // cmangos's AI knows whether a creature is a training dummy kept alive on purpose.
+        // Nothing here tracks that, so no target is treated as a dummy.
+        if (false)
         {
 
             isDummy = true;

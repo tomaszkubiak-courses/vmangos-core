@@ -287,7 +287,7 @@ std::list<GuidPosition> ActiveQuestTakersValue::Calculate()
 
 				if (info)
 				{
-					if (!ai->IsFriendlyTo(info->Faction))
+					if (!ai->IsFriendlyTo(info->faction))
 						continue;
 				}
 			}

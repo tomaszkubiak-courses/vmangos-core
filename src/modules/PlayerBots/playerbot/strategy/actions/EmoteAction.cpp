@@ -103,7 +103,7 @@ bool EmoteActionBase::Emote(Unit* target, uint32 type, bool textEmote)
     if (target && !sServerFacade.IsInFront(bot, target, sPlayerbotAIConfig.sightDistance, M_PI_F))
         sServerFacade.SetFacingTo(bot, target);
 
-    ObjectGuid oldSelection = bot->GetSelectionGuid();
+    ObjectGuid oldSelection = bot->GetTargetGuid();
     if (target)
     {
         bot->SetSelectionGuid(target->GetObjectGuid());
@@ -117,7 +117,7 @@ bool EmoteActionBase::Emote(Unit* target, uint32 type, bool textEmote)
         WorldPacket data(SMSG_TEXT_EMOTE);
         data << type;
         data << urand(0, GetNumberOfEmoteVariants((TextEmotes)type, bot->GetRace(), bot->GetGender()) - 1);
-        data << ((bot->GetSelectionGuid() && urand(0, 1)) ? bot->GetSelectionGuid() : ObjectGuid());
+        data << ((bot->GetTargetGuid() && urand(0, 1)) ? bot->GetTargetGuid() : ObjectGuid());
         bot->GetSession()->BotHandleTextEmoteOpcode(data);
     }
     else
@@ -711,7 +711,7 @@ bool EmoteAction::Execute(Event& event)
         pSource = sObjectMgr.GetPlayer(source);
         if (pSource && pSource != bot && sServerFacade.GetDistance2d(bot, pSource) < sPlayerbotAIConfig.farDistance && emoteId != EMOTE_ONESHOT_NONE)
         {
-            if ((pSource->GetObjectGuid() != bot->GetObjectGuid()) && (pSource->GetSelectionGuid() == bot->GetObjectGuid() || (urand(0, 1) && sServerFacade.IsInFront(pSource, bot, 10.0f, M_PI_F))))
+            if ((pSource->GetObjectGuid() != bot->GetObjectGuid()) && (pSource->GetTargetGuid() == bot->GetObjectGuid() || (urand(0, 1) && sServerFacade.IsInFront(pSource, bot, 10.0f, M_PI_F))))
             {
                 sLog.outDetail("Bot #%d %s:%d <%s> received SMSG_EMOTE %d from player #%d <%s>", bot->GetGUIDLow(), bot->GetTeam() == ALLIANCE ? "A" : "H", bot->GetLevel(), bot->GetName(), emoteId, pSource->GetGUIDLow(), pSource->GetName());
                 std::vector<uint32> types;
@@ -798,7 +798,7 @@ bool EmoteAction::Execute(Event& event)
         WorldPacket data(SMSG_TEXT_EMOTE);
         data << textEmotes[param];
         data << urand(0, GetNumberOfEmoteVariants((TextEmotes)textEmotes[param], bot->GetRace(), bot->GetGender()) - 1);
-        data << ((bot->GetSelectionGuid() && urand(0, 1)) ? bot->GetSelectionGuid() : ObjectGuid());
+        data << ((bot->GetTargetGuid() && urand(0, 1)) ? bot->GetTargetGuid() : ObjectGuid());
         bot->GetSession()->BotHandleTextEmoteOpcode(data);
 
         if (emotes.find(param) != emotes.end())

@@ -244,24 +244,7 @@ inline bool IsPositiveSpell(SpellEntry const* spellInfo, WorldObject const* cast
 #define TRIGGERED_IGNORE_AURA_SCALING true
 #endif
 
-// === ClientLootType (cmangos has it in Loot/LootMgr.h; Penqle's LootMgr.h doesn't) ===
-// Bot's LootValues.h references this enum. Stub copy from cmangos.
-enum ClientLootType
-{
-    CLIENT_LOOT_NONE            = 0,
-    CLIENT_LOOT_CORPSE          = 1,
-    CLIENT_LOOT_PICKPOCKETING   = 2,
-    CLIENT_LOOT_FISHING         = 3,
-    CLIENT_LOOT_DISENCHANTING   = 4,
-    CLIENT_LOOT_FISHINGFAIL     = 5,
-    CLIENT_LOOT_INSIGNIA        = 6,
-    CLIENT_LOOT_FISHINGHOLE     = 8,
-};
 
-// === GroupLootRoll / GroupLootRollMap (cmangos types not in Penqle) ===
-// Bot's LootValues.h has a GroupLootRollMap field. Stub class so the field declaration parses.
-class GroupLootRoll;  // opaque
-typedef std::unordered_map<uint32, GroupLootRoll*> GroupLootRollMap;
 
 // TimePoint is defined in src/shared/Common.h here, as a system_clock time_point at
 // millisecond precision rather than the clock's native resolution.
@@ -353,15 +336,6 @@ inline bool IsAreaAuraEffect(uint32 effect) {
         || effect == SPELL_EFFECT_APPLY_AREA_AURA_OWNER;
 }
 
-// === LootItem cmangos-only fields ===
-// cmangos has lootItemType + LOOTITEM_TYPE_*; Penqle has only the basic LootItem.
-// Add stubs to compile bot's checks; behavior degraded (everything looks "normal").
-enum LootItemType {
-    LOOTITEM_TYPE_NORMAL = 0,
-    LOOTITEM_TYPE_QUEST = 1,
-    LOOTITEM_TYPE_FFA = 2,
-    LOOTITEM_TYPE_CONDITIONNAL = 3,
-};
 
 // === NAV_AREA_* / NAV_* (cmangos navmesh area types) ===
 #ifndef NAV_AREA_WATER
@@ -381,9 +355,8 @@ enum LootItemType {
 #endif
 
 // === CONDITION_FROM_AREATRIGGER_TELEPORT (cmangos) ===
-#ifndef CONDITION_FROM_AREATRIGGER_TELEPORT
-#define CONDITION_FROM_AREATRIGGER_TELEPORT 0
-#endif
+// The same condition source, spelled CONDITION_FROM_AREATRIGGER here.
+#define CONDITION_FROM_AREATRIGGER_TELEPORT CONDITION_FROM_AREATRIGGER
 
 // === MINIMUM_LOOTING_TIME ===
 #ifndef MINIMUM_LOOTING_TIME
@@ -442,21 +415,6 @@ static CmangosAreaTriggerStoreProxy sAreaTriggerStore;
 // Real enums here, in src/game/LFG/LFGDefines.h, over the same PLAYER_ROLE_* values
 // cmangos uses. The donor aliased them onto types its own dungeon-finder work added.
 
-// === Taxi namespace stub (cmangos has Taxi::Map for in-flight spline tracking) ===
-// Penqle has no equivalent; bot uses GetTaxiPathSpline() which we stub to return nullptr/empty.
-namespace Taxi {
-    struct PathNode {
-        uint32 mapId = 0; float x = 0, y = 0, z = 0;
-    };
-    class Map {
-    public:
-        Map() {}
-        Map(void*) {}  // accept the void* from Player::GetTaxiPathSpline stub
-        bool empty() const { return true; }
-        PathNode const* back() const { return nullptr; }
-        PathNode const* front() const { return nullptr; }
-    };
-}
 
 // === Other small defines ===
 #ifndef ITEM_FLAG_UNIQUE_EQUIPPABLE
@@ -472,11 +430,11 @@ namespace Taxi {
 #define SKILL_FLAG_CAN_UNLEARN 0x10
 #endif
 
-// === sScriptDevAIMgr (cmangos has ScriptDevAI; Penqle uses sScriptMgr) ===
-// Stub so symbol resolves; bot's calls are no-ops. The variadic template
-// absorbs whatever cmangos's OnGossipHello signature looks like in the
-// vendor tree — we don't care, we just need a callable returning false.
-// Penqle's own sScriptMgr is wired separately.
+// === sScriptDevAIMgr (cmangos's ScriptDevAI) ===
+// Gossip goes to the real thing - sScriptMgr::OnGossipHello - so a bot talking to a
+// scripted npc runs the same script a player would. What is left here is the handful of
+// hooks this core has no counterpart for, chiefly OnNpcSpellClick (spell-click handling is
+// a later-expansion feature), which answer false so the caller falls through.
 struct CmangosScriptDevAIMgrStub {
     template<typename... Args>
     bool OnGossipHello(Args... /*args*/) { return false; }
@@ -749,23 +707,6 @@ static CmangosLootMgrStub sLootMgr;
 // Penqle uses GetLosHitPosition. The bot module's call sites were patched at
 // the source level (TravelMgr.cpp / WorldPosition.h).
 
-// === FormationSlotData / SpawnGroupFormationSlotType (cmangos formation system) ===
-// Penqle has no formation system; these are stubs; flesh out if we want bot squads.
-struct FormationSlotData {
-    uint32 slotId = 0;
-    FormationSlotData() = default;
-    // bot calls make_shared<FormationSlotData>(int, ObjectGuid, nullptr, uint32).
-    // Stub ctor accepts those 4 args; only slotId tracked.
-    FormationSlotData(int /*idx*/, ObjectGuid const& /*guid*/, void* /*nullptr*/, uint32 slotId_)
-        : slotId(slotId_) {}
-};
-typedef std::shared_ptr<FormationSlotData> FormationSlotDataSPtr;
-namespace SpawnGroupFormationSlotType {
-    constexpr uint32 SPAWN_GROUP_FORMATION_SLOT_TYPE_STATIC = 0;
-    constexpr uint32 SPAWN_GROUP_FORMATION_SLOT_TYPE_SCRIPT = 1;
-}
-using SpawnGroupFormationSlotType::SPAWN_GROUP_FORMATION_SLOT_TYPE_STATIC;
-using SpawnGroupFormationSlotType::SPAWN_GROUP_FORMATION_SLOT_TYPE_SCRIPT;
 
 // === Free-function helpers (cmangos style) wrapping Penqle SpellEntry methods ===
 // cmangos exposes these as free functions; Penqle wraps them in SpellEntry::method.
@@ -883,13 +824,11 @@ constexpr uint32 NOT_GROUP_TYPE_LOOT = 0xFF;
 #endif
 
 // === SPELL_ATTR_ON_NEXT_SWING aliases ===
-// cmangos has SPELL_ATTR_ON_NEXT_SWING / _NO_DAMAGE; Penqle has SPELL_ATTR_ON_NEXT_SWING_1/_2.
-#ifndef SPELL_ATTR_ON_NEXT_SWING
-#define SPELL_ATTR_ON_NEXT_SWING SPELL_ATTR_ON_NEXT_SWING_1
-#endif
-#ifndef SPELL_ATTR_ON_NEXT_SWING_NO_DAMAGE
-#define SPELL_ATTR_ON_NEXT_SWING_NO_DAMAGE SPELL_ATTR_ON_NEXT_SWING_2
-#endif
+// The module writes the cmangos-of-a-different-vintage spelling, SPELL_ATTR_ON_NEXT_SWING_1
+// and _2; this core names them SPELL_ATTR_ON_NEXT_SWING (the damaging one, bit 10) and
+// SPELL_ATTR_ON_NEXT_SWING_NO_DAMAGE (bit 2).
+#define SPELL_ATTR_ON_NEXT_SWING_1 SPELL_ATTR_ON_NEXT_SWING
+#define SPELL_ATTR_ON_NEXT_SWING_2 SPELL_ATTR_ON_NEXT_SWING_NO_DAMAGE
 
 // === UNIT_FLAG_UNTARGETABLE / UNIT_FLAG_UNINTERACTIBLE (cmangos names) ===
 // Penqle uses UNIT_FLAG_NOT_SELECTABLE for both concepts.
@@ -1170,13 +1109,26 @@ inline PlayerPointer BotPlayerPointer(Player* player)
     return PlayerPointer(new PlayerWrapper<Player>(*player));
 }
 
-// cmangos names the DBC channel ids ChatChannelId::X; this core spells them CHANNEL_ID_X.
-namespace ChatChannelId
+// === Player::GetTaxiPathSpline (cmangos) ===
+// cmangos hands back the spline a flight is following. Here the flight is a list of taxi
+// nodes on PlayerTaxi, so the question the bot actually asks - where is this flight going -
+// is answered from the last node of that list.
+inline TaxiNodesEntry const* BotTaxiDestinationNode(Player const* player)
 {
-    constexpr uint32 GENERAL            = CHANNEL_ID_GENERAL;
-    constexpr uint32 TRADE              = CHANNEL_ID_TRADE;
-    constexpr uint32 LOCAL_DEFENSE      = CHANNEL_ID_LOCAL_DEFENSE;
-    constexpr uint32 WORLD_DEFENSE      = CHANNEL_ID_WORLD_DEFENSE;
-    constexpr uint32 GUILD_RECRUITMENT  = CHANNEL_ID_GUILD_RECRUITMENT;
-    constexpr uint32 LOOKING_FOR_GROUP  = CHANNEL_ID_LOOKING_FOR_GROUP;
+    if (!player || !player->IsTaxiFlying())
+        return nullptr;
+
+    uint32 const destNode = player->GetTaxi().GetTaxiDestination();
+    return destNode ? sObjectMgr.GetTaxiNodeEntry(destNode) : nullptr;
+}
+
+// === Position distance ===
+// cmangos's Position answers distances itself. Here Position is a plain coordinate struct,
+// so the two-point distance is computed where it is needed.
+inline float BotPositionDistance(Position const& from, Position const& to)
+{
+    float const dx = from.x - to.x;
+    float const dy = from.y - to.y;
+    float const dz = from.z - to.z;
+    return sqrt(dx * dx + dy * dy + dz * dz);
 }

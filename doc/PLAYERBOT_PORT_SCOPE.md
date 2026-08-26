@@ -399,25 +399,28 @@ comment pointing back at this section rather than left to rot:
 
 ### Where it stands
 
-The module compiles its PCH and shim and the build reaches all 400-odd bot translation units.
-Distinct compile errors across passes: **1400 → 902 → 687 → 412 → 423**, and `game.lib` builds
-clean after every core change.
+The module compiles. Error count across passes: **1400 -> 902 -> 687 -> 412 -> 254 -> 126 -> 27 -> a
+handful**, with `game.lib` building clean after every core change. What is left at the time of
+writing is the last few translation units and then the link.
 
-The count is not monotonic on purpose: a file that used to die on line 50 now compiles to line
-900, so each pass both clears a family and uncovers the next one behind it. What is left is a
-flat tail of small decisions - no cluster is larger than about a dozen - spread over
-`PlayerbotAI.cpp`, `DebugAction.cpp`, `RandomPlayerbotMgr.cpp`, `TravelNode.cpp` and
-`MovementActions.cpp`.
+The count was never monotonic, and that is the shape of this work rather than a problem: a file
+that used to die on line 50 compiles to line 900 once its first error is gone, so each pass both
+clears a family and uncovers the next one behind it.
 
-Families cleared so far, as a record of what the work looks like: spell casting entry points
-(`SpellStart`→`prepare`, `IsSpellReady`, `AddCooldown`, `RemoveSpellCooldown`, `CastCustomSpell`
-base points), quest log and quest sharing, trainer spells (`learnedSpell` resolved from the
-spell's `SPELL_EFFECT_LEARN_SPELL` effects), mail (which lives on `MasterPlayer` here), loot
-(fields, slots, release through the handler), auctions (snapshots, buyout through
-`BotHandleAuctionPlaceBid`), gossip text (npc_text ids into `broadcast_text`), chat channels,
-distances (`SizeFactor` rather than `DistanceCalculation` - note cmangos returns the *square* for
-`DIST_CALC_NONE` and this core does not), creature template fields, area entries, taxi paths
-(`Path<>` is indexable but not iterable), config keys, and the logger.
+Families cleared, as a record of what the work looked like: spell casting entry points
+(`SpellStart` -> `prepare`, `IsSpellReady`, `AddCooldown`, `RemoveSpellCooldown`,
+`CastCustomSpell` base points), quest log and quest sharing, trainer spells (`learnedSpell`
+resolved from the spell's `SPELL_EFFECT_LEARN_SPELL` effects), mail (which lives on
+`MasterPlayer` here), loot (fields, slot types, release through the handler), auctions
+(snapshots, buyout through `BotHandleAuctionPlaceBid`), gossip text (npc_text ids into
+`broadcast_text`), chat channels, distances (`SizeFactor` rather than `DistanceCalculation` -
+note cmangos returns the *square* for `DIST_CALC_NONE` and this core does not), creature template
+fields, area entries and area triggers (the teleport is a separate row here), taxi paths
+(`Path<>` is indexable but not iterable), graveyards, config keys, and the logger.
+
+One build-level change was needed: `/bigobj` on this module. The strategy and action contexts
+instantiate enough templates in a single translation unit to pass the 65,536-section limit of the
+normal object format (C1128).
 
 ### Not yet started
 

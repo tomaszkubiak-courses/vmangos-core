@@ -211,7 +211,8 @@ TestResult TestAction::ExecuteCommand(const std::string& line, std::string& mess
     }
 
     if (line[0] == '.')
-        if (ChatHandler(bot).ParseCommands(line.c_str()))
+        // ParseCommands reports what it did rather than whether it did anything.
+        if (ChatHandler(bot).ParseCommands(line.c_str()) == ParseCommandResult::CommandDetectedAndHandled)
             return TestResult::PASS;
 
     ai->HandleCommand(CHAT_MSG_WHISPER, line, *bot);

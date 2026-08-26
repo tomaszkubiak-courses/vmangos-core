@@ -298,7 +298,7 @@ bool RpgTrainTrigger::IsTrainerOf(CreatureInfo const* cInfo, Player* pPlayer)
         }
         break;
     case TRAINER_TYPE_TRADESKILLS:
-        if (cInfo->TrainerSpell && !pPlayer->HasSpell(cInfo->TrainerSpell))
+        if (cInfo->trainer_spell && !pPlayer->HasSpell(cInfo->trainer_spell))
         {
             return false;
         }
@@ -335,8 +335,9 @@ bool RpgTrainTrigger::IsActive()
         return false;
     }
 
-    FactionTemplateEntry const* factionTemplate = sFactionTemplateStore.LookupEntry(cInfo->faction);
-    float fDiscountMod = bot->GetReputationPriceDiscount(factionTemplate);
+    // The discount is asked of the creature here, not of its faction template.
+    Creature* trainer = guidP.GetCreature(bot->GetInstanceId());
+    float fDiscountMod = trainer ? bot->GetReputationPriceDiscount(trainer) : 1.0f;
 
     TrainerSpellMap trainer_spells;
     if (cSpells)
@@ -806,7 +807,7 @@ bool RpgDuelTrigger::IsActive()
     if (ai->HasRealPlayerMaster())
     {
         // do not auto duel if master is not afk
-        if (ai->GetMaster() && !ai->GetMaster()->isAFK())
+        if (ai->GetMaster() && !ai->GetMaster()->IsAFK())
             return false;
     }
 
@@ -902,7 +903,7 @@ bool RpgGossipTalkTrigger::IsActive()
     if (!guidP.IsCreature())
         return false;
 
-    GossipMenuItemsMapBounds pMenuItemBounds = sObjectMgr.GetGossipMenuItemsMapBounds(guidP.GetCreatureTemplate()->GossipMenuId);
+    GossipMenuItemsMapBounds pMenuItemBounds = sObjectMgr.GetGossipMenuItemsMapBounds(guidP.GetCreatureTemplate()->gossip_menu_id);
     if (pMenuItemBounds.first == pMenuItemBounds.second)
         return false;
 
@@ -911,7 +912,7 @@ bool RpgGossipTalkTrigger::IsActive()
     if (!creature)
         return false;
 
-    if (!creature->isGossip())
+    if (!creature->IsGossip())
         return false;
 
 #ifdef MANGOSBOT_TWO
@@ -925,7 +926,7 @@ bool RpgGossipTalkTrigger::IsActive()
     }
 #endif
 
-    if (!sScriptDevAIMgr.OnGossipHello(bot, creature))
+    if (!sScriptMgr.OnGossipHello(bot, creature))
     {
         bot->PrepareGossipMenu(creature, creature->GetDefaultGossipMenuId());
     }

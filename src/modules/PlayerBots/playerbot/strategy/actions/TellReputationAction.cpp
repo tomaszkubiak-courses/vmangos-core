@@ -11,7 +11,7 @@ bool TellReputationAction::Execute(Event& event)
     if (!requester)
         return false;
 
-    ObjectGuid selection = requester->GetSelectionGuid();
+    ObjectGuid selection = requester->GetTargetGuid();
     if (selection.IsEmpty())
         return false;
 

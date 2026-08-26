@@ -26,7 +26,7 @@ namespace ai
                     Group* group = bot->GetGroup();
                     if (group)
                     {
-                        const ObjectGuid guid = group->GetTargetWithIcon(RtiTargetValue::GetRtiIndex("skull"));
+                        const ObjectGuid guid = group->GetTargetWithIcon(RaidTargetIcon(RtiTargetValue::GetRtiIndex("skull")));
                         if (!guid.IsEmpty())
                         {
                             Unit* unit = ai->GetUnit(ObjectGuid(guid));

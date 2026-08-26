@@ -246,9 +246,9 @@ bool LootObject::IsLootPossible(Player* bot)
         Creature* creature = ai->GetCreature(guid);
         if (creature && sServerFacade.GetDeathState(creature) == CORPSE)
         {
-            if (&creature->loot && skillId != SKILL_SKINNING)
-                if (!&creature->loot->CanLoot(bot))
-                    return false;
+            // Whether a corpse may be looted is asked of the player here, not of the loot.
+            if (skillId != SKILL_SKINNING && !bot->IsAllowedToLoot(creature))
+                return false;
         }
     }
 
@@ -290,7 +290,7 @@ bool LootObject::IsLootPossible(Player* bot)
                                 hasQuestItems = true;
                             }
                         }
-                        return hasQuestItems || go->GetLootState() != GO_READY;
+                        return hasQuestItems || go->getLootState() != GO_READY;
                     }
                 }
             }

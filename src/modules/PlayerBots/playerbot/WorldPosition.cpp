@@ -340,7 +340,7 @@ bool WorldPosition::IsInStaticLineOfSight(WorldPosition pos, float heightMod) co
     float dstY = pos.y;
     float dstZ = pos.z + heightMod;
 
-    return VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(this->mapId, srcX, srcY, srcZ, dstX, dstY, dstZ);
+    return VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(this->mapId, srcX, srcY, srcZ, dstX, dstY, dstZ, true);
 }
 
 bool WorldPosition::canFly() const
@@ -526,7 +526,7 @@ int32 WorldPosition::getAreaLevel() const
         return 1;
 
     if(GetArea())
-        return sTravelMgr.GetAreaLevel(GetArea()->ID);
+        return sTravelMgr.GetAreaLevel(GetArea()->Id);
 
     return 0;
 }
@@ -551,11 +551,11 @@ bool WorldPosition::HasFaction(const Team team) const
     AreaTableEntry const* areaEntry = GetArea();
     if (areaEntry)
     {
-        if (areaEntry->team == 2 && team == ALLIANCE)
+        if (areaEntry->Team == 2 && team == ALLIANCE)
             return true;
-        if (areaEntry->team == 4 && team == HORDE)
+        if (areaEntry->Team == 4 && team == HORDE)
             return true;
-        if (areaEntry->team == 6)
+        if (areaEntry->Team == 6)
             return true;
     }
     return false;
@@ -871,7 +871,9 @@ bool WorldPosition::isVmapLoaded(uint32 /*mapId*/, int /*x*/, int /*y*/)
 bool WorldPosition::isMmapLoaded(uint32 mapId, uint32 instanceId, int x, int y)
 {
 #ifndef MANGOSBOT_TWO
-    return MMAP::MMapFactory::createOrGetMMapManager()->IsMMapIsLoaded(mapId, x, y);
+    // This core has no per-tile query. loadMap() is idempotent - it returns false for a tile
+    // it already holds - so "loaded" here means the map has a navmesh at all.
+    return MMAP::MMapFactory::createOrGetMMapManager()->GetNavMesh(mapId) != nullptr;
 #else
     return MMAP::MMapFactory::createOrGetMMapManager()->IsMMapTileLoaded(mapId, instanceId, x, y);
 #endif
@@ -898,17 +900,13 @@ bool WorldPosition::loadMapAndVMap(uint32 mapId, uint32 instanceId, int x, int y
     if (!hasMmap)
     {
 #ifndef MANGOSBOT_TWO
-        if (mapId == 0 || mapId == 1 || mapId == 530 || mapId == 571)
-            isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), mapId, x, y);
-        else
-        {
-            MMAP::MMapFactory::createOrGetMMapManager()->loadMapInstance(sWorld.GetDataPath(), mapId, instanceId);
-            isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), mapId, x, y);
-        }
+        // Tiles are keyed by map here, not by map and instance, and the data path comes from
+        // the world rather than the caller.
+        isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(mapId, x, y);
 #else
         if (mapId == 0 || mapId == 1 || mapId == 530 || mapId == 571)
         {
-            isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), mapId, 0, x, y, 0);
+            isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(mapId, 0, x, y, 0);
         }
         else
         {
@@ -918,7 +916,7 @@ bool WorldPosition::loadMapAndVMap(uint32 mapId, uint32 instanceId, int x, int y
                 loadedMap = MMAP::MMapFactory::createOrGetMMapManager()->loadMapInstance(sWorld.GetDataPath(), mapId, instanceId);
 
             if (loadedMap)
-                isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(sWorld.GetDataPath(), mapId, instanceId, x, y, 0);
+                isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(mapId, instanceId, x, y, 0);
         }
 #endif
 
@@ -1122,14 +1120,12 @@ std::vector<WorldPosition> WorldPosition::getPathFromPath(const std::vector<Worl
 
     std::unique_ptr<PathFinder> pathfinder = nullptr;
 
-    if (bot && instanceId == bot->GetInstanceId())
-        pathfinder = std::make_unique<PathFinder>(bot);
-    else
-        pathfinder = std::make_unique<PathFinder>(getMapId(), instanceId);
+    // PathFinder here always paths for a unit - there is no map-and-instance constructor -
+    // so a path asked for on another instance is not something this core can answer.
+    if (!bot)
+        return {};
 
-    pathfinder->setAreaCost(NAV_AREA_WATER, 10.0f);
-    pathfinder->setAreaCost(12, 5.0f);
-    pathfinder->setAreaCost(13, 20.0f);
+    pathfinder = std::make_unique<PathFinder>(bot);
 
     //Limit the pathfinding attempts
     for (uint32 i = 0; i < maxAttempt; i++)
@@ -1163,7 +1159,7 @@ bool WorldPosition::ClosestCorrectPoint(float maxRange, float maxHeight, uint32 
 
     MANGOS_ASSERT(mmap);
 
-    dtNavMeshQuery const* query = mmap->GetNavMeshQuery(getMapId(), instanceId);
+    dtNavMeshQuery const* query = mmap->GetNavMeshQuery(getMapId());
 
     MANGOS_ASSERT(query && query->getAttachedNavMesh());
 
@@ -1196,7 +1192,9 @@ bool WorldPosition::ClosestCorrectPoint(float maxRange, float maxHeight, uint32 
 bool WorldPosition::GetReachableRandomPointOnGround(const Player* bot, const float radius, const bool randomRange) 
 {
 #ifndef MANGOSBOT_TWO         
-    return getMap(bot ? bot->GetInstanceId() : getFirstInstanceId())->GetReachableRandomPointOnGround(this->x, this->y, this->z, radius, randomRange);
+    // This core walks the navmesh from the position itself (GetWalkRandomPosition) rather
+    // than taking a "random range" flag; the position is updated in place either way.
+    return getMap(bot ? bot->GetInstanceId() : getFirstInstanceId())->GetWalkRandomPosition(bot ? bot->GetTransport() : nullptr, this->x, this->y, this->z, radius);
 #else
     return getMap(bot ? bot->GetInstanceId() : getFirstInstanceId())->GetReachableRandomPointOnGround(bot->GetPhaseMask(), this->x, this->y, this->z, radius, randomRange);
 #endif
@@ -1232,10 +1230,6 @@ std::vector<WorldPosition> WorldPosition::ComputePathToRandomPoint(const Player*
     this->y += range * sin(angle);
 
     std::unique_ptr<PathFinder> pathfinder = std::make_unique<PathFinder>(bot);
-
-    pathfinder->setAreaCost(NAV_AREA_WATER, 10.0f);
-    pathfinder->setAreaCost(12, 5.0f);
-    pathfinder->setAreaCost(13, 20.0f);
 
     std::vector<WorldPosition> path = getPathStepFrom(start, pathfinder, bot);
     

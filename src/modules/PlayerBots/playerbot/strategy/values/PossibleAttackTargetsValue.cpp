@@ -106,7 +106,7 @@ void PossibleAttackTargetsValue::RemoveNonThreating(std::list<ObjectGuid>& targe
 bool PossibleAttackTargetsValue::HasIgnoreCCRti(Unit* target, Player* player)
 {
     Group* group = player->GetGroup();
-    return group && (group->GetTargetWithIcon(7) == target->GetObjectGuid());
+    return group && (group->GetTargetWithIcon(RaidTargetIcon(7)) == target->GetObjectGuid());
 }
 
 bool PossibleAttackTargetsValue::HasBreakableCC(Unit* target, Player* player)
@@ -145,7 +145,7 @@ bool PossibleAttackTargetsValue::HasBreakableCC(Unit* target, Player* player)
 
 bool PossibleAttackTargetsValue::HasUnBreakableCC(Unit* target, Player* player)
 {
-    if (target->IsStunned())
+    if (target->HasUnitState(UNIT_STATE_STUNNED))
     {
         return true;
     }
@@ -166,7 +166,8 @@ bool PossibleAttackTargetsValue::HasUnBreakableCC(Unit* target, Player* player)
 bool PossibleAttackTargetsValue::IsImmuneToDamage(Unit* target, Player* player)
 {
     // Charmed
-    if (sServerFacade.IsCharmed(target) && target->IsInTeam(player, true))
+    // "Same side" is a team comparison here rather than a helper on Unit.
+    if (sServerFacade.IsCharmed(target) && player && target->GetTeam() == player->GetTeam())
     {
         return true;
     }

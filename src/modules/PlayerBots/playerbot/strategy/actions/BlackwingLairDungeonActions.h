@@ -127,15 +127,19 @@ namespace ai
                 if (!go)
                     continue;
 
-                if (go->GetLootState() != GO_READY)
+                if (go->getLootState() != GO_READY)
                     continue;
 
                 if (!bot->GetGameObjectIfCanInteractWith(go->GetObjectGuid(), GAMEOBJECT_TYPE_TRAP))
                     continue;
 
-                std::unique_ptr<WorldPacket> packet(new WorldPacket(CMSG_GAMEOBJ_USE));
-                *packet << go->GetObjectGuid();
-                bot->GetSession()->QueuePacket(std::move(packet));
+                WorldPacket packet(CMSG_GAMEOBJ_USE);
+
+
+                packet << go->GetObjectGuid();
+
+
+                bot->GetSession()->BotHandleGameObjectUseOpcode(packet);
 
                 if (ai->HasStrategy("debug move", BotState::BOT_STATE_NON_COMBAT))
                 {
@@ -182,7 +186,7 @@ namespace ai
                 if (!go)
                     continue;
 
-                if (go->GetLootState() != GO_READY)
+                if (go->getLootState() != GO_READY)
                     continue;
 
                 float dist = botPos.distance(WorldPosition(go));

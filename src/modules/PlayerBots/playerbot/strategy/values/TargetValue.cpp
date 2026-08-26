@@ -47,14 +47,14 @@ bool FindNonCcTargetStrategy::IsCcTarget(Unit* attacker)
                 int index = RtiTargetValue::GetRtiIndex(rti);
                 if (index != -1)
                 {
-                    uint64 guid = group->GetTargetWithIcon(index);
+                    uint64 guid = group->GetTargetWithIcon(RaidTargetIcon(index));
                     if (guid && attacker->GetObjectGuid() == ObjectGuid(guid))
                         return true;
                 }
             }
         }
 
-        uint64 guid = group->GetTargetWithIcon(4);
+        uint64 guid = group->GetTargetWithIcon(RaidTargetIcon(4));
         if (guid && attacker->GetObjectGuid() == ObjectGuid(guid))
             return true;
     }
@@ -131,10 +131,8 @@ WorldPosition LastLongMoveValue::Calculate()
 
 WorldPosition HomeBindValue::Calculate()
 {
-    float x, y, z;
-    uint32 mapId;
-    bot->GetHomebindLocation(x, y, z, mapId);
-    return WorldPosition(mapId, x, y, z, 0.0);
+    WorldLocation const& homebind = bot->GetHomeBindPosition();
+    return WorldPosition(homebind.mapId, homebind.x, homebind.y, homebind.z, 0.0);
 }
 
 std::string HomeBindValue::Format()

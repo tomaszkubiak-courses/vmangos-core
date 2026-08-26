@@ -103,7 +103,7 @@ bool WaitForAttackKeepSafeDistanceAction::IsEnemyClose(const WorldPosition& poin
             if (enemy->IsWithinLOSInMap(bot))
             {
                 // If the enemy is not neutral
-                if (enemy->CanInitiateAttack())
+                if ((enemy->IsCreature() && ((Creature*)enemy)->CanInitiateAttack()))
                 {
                     const float enemyAttackRange = BotGetAttackDistance(enemy, bot) + ATTACK_DISTANCE;
                     const float distanceToPoint = WorldPosition(enemy).sqDistance(point);

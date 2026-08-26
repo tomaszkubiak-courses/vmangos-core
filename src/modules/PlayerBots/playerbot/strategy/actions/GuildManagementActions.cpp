@@ -35,7 +35,7 @@ Player* GuidManageAction::GetPlayer(Event event)
         
     Player* master = GetMaster();
     if (master && master == event.getOwner())
-        guid = bot->GetSelectionGuid();
+        guid = bot->GetTargetGuid();
     
     player = sObjectMgr.GetPlayer(guid);
 

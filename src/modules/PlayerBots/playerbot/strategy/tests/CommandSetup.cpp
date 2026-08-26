@@ -58,16 +58,9 @@ TestResult CommandSetupGM::Execute(const std::string& params, Player* bot, Playe
         bot->GetSession()->SendNotification(LANG_INVISIBLE_INVISIBLE);
         return TestResult::PASS;
     }
-    else if (params == "fly on")
+    else if (params == "fly on" || params == "fly off")
     {
-        bot->SetCanFly(true);
-        bot->GetSession()->SendNotification(LANG_COMMAND_FLYMODE_STATUS);
-        return TestResult::PASS;
-    }
-    else if (params == "fly off")
-    {
-        bot->SetCanFly(false);
-        bot->GetSession()->SendNotification(LANG_COMMAND_FLYMODE_STATUS);
+        // Nothing flies in vanilla - no flight toggle, and no string to report one.
         return TestResult::PASS;
     }
     else

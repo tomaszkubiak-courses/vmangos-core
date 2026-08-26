@@ -454,7 +454,7 @@ public:
             if (!isRti)
                 continue;
 
-            ObjectGuid rtiTarget = group->GetTargetWithIcon(RtiTargetValue::GetRtiIndex(rti.substr(1)));
+            ObjectGuid rtiTarget = group->GetTargetWithIcon(RaidTargetIcon(RtiTargetValue::GetRtiIndex(rti.substr(1))));
             if (bot->GetObjectGuid() == rtiTarget)
                 return ChatFilter::Filter(message);
 

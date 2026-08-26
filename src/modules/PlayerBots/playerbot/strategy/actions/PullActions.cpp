@@ -114,7 +114,7 @@ Unit* PullMyTargetAction::GetTarget(Event& event)
     }
     else if (requester)
     {
-        target = ai->GetUnit(requester->GetSelectionGuid());
+        target = ai->GetUnit(requester->GetTargetGuid());
     }
 
     return target;

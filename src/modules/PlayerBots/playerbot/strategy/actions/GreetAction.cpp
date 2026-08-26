@@ -21,7 +21,7 @@ bool GreetAction::Execute(Event& event)
     if (!sServerFacade.IsInFront(bot, player, sPlayerbotAIConfig.sightDistance, CAST_ANGLE_IN_FRONT))
         sServerFacade.SetFacingTo(bot, player);
 
-    ObjectGuid oldSel = bot->GetSelectionGuid();
+    ObjectGuid oldSel = bot->GetTargetGuid();
     bot->SetSelectionGuid(guid);
     //bot->HandleEmote(EMOTE_ONESHOT_WAVE);
     ai->PlayEmote(TEXTEMOTE_HELLO);

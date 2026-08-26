@@ -73,9 +73,10 @@ WorldSafeLocsEntry const* GraveyardValue::GetAnotherAppropriateClosestGraveyard(
     uint32 botMapId = corpse->GetMapId();
     uint32 botZoneId = corpse->GetZoneId();
 
-    for (auto mapValues : sWorld.GetGraveyardManager().GetGraveyardMap())
+    // Graveyards live in ObjectMgr here, not in a per-world manager, and the map is keyed
+    // by zone rather than by graveyard id.
+    for (auto const& mapValues : sObjectMgr.GetGraveYardMap())
     {
-        uint32 locId = mapValues.first;
         GraveYardData const& graveyardData = mapValues.second;
 
         //skip non-neutral or hostile graveyards
@@ -101,7 +102,7 @@ WorldSafeLocsEntry const* GraveyardValue::GetAnotherAppropriateClosestGraveyard(
             continue;
 
         //skip higher level zones
-        if (bot->GetLevel() + 5 < (uint32)graveyardAreaEntry->area_level)
+        if (bot->GetLevel() + 5 < (uint32)graveyardAreaEntry->AreaLevel)
             continue;
 
         float dist = WorldPosition(corpse).sqDistance(graveyardCoreEntry);

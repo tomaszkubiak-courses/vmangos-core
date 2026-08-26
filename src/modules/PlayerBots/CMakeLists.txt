@@ -124,6 +124,10 @@ if (ENABLE_CPPTRACE)
 endif()
 
 if(MSVC)
+  # /bigobj: the strategy and action contexts instantiate enough templates in one translation
+  # unit to pass the 65,536-section limit of the normal object format (C1128).
+  target_compile_options(${LIBRARY_NAME} PRIVATE /bigobj)
+
   # Constrain the MSVC inliner on this module only, carried over from the donor: the
   # vendored tree is heavily templated (the strategy and action queues, Singleton<>
   # instantiations) and /Ob2 can ICE the optimizer with C1001 while expanding them.

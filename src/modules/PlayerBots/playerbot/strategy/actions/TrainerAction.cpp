@@ -206,7 +206,7 @@ bool TrainerAction::Execute(Event& event)
     else
     {
         if (requester)
-            creature = ai->GetCreature(requester->GetSelectionGuid());
+            creature = ai->GetCreature(requester->GetTargetGuid());
         else
             return false;
     }
@@ -215,7 +215,7 @@ bool TrainerAction::Execute(Event& event)
     if (!creature || !creature->IsTrainer())
 #endif
 #ifdef CMANGOS
-    if (!creature || !creature->isTrainer())
+    if (!creature || !creature->IsTrainer())
 #endif
         return false;       
             

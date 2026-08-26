@@ -138,7 +138,7 @@ EntryTravelPurposeMap EntryTravelPurposeMapValue::Calculate()
                 purpose |= (uint32)TravelDestinationPurpose::Boss;
         }
 
-        if (cInfo->skinning_loot_id && cInfo->GetRequiredLootSkill() == SKILL_SKINNING)
+        if (cInfo->skinning_loot_id && cInfo->skinning_loot_id != 0)
         {
             purpose |= (uint32)TravelDestinationPurpose::GatherSkinning;
         }
@@ -215,7 +215,7 @@ uint32 EntryTravelPurposeMapValue::SkillIdToGatherEntry(int32 entry)
         if (!cInfo->skinning_loot_id)
             return 0;
 
-        return cInfo->GetRequiredLootSkill();
+        return SKILL_SKINNING;
     }
     else
     {

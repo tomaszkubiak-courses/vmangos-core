@@ -56,7 +56,9 @@ namespace ai
     protected:
         void FindUnits(std::list<Unit*>& targets) override
         {
-            MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck u_check(bot, range);
+            // The check here takes the object the range is measured from and the unit whose
+            // hostility is judged separately; for a bot looking around itself both are the bot.
+            MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck u_check(bot, bot, range);
             MaNGOS::UnitListSearcher<MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck> searcher(targets, u_check);
             Cell::VisitAllObjects(bot, searcher, range);
         }

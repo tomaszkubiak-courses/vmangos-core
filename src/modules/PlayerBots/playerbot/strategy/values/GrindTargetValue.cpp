@@ -218,7 +218,7 @@ Unit* GrindTargetValue::FindTargetForGrinding(int assistCount)
             continue;
         }
 
-        if (creature && creature->IsCritter() && urand(0, 10))
+        if (creature && (creature->GetCreatureInfo()->type == CREATURE_TYPE_CRITTER) && urand(0, 10))
         {
             logGrind(unit, "ignored (ignore critters).");
             continue;
@@ -339,7 +339,7 @@ int GrindTargetValue::GetTargetingPlayerCount( Unit* unit )
 
         PlayerbotAI* ai = GetBotAI(member);
         if ((ai && *ai->GetAiObjectContext()->GetValue<Unit*>("current target") == unit) ||
-            (!ai && member->GetSelectionGuid() == unit->GetObjectGuid()))
+            (!ai && member->GetTargetGuid() == unit->GetObjectGuid()))
             count++;
     }
 

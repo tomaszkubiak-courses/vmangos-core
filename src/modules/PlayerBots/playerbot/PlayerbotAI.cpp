@@ -930,13 +930,13 @@ void PlayerbotAI::UpdateTalentSpec(PlayerTalentSpec spec)
     aiObjectContext->GetValue<PlayerTalentSpec>("talent spec")->Set(spec);
 }
 
-bool PlayerbotAI::CanEnterArea(const AreaTrigger* area)
+bool PlayerbotAI::CanEnterArea(const AreaTriggerTeleport* area)
 {
     if (sRandomPlayerbotMgr.IsRandomBot(GetBot()))
     {
-        DungeonPersistentState* state = bot->GetBoundInstanceSaveForSelfOrGroup(area->target_mapId);
-        Map* map = sMapMgr.FindMap(area->target_mapId, state ? state->GetInstanceId() : 0);
-        const MapEntry* mapEntry = sMapStore.LookupEntry(area->target_mapId);
+        DungeonPersistentState* state = bot->GetBoundInstanceSaveForSelfOrGroup(area->destination.mapId);
+        Map* map = sMapMgr.FindMap(area->destination.mapId, state ? state->GetInstanceId() : 0);
+        const MapEntry* mapEntry = sMapStore.LookupEntry(area->destination.mapId);
 
         // check if this account try to abuse reseting instance
 #ifdef MANGOSBOT_ZERO
@@ -947,7 +947,8 @@ bool PlayerbotAI::CanEnterArea(const AreaTrigger* area)
         if (mapEntry->IsNonRaidDungeon() && ((map && map->GetDifficulty() == DUNGEON_DIFFICULTY_NORMAL) || (bot->GetDifficulty(false) == DUNGEON_DIFFICULTY_NORMAL)))
 #endif
         {
-            if (!bot->CanEnterNewInstance(state ? state->GetInstanceId() : 0))
+            // The reset-abuse guard here counts instances per account.
+            if (!bot->CheckInstanceCount(state ? state->GetInstanceId() : 0))
             {
                 return false;
             }
@@ -957,7 +958,7 @@ bool PlayerbotAI::CanEnterArea(const AreaTrigger* area)
         if (map && map->IsDungeon())
         {
             // cannot enter if the instance is full (player cap), GMs don't count, must not check when teleporting around the same map
-            if (bot->GetMapId() != area->target_mapId)
+            if (bot->GetMapId() != area->destination.mapId)
             {
                 if (((DungeonMap*)map)->GetPlayersCountExceptGMs() >= ((DungeonMap*)map)->GetMaxPlayers())
                 {
@@ -972,11 +973,11 @@ bool PlayerbotAI::CanEnterArea(const AreaTrigger* area)
 
                 // Bind Checks
 #ifdef MANGOSBOT_ZERO
-                InstancePlayerBind* pBind = bot->GetBoundInstance(area->target_mapId);
+                InstancePlayerBind* pBind = bot->GetBoundInstance(area->destination.mapId);
 #elif MANGOSBOT_ONE
-                InstancePlayerBind* pBind = bot->GetBoundInstance(area->target_mapId, bot->GetDifficulty());
+                InstancePlayerBind* pBind = bot->GetBoundInstance(area->destination.mapId, bot->GetDifficulty());
 #else
-                InstancePlayerBind* pBind = bot->GetBoundInstance(area->target_mapId, bot->GetDifficulty(mapEntry->IsRaid()));
+                InstancePlayerBind* pBind = bot->GetBoundInstance(area->destination.mapId, bot->GetDifficulty(mapEntry->IsRaid()));
 #endif
                 if (pBind && pBind->perm && pBind->state != state)
                 {
@@ -1006,10 +1007,8 @@ void PlayerbotAI::Unmount()
         bot->UpdateSpeed(MOVE_RUN, true);
         bot->UpdateSpeed(MOVE_RUN, false);
 
-        if (bot->IsFlying())
-        {
-            bot->GetMotionMaster()->MoveFall();
-        }
+        // Nothing flies in vanilla, and this core has no MoveFall generator - a fall runs on
+        // the movement flags on its own.
     }
 }
 
@@ -1434,7 +1433,7 @@ void PlayerbotAI::Reset(bool full)
 #ifdef MANGOS
         bot->GetTaxi().ClearTaxiDestinations();
 #endif
-        bot->OnTaxiFlightEject(true);
+        bot->GetTaxi().ClearTaxiDestinations();
     }
 
     if (full)
@@ -2044,7 +2043,7 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
 #endif
         ack << uint32(0);
         ack << bot->m_movementInfo;
-        bot->GetSession()->HandleMoveKnockBackAck(ack);
+        bot->GetSession()->BotHandleMoveKnockBackAck(ack);
 
         // write jump time
         uint32 curTime = sWorld.GetCurrentMSTime();
@@ -2587,7 +2586,7 @@ bool PlayerbotAI::PlayEmote(uint32 emote)
     WorldPacket data(SMSG_TEXT_EMOTE);
     data << (TextEmotes)emote;
     data << urand(0, EmoteAction::GetNumberOfEmoteVariants((TextEmotes)emote, bot->GetRace(), bot->GetGender()) - 1);
-    data << ((master && (sServerFacade.GetDistance2d(bot, master) < 30.0f) && urand(0, 1)) ? master->GetObjectGuid() : (bot->GetSelectionGuid() && urand(0, 1)) ? bot->GetSelectionGuid() : ObjectGuid());
+    data << ((master && (sServerFacade.GetDistance2d(bot, master) < 30.0f) && urand(0, 1)) ? master->GetObjectGuid() : (bot->GetTargetGuid() && urand(0, 1)) ? bot->GetTargetGuid() : ObjectGuid());
     bot->GetSession()->BotHandleTextEmoteOpcode(data);
 
     return false;
@@ -4363,7 +4362,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, Unit* target, uint8 effectMask, b
         }
 	}
 
-	ObjectGuid oldSel = bot->GetSelectionGuid();
+	ObjectGuid oldSel = bot->GetTargetGuid();
 	//bot->SetSelectionGuid(target->GetObjectGuid());
 	Spell *spell = new Spell(bot, spellInfo, false);
 
@@ -4491,7 +4490,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, GameObject* goTarget, uint8 effec
         return false;
     }
 
-    //ObjectGuid oldSel = bot->GetSelectionGuid();
+    //ObjectGuid oldSel = bot->GetTargetGuid();
     bot->SetSelectionGuid(goTarget->GetObjectGuid());
     Spell* spell = new Spell(bot, spellInfo, false);
 
@@ -4713,7 +4712,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
         failWithDelay = true;
     }
 
-	ObjectGuid oldSel = bot->GetSelectionGuid();
+	ObjectGuid oldSel = bot->GetTargetGuid();
 	bot->SetSelectionGuid(target->GetObjectGuid());
 
     WorldObject* faceTo = target;
@@ -4868,7 +4867,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
                     obj->SetOwnerGuid(bot->GetObjectGuid());
                     obj->SetLootState(GO_JUST_DEACTIVATED);
 
-                    bot->RemoveGameObject(obj, false, pSpellInfo->Id != obj->GetSpellId());
+                    bot->RemoveGameObject(obj, false);
                     bot->m_ObjectSlotGuid[slot].Clear();
 
                     obj->SetOwnerGuid(ownerGuid);
@@ -5104,9 +5103,9 @@ bool PlayerbotAI::CastSpell(uint32 spellId, float x, float y, float z, Item* ite
         failWithDelay = true;
     }
 
-    ObjectGuid oldSel = bot->GetSelectionGuid();
+    ObjectGuid oldSel = bot->GetTargetGuid();
 
-    if (!sServerFacade.isMoving(bot)) sServerFacade.SetFacingTo(bot, bot->GetAngleAt(bot->GetPositionX(), bot->GetPositionY(), x, y));
+    if (!sServerFacade.isMoving(bot)) sServerFacade.SetFacingTo(bot, bot->GetAngle(x, y));
 
     if (failWithDelay)
     {
@@ -5419,7 +5418,7 @@ bool PlayerbotAI::CastVehicleSpell(uint32 spellId, Unit* target, float projectil
     //bot->ClearUnitState(UNIT_STATE_CHASE);
     //bot->ClearUnitState(UNIT_STATE_FOLLOW);
 
-    //ObjectGuid oldSel = bot->GetSelectionGuid();
+    //ObjectGuid oldSel = bot->GetTargetGuid();
     //bot->SetSelectionGuid(target->GetObjectGuid());
 
     // turn vehicle if target is not in front
@@ -5459,7 +5458,7 @@ bool PlayerbotAI::CastVehicleSpell(uint32 spellId, Unit* target, float projectil
 
         targets.setDestination(dest.x, dest.y, dest.z);
         targets.setSpeed(projectileSpeed);
-        float distanceToDest = sqrt(vehicle->GetPosition().GetDistance(Position(dest.x, dest.y, dest.z, 0.0f)));
+        float distanceToDest = BotPositionDistance(vehicle->GetPosition(), Position(dest.x, dest.y, dest.z, 0.0f));
         float elev = 0.01f;
         if (distanceToDest < 25.0f)
             elev = 0.04f;
@@ -5795,7 +5794,9 @@ bool PlayerbotAI::HasSpellItems(uint32 spellId, const Item* castItem) const
         }
         else
         {
-            if (!bot->CanNoReagentCast(spellEntry))
+            // Nothing waives reagents in vanilla - the no-reagent-cast aura arrived later -
+            // so the reagents are always required here.
+            if (true)
             {
                 for (uint32 i = 0; i < MAX_SPELL_REAGENTS; ++i)
                 {
@@ -6742,7 +6743,7 @@ std::string PlayerbotAI::HandleRemoteCommand(std::string command)
         bool hasAttackers = GetAiObjectContext()->GetValue<bool>("has attackers")->Get();
         out << ", has attackers: " << (hasAttackers ? "true" : "false");
 
-        out << " | Selection: " << bot->GetSelectionGuid().GetCounter();
+        out << " | Selection: " << bot->GetTargetGuid().GetCounter();
 
         return out.str();
     }
@@ -6920,18 +6921,20 @@ bool PlayerbotAI::HasSkill(SkillType skill)
     return bot->HasSkill(skill) && bot->GetSkillValue(skill) > 0;
 }
 
-bool ChatHandler::HandlePlayerbotCommand(char* args)
+// The donor's core declared these three on ChatHandler as GM commands. This tree's command
+// table is ChatHandler::getCommandTable(), which the module does not extend yet, so they stand
+// on their own until the bot command set is wired up - see doc/PLAYERBOT_PORT_SCOPE.md.
+bool HandlePlayerbotCommand(ChatHandler* handler, char* args)
 {
-    return PlayerbotMgr::HandlePlayerbotMgrCommand(this, args);
+    return PlayerbotMgr::HandlePlayerbotMgrCommand(handler, args);
 }
 
-bool ChatHandler::HandleRandomPlayerbotCommand(char* args)
+bool HandleRandomPlayerbotCommand(ChatHandler* handler, char* args)
 {
-    return RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(this, args);
+    return RandomPlayerbotMgr::HandlePlayerbotConsoleCommand(handler, args);
 }
 
-//Dummy handler until Chat.h can be modified.
-bool ChatHandler::HandleAhBotCommand(char* args)
+bool HandleAhBotCommand(ChatHandler* /*handler*/, char* /*args*/)
 {
     return false;
 }
@@ -6962,12 +6965,12 @@ float PlayerbotAI::GetRange(std::string type)
 //Copy from reputation GetFactionReaction
 ReputationRank PlayerbotAI::GetFactionReaction(FactionTemplateEntry const* thisTemplate, FactionTemplateEntry const* otherTemplate)
 {
-    MANGOS_ASSERT(thisTemplate)
-        MANGOS_ASSERT(otherTemplate)
+    // MANGOS_ASSERT is a statement macro here, not an expression, so each one ends in a
+    // semicolon.
+    MANGOS_ASSERT(thisTemplate);
+    MANGOS_ASSERT(otherTemplate);
 
-        // Original logic begins
-
-        if (otherTemplate->ourMask & thisTemplate->hostileMask)
+    if (otherTemplate->ourMask & thisTemplate->hostileMask)
             return REP_HOSTILE;
 
     if (thisTemplate->enemyFaction[0] && otherTemplate->faction)
@@ -7278,7 +7281,7 @@ bool PlayerbotAI::HasNotFullStacksInBagsForLootItems(LootItemList &lootItemList)
                 {
                     if (Item* pItem = pBag->GetItemByPos(j))
                     {
-                        if (pItem->GetProto()->ItemId == lootItem.itemId
+                        if (pItem->GetProto()->ItemId == lootItem.itemid
                             && pItem->GetCount() < pItem->GetMaxStackCount())
                         {
                             return true;
@@ -7292,7 +7295,7 @@ bool PlayerbotAI::HasNotFullStacksInBagsForLootItems(LootItemList &lootItemList)
         {
             if (Item* pItem = bot->GetItemByPos(INVENTORY_SLOT_BAG_0, i))
             {
-                if (pItem->GetProto()->ItemId == lootItem.itemId
+                if (pItem->GetProto()->ItemId == lootItem.itemid
                     && pItem->GetCount() < pItem->GetMaxStackCount())
                 {
                     return true;
@@ -7332,7 +7335,7 @@ bool PlayerbotAI::HasQuestItemsInLootList(LootItemList &lootItemList)
 {
     for (auto lootItem : lootItemList)
     {
-        if (lootItem.lootItemType == LOOTITEM_TYPE_QUEST)
+        if (lootItem.needs_quest)
         {
             return true;
         }
@@ -7352,7 +7355,7 @@ bool PlayerbotAI::CanLootSomethingFromWO(WorldObject* wo)
         Creature* creature = GetCreature(guid);
         if (creature && sServerFacade.GetDeathState(creature) == CORPSE)
         {
-            if (&creature->loot->gold > 0)
+            if (creature->loot.gold > 0)
             {
                 return true;
             }
@@ -7837,7 +7840,7 @@ void PlayerbotAI::AccelerateRespawn(Creature* creature, float accelMod)
 
         playersNr = std::min(playersNr - sPlayerbotAIConfig.respawnModThreshold, sPlayerbotAIConfig.respawnModMax);
 
-        accelMod = playersNr * (creature->CanInitiateAttack() ? sPlayerbotAIConfig.respawnModHostile : sPlayerbotAIConfig.respawnModNeutral) * 0.01f;
+        accelMod = playersNr * ((creature->IsCreature() && ((Creature*)creature)->CanInitiateAttack()) ? sPlayerbotAIConfig.respawnModHostile : sPlayerbotAIConfig.respawnModNeutral) * 0.01f;
     }
 
     if (!accelMod)
@@ -7875,9 +7878,11 @@ void PlayerbotAI::AccelerateRespawn(Creature* creature, float accelMod)
             m_respawnDelay -= totalDelay * accelMod;
     }
 
-    creature->SetRespawnDelay(m_respawnDelay / IN_MILLISECONDS,true);
+    // SetRespawnDelay here only records the delay - the respawn time is recomputed from it
+    // when the creature dies, so there is no "apply now" flag to pass.
+    creature->SetRespawnDelay(m_respawnDelay / IN_MILLISECONDS);
 
-    if (!m_corpseAccelerationDecayDelay && &creature->loot)
+    if (!m_corpseAccelerationDecayDelay)
     {
         // LootAccess wraps Loot* now.
         LootAccess lootAccess(&creature->loot);
@@ -7892,9 +7897,10 @@ void PlayerbotAI::AccelerateRespawn(Creature* creature, float accelMod)
 
         CreatureInfo const* cinfo = creature->GetCreatureInfo();
 
-        if (cinfo->CorpseDelay)
-            defaultDelay = cinfo->CorpseDelay;
-        else if (sObjectMgr.IsEncounter(creature->GetEntry(), creature->GetMapId()))
+        // No per-template decay time in this core's creature_template; the rank decides it,
+        // as it does in Creature::SetDeathState.
+        // No encounter registry here; the rank below decides the decay for every creature.
+        if (false)
         {
             // encounter boss forced decay timer to 1h
             defaultDelay = 3600;                               // TODO: maybe add that to config file
@@ -7921,17 +7927,19 @@ void PlayerbotAI::AccelerateRespawn(Creature* creature, float accelMod)
             }
         }
 
-        defaultDelay *= static_cast<uint32>(IN_MILLISECONDS) / (1+accelMod);
+        defaultDelay /= (1 + accelMod);
 
-        //We will decrease the loot time by a factor capping at 20 seconds.
-        m_corpseAccelerationDecayDelay = std::max(uint32(20 * static_cast<uint32>(IN_MILLISECONDS)), defaultDelay);
-        creature->SetCorpseAccelerationDelay(m_corpseAccelerationDecayDelay);
-
-        creature->ReduceCorpseDecayTimer();
+        // Never below twenty seconds, so a looted corpse does not vanish under a bot that is
+        // still walking to it. SetCorpseDelay here takes seconds, and the corpse timer is
+        // recomputed from it when the creature dies - there is no separate "acceleration"
+        // delay to set, so the shortened delay is simply the delay.
+        m_corpseAccelerationDecayDelay = std::max(uint32(20), defaultDelay);
+        creature->SetCorpseDelay(m_corpseAccelerationDecayDelay);
         return;
     }
-    MANGOS_ASSERT(m_corpseAccelerationDecayDelay < 24 * HOUR * static_cast<uint32>(IN_MILLISECONDS));
-    creature->SetCorpseAccelerationDelay(m_corpseAccelerationDecayDelay);
+
+    MANGOS_ASSERT(m_corpseAccelerationDecayDelay < 24 * HOUR);
+    creature->SetCorpseDelay(m_corpseAccelerationDecayDelay);
 }
 
 std::list<Unit*> PlayerbotAI::GetAllHostileUnitsAroundWO(WorldObject* wo, float distanceAround)
@@ -8013,8 +8021,9 @@ PlayerbotHolder* PlayerbotAI::GetHolder() const
     if (sRandomPlayerbotMgr.IsRandomBot(bot))
         return &sRandomPlayerbotMgr;
 
-    if (bot->GetMaster())
-        return GetBotMgr(static_cast<Player*>(bot->GetMaster()));
+    // The master a bot follows is kept by its AI here, not on the Player.
+    if (Player* botMaster = GetMaster())
+        return GetBotMgr(botMaster);
 
     return GetBotMgr(bot);
 }
@@ -8056,25 +8065,11 @@ void PlayerbotAI::Ping(float x, float y)
 
     if (bot->GetGroup())
     {
-        bot->GetGroup()->BroadcastPacket(
-#ifdef MANGOS
-            & data,
-#endif
-#ifdef CMANGOS
-            data,
-#endif
-            true, -1, bot->GetObjectGuid());
+        bot->GetGroup()->BroadcastPacket(&data, true, -1, bot->GetObjectGuid());
     }
     else
     {
-        bot->GetSession()->SendPacket(
-#ifdef MANGOS
-            & data
-#endif
-#ifdef CMANGOS
-            data
-#endif
-            );
+        bot->GetSession()->SendPacket(&data);
     }
 }
 
@@ -8525,7 +8520,7 @@ bool PlayerbotAI::CanMove()
     {
         return false;
     }
-    if (bot->IsStunned())
+    if (bot->HasUnitState(UNIT_STATE_STUNNED))
     {
         return false;
     }
@@ -8702,9 +8697,10 @@ bool PlayerbotAI::PlayAttackEmote(float chanceMultiplier)
 
 void PlayerbotAI::QueuePacket(WorldPacket& pkt)
 {
-    // Penqle WorldPacket has deleted copy-assign; copy-construct + move-assign.
-    std::unique_ptr<WorldPacket> packet(new WorldPacket(pkt));
-    bot->GetSession()->QueuePacket(std::move(packet));
+    // Everything the module sends this way is a movement message the bot is reporting about
+    // itself (MSG_MOVE_*). The session queue holds parsed packets here, so it is parsed into
+    // the movement packet and queued as that - which keeps the handoff to the world thread.
+    BotQueuePacket<WorldPackets::Movement::MovementPacket>(bot->GetSession(), pkt);
 }
 
 float PlayerbotAI::GetLevelFloat() const

@@ -331,7 +331,7 @@ RandomPlayerbotMgr::RandomPlayerbotMgr()
             if (!sMapStore.LookupEntry(i))
                 continue;
 
-            uint32 mapId = sMapStore.LookupEntry(i)->MapID;
+            uint32 mapId = sMapStore.LookupEntry(i)->id;
             facingFix[mapId] = {};
         }
 
@@ -2689,7 +2689,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
                 return true;
 
             bool isEnemyZone = false;
-            switch (zone->team)
+            switch (zone->Team)
             {
             case AREATEAM_ALLY:
                 isEnemyZone = bot->GetTeam() != ALLIANCE;
@@ -2701,7 +2701,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
                 isEnemyZone = false;
                 break;
             }
-            if (isEnemyZone && (bot->GetLevel() < 21 || (zone->flags & AREA_FLAG_CAPITAL)))
+            if (isEnemyZone && (bot->GetLevel() < 21 || (zone->Flags & AREA_FLAG_CAPITAL)))
                 return true;
 
             // filter other races zones
@@ -2739,7 +2739,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
             return true;
 
         bool isEnemyZone = false;
-        switch (area->team)
+        switch (area->Team)
         {
         case AREATEAM_ALLY:
             isEnemyZone = bot->GetTeam() != ALLIANCE;
@@ -2806,7 +2806,7 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
 
 #ifndef MANGOSBOT_ZERO
             // Do not teleport to outland before portal opening (allow new races zones)
-            if (sWorldState.GetExpansion() == EXPANSION_NONE && (loc.mapId == 571 || (loc.mapId == 530 && area->team != 2 && area->team != 4)))
+            if (sWorldState.GetExpansion() == EXPANSION_NONE && (loc.mapId == 571 || (loc.mapId == 530 && area->Team != 2 && area->Team != 4)))
                 continue;
 #endif
 
@@ -3819,7 +3819,7 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
     DisablePlayerBot(player->GetGUIDLow());
 
     if (!hadPlayerBot && GetBotAI(player) && GetBotAI(player)->IsRealPlayer() && player->GetGroup() && sPlayerbotAIConfig.IsFreeAltBot(player))
-        player->GetSession()->SetOffline(); //Prevent groupkick
+        player->GetSession()->SetDisconnectedSession(); //Prevent groupkick
 
     ForEachPlayerbot([&](Player* bot) {
         PlayerbotAI* ai = GetBotAI(bot);
@@ -3918,7 +3918,7 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
     Player* requester = GetPlayer(requesterGuid);
     std::stringstream ss; ss << GetPlayerbotsAmount() << " Random Bots online";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     std::map<uint32, int> alliance, horde;
     for (uint32 i = 0; i < 10; ++i)
@@ -4047,7 +4047,7 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
 
     ss.str(""); ss << "Bots level:";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
 	uint32 maxLevel = sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL);
 	for (uint32 i = 0; i < 10; ++i)
@@ -4061,12 +4061,12 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
 
         ss.str(""); ss << "    " << from << ".." << to << ": " << alliance[i] << " alliance, " << horde[i] << " horde";
         sLog.outString("%s", ss.str().c_str());
-        if (requester) { requester->SendMessageToPlayer(ss.str()); }
+        if (requester) { requester->SendSysMessage(ss.str().c_str()); }
     }
 
     ss.str(""); ss << "Bots race:";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     for (uint8 race = RACE_HUMAN; race < MAX_RACES; ++race)
     {
@@ -4074,13 +4074,13 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
         {
             ss.str(""); ss << "    " << ChatHelper::formatRace(race) << ": " << perRace[race];
             sLog.outString("%s", ss.str().c_str());
-            if (requester) { requester->SendMessageToPlayer(ss.str()); }
+            if (requester) { requester->SendSysMessage(ss.str().c_str()); }
         }
     }
 
     ss.str(""); ss << "Bots class:";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     for (uint8 cls = CLASS_WARRIOR; cls < MAX_CLASSES; ++cls)
     {
@@ -4088,29 +4088,29 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
         {
             ss.str(""); ss << "    " << ChatHelper::formatClass(cls) << ": " << perClass[cls];
             sLog.outString("%s", ss.str().c_str());
-            if (requester) { requester->SendMessageToPlayer(ss.str()); }
+            if (requester) { requester->SendSysMessage(ss.str().c_str()); }
         }
     }
 
     ss.str(""); ss << "Bots role:";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    tank: " << tank << ", heal: " << heal << ", dps: " << dps;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "Bots status:";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Active: " << active;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Moving: " << moving;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     //sLog.outString("Bots to:");
     //sLog.outString("    update: %d", update);
@@ -4121,43 +4121,43 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
 
     ss.str(""); ss << "    On taxi: " << taxi;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    On mount: " << mounted;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    In combat: " << combat;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Dead: " << dead;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    AFK: " << afk;
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "Bots questing:";
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Picking quests: " << stateCount[(uint8)TravelState::TRAVEL_STATE_TRAVEL_PICK_UP_QUEST] + stateCount[(uint8)TravelState::TRAVEL_STATE_WORK_PICK_UP_QUEST];
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Doing quests: " << stateCount[(uint8)TravelState::TRAVEL_STATE_TRAVEL_DO_QUEST] + stateCount[(uint8)TravelState::TRAVEL_STATE_WORK_DO_QUEST];
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Completing quests: " << stateCount[(uint8)TravelState::TRAVEL_STATE_TRAVEL_HAND_IN_QUEST] + stateCount[(uint8)TravelState::TRAVEL_STATE_WORK_HAND_IN_QUEST];
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 
     ss.str(""); ss << "    Idling: " << stateCount[(uint8)TravelState::TRAVEL_STATE_IDLE];
     sLog.outString("%s", ss.str().c_str());
-    if (requester) { requester->SendMessageToPlayer(ss.str()); }
+    if (requester) { requester->SendSysMessage(ss.str().c_str()); }
 }
 
 double RandomPlayerbotMgr::GetBuyMultiplier(Player* bot)
@@ -4372,9 +4372,9 @@ uint32 RandomPlayerbotMgr::GetBattleMasterEntry(Player* bot, BattleGroundTypeId 
         if (!area)
             continue;
 
-        if (area->team == 4 && bot->GetTeam() == ALLIANCE)
+        if (area->Team == 4 && bot->GetTeam() == ALLIANCE)
             continue;
-        if (area->team == 2 && bot->GetTeam() == HORDE)
+        if (area->Team == 2 && bot->GetTeam() == HORDE)
             continue;
 
         if (Bm->GetDeathState() == DEAD)
@@ -4832,7 +4832,7 @@ std::list<std::string> RandomPlayerbotMgr::HandleConsoleCleanMap(std::string par
         if (!sMapStore.LookupEntry(i))
             continue;
 
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
+        uint32 mapId = sMapStore.LookupEntry(i)->id;
         std::thread t([mapId]() {WorldPosition::unloadMapAndVMaps(mapId); });
         t.detach();
     }

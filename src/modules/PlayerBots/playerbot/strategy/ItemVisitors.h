@@ -206,7 +206,7 @@ namespace ai
         virtual bool Visit(Item* item) override
         {
             const ItemPrototype* proto = item->GetProto();
-            if (proto && proto->Name1.empty() && strstri(proto->Name1, name.c_str()))
+            if (proto && proto->Name1 && *proto->Name1 && strstri(proto->Name1, name.c_str()))
                 count += item->GetCount();
 
             return true;
@@ -225,7 +225,7 @@ namespace ai
 
         virtual bool Accept(const ItemPrototype* proto) override
         {
-            return proto && !proto->Name1.empty() && strstri(proto->Name1, name.c_str());
+            return proto && proto->Name1 && *proto->Name1 && strstri(proto->Name1, name.c_str());
         }
 
     private:

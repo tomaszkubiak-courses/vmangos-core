@@ -56,6 +56,7 @@
 #include <memory>
 #include <regex>
 #include <numeric>
+#include <typeindex>
 
 // Typed access to the player slots this module owns. Replaces the
 // Player::GetPlayerbotAI() / GetPlayerbotMgr() members the core used to carry.

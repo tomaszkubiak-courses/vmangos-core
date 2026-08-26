@@ -1134,7 +1134,7 @@ int32 TravelMgr::GetAreaLevel(uint32 area_id)
         if (!subArea || subArea->ZoneId != area->Id)
             continue;
 
-        int32 subLevel = GetAreaLevel(subArea->ID);
+        int32 subLevel = GetAreaLevel(subArea->Id);
 
         if (!subLevel)
             continue;
@@ -1250,69 +1250,13 @@ void TravelMgr::LoadAreaLevels()
 
 void TravelMgr::SetMobAvoidArea()
 {
-    sLog.outString("-Apply mob avoidance maps");
-
-    std::vector<std::future<void>> calculations;
-
-    BarGoLink bar(sMapStore.GetNumRows());
-
-    for (uint32 i = 0; i < sMapStore.GetNumRows(); ++i)
-    {
-        if (!sMapStore.LookupEntry(i))
-            continue;
-        
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
-        calculations.push_back(std::async([this, mapId] { SetMobAvoidAreaMap(mapId); }));
-        bar.step();
-    }
-
-    BarGoLink bar2(calculations.size());
-    for (uint32 i = 0; i < calculations.size(); i++)
-    {
-        calculations[i].wait();
-        bar2.step();
-    }
-
-    sLog.outString(">> Modified navmap areas for %d maps.", sMapStore.GetNumRows());
+    // cmangos paints the navmesh around hostile mobs with a costlier area so bots path around
+    // them. This core's pathfinder has no area costs to paint - see doc/PLAYERBOT_PORT_SCOPE.md -
+    // so there is nothing to build here.
 }
 
-void TravelMgr::SetMobAvoidAreaMap(uint32 mapId) 
+void TravelMgr::SetMobAvoidAreaMap(uint32 /*mapId*/)
 {
-    PathFinder path(mapId, 0);
-    FactionTemplateEntry const* humanFaction = sFactionTemplateStore.LookupEntry(1);
-    FactionTemplateEntry const* orcFaction = sFactionTemplateStore.LookupEntry(2);
-
-    std::vector<CreatureDataPair const*> creatures = WorldPosition(mapId, 1,1).getCreaturesNear();
-
-    for (auto& creaturePair : creatures)
-    {
-        CreatureData const cData = creaturePair->second;
-        CreatureInfo const* cInfo = sObjectMgr.GetCreatureTemplate(cData.creature_id[0]);
-
-        if (!cInfo)
-            continue;
-
-        WorldPosition point = WorldPosition(cData.position.mapId, cData.position.x, cData.position.y, cData.position.z, cData.position.o);
-
-        if (cInfo->npc_flags > 0)
-            continue;
-
-        FactionTemplateEntry const* factionEntry = sFactionTemplateStore.LookupEntry(cInfo->faction);
-        ReputationRank reactionHum = PlayerbotAI::GetFactionReaction(humanFaction, factionEntry);
-        ReputationRank reactionOrc = PlayerbotAI::GetFactionReaction(orcFaction, factionEntry);
-
-        if (reactionHum >= REP_NEUTRAL || reactionOrc >= REP_NEUTRAL)
-            continue;
-
-        if (!point.getTerrain())
-            continue;
-
-        if (!point.loadMapAndVMap(0))
-            continue;
-
-        path.setArea(point.getMapId(), point.getX(), point.getY(), point.getZ(), 12, 50.0f);
-        path.setArea(point.getMapId(), point.getX(), point.getY(), point.getZ(), 13, 20.0f);
-    }
 }
 
 // Custom player-only starting zones with no MMAP support: Blackstone Island (Goblin, map 1)
@@ -2280,7 +2224,7 @@ void TravelMgr::LoadQuestTravelTable()
         if (!sMapStore.LookupEntry(i))
             continue;
 
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
+        uint32 mapId = sMapStore.LookupEntry(i)->id;
 
         if (WorldPosition(mapId, 0, 0).getMap(0))
             continue;
@@ -2303,7 +2247,7 @@ void TravelMgr::GetPopulatedGrids()
         if (!sMapStore.LookupEntry(i))
             continue;
 
-        uint32 mapId = sMapStore.LookupEntry(i)->MapID;
+        uint32 mapId = sMapStore.LookupEntry(i)->id;
 
         GetPopulatedGrids(mapId);
     }
@@ -2446,8 +2390,6 @@ void TravelMgr::GetFishLocations(uint32 mapId)
     TravelNode* ironForgeNode = sTravelNodeMap.getNode(ironForge);
     WorldPosition orgrimmar(1, 1845.49, -4395.95, 5.19264);
 
-    PathFinder path(mapId,0);
-
     const int8 subCellPerGrid = 64;
     const float sizeOfSubCell = SIZE_OF_GRIDS / subCellPerGrid;
 
@@ -2492,14 +2434,10 @@ void TravelMgr::GetFishLocations(uint32 mapId)
                         if (fabs(fishSpot.getZ() - waterSpot.getZ()) > 10.0f)
                             continue;
 
-                        uint32 area = path.getArea(mapId, fishSpot.getX(), fishSpot.getY(), fishSpot.getZ());
+                        // cmangos skipped points whose navmesh area is missing or too steep to
+                        // stand on. There is no area query here, so the water test below is what
+                        // decides whether this is a fishing spot.
 
-                        if (!area || area == NAV_AREA_GROUND_STEEP)
-                        {
-                        //    sLog.outError("no area %d %f %f %f", mapId, fishSpot.getX(), fishSpot.getY(), fishSpot.getZ());
-                            continue;
-                        }
-                   
                         inWater = fishSpot.isInWater();
 
                         if (!inWater)

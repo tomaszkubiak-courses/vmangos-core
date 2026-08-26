@@ -111,7 +111,7 @@ bool CastSpellAction::isPossible()
     }
     else
     {
-        float dist = bot->GetDistance(spellTarget, true, ai->IsRanged(bot) ? DIST_CALC_COMBAT_REACH : DIST_CALC_COMBAT_REACH_WITH_MELEE);
+        float dist = bot->GetDistance(spellTarget, ai->IsRanged(bot) ? DIST_CALC_COMBAT_REACH : DIST_CALC_COMBAT_REACH_WITH_MELEE);
         if (range == ATTACK_DISTANCE) 
         {
             canReach = bot->CanReachWithMeleeAutoAttack(spellTarget);
@@ -703,7 +703,6 @@ bool CastItemTargetAction::Execute(Event& event)
         if (item)
         {
             spell->SetCastItem(item);
-            item->SetUsedInSpell(true);
         }
         bool result = (spell->ForceSpellStart(&targets) == SPELL_CAST_OK);
 

@@ -606,7 +606,9 @@ bool BroadcastHelper::BroadcastCreatureKill(
                 );
             }
             break;
-        case CREATURE_UNKNOWN:
+        // cmangos has a sixth rank, CREATURE_UNKNOWN, that this core's enum stops short of.
+        // Nothing can carry it here, so the branch is folded into the default below.
+        default:
             if (urand(1, sPlayerbotAIConfig.broadcastChanceMaxValue) <= sPlayerbotAIConfig.broadcastChanceKillUnknown)
             {
                 return BroadcastToChannelWithGlobalChance(
@@ -615,8 +617,6 @@ bool BroadcastHelper::BroadcastCreatureKill(
                     { {TO_GUILD, 50}, {TO_WORLD, 50}, {TO_GENERAL, 100} }
                 );
             }
-            break;
-        default:
             break;
         }
     }

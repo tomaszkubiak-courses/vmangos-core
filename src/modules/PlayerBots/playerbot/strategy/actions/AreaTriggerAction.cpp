@@ -21,7 +21,7 @@ bool ReachAreaTriggerAction::Execute(Event& event)
     if(!atEntry)
         return false;
 
-    AreaTrigger const* at = sObjectMgr.GetAreaTrigger(triggerId);
+    AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(triggerId);
     if (!at)
     {
         WorldPacket p1(CMSG_AREATRIGGER);
@@ -70,7 +70,7 @@ bool AreaTriggerAction::Execute(Event& event)
     if(!atEntry)
         return false;
 
-    AreaTrigger const* at = sObjectMgr.GetAreaTrigger(triggerId);
+    AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(triggerId);
     if (!at)
         return true;
 

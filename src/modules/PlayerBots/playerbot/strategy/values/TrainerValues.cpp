@@ -76,8 +76,8 @@ trainableSpellMap* TrainableSpellMapValue::Calculate()
 #endif
                     continue;
 
-                if (otherTrainerSpell->conditionId != trainerSpell.conditionId)
-                    continue;
+                // npc_trainer here carries no condition column, so there is nothing else to
+                // compare beyond the spell, its cost and its requirements.
 
                 sameTrainerSpell = otherTrainerSpell;
                 break;
