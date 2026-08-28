@@ -36,7 +36,10 @@ namespace ai
     class PetIsDeadValue : public BoolCalculatedValue
     {
     public:
-        PetIsDeadValue(PlayerbotAI* ai, std::string name = "pet dead") : BoolCalculatedValue(ai, name) {}
+        // Reaches the character database when the pet is not in the world, so it must not run
+        // at the default once-a-second: with a few hundred bots that was a synchronous query
+        // per petless hunter per second on the world thread. A revive is not urgent.
+        PetIsDeadValue(PlayerbotAI* ai, std::string name = "pet dead") : BoolCalculatedValue(ai, name, 20) {}
         virtual bool Calculate() override;
     };
 

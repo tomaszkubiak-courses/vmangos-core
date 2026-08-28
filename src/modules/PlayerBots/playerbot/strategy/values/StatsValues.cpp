@@ -26,22 +26,20 @@ bool IsDeadValue::Calculate()
 
 bool PetIsDeadValue::Calculate()
 {
-#ifdef MANGOSBOT_ZERO
-#ifdef MANGOS
-    PetDatabaseStatus status = Pet::GetStatusFromDB(bot);
-    if (status == PET_DB_DEAD)
-#endif
-#endif
-    if (!bot->GetPet())
-    {
-        uint32 ownerid = bot->GetGUIDLow();
-        auto result = CharacterDatabase.PQuery("SELECT id FROM character_pet WHERE owner_guid = '%u'", ownerid);
-        return result != nullptr;
-    }
-    if (bot->GetPetGuid() && !bot->GetPet())
-        return true;
+    if (Pet* pet = bot->GetPet())
+        return sServerFacade.GetDeathState(pet) != ALIVE;
 
-    return bot->GetPet() && sServerFacade.GetDeathState(bot->GetPet()) != ALIVE;
+    // No pet in the world. The only way to tell a corpse waiting to be revived from a pet
+    // that is merely stabled or was never called is the saved row, so this has to reach the
+    // database - hence the long check interval on this value. The old query asked whether
+    // the bot owned *any* pet row, which made every hunter with a stabled or uncalled pet
+    // permanently "pet dead": the revive-pet trigger then fired on every tick forever, and
+    // ran this query with it.
+    std::unique_ptr<QueryResult> result(CharacterDatabase.PQuery(
+        "SELECT 1 FROM `character_pet` WHERE `owner_guid` = '%u' AND `slot` = '%u' AND `current_health` = 0 LIMIT 1",
+        bot->GetGUIDLow(), uint32(PET_SAVE_AS_CURRENT)));
+
+    return result != nullptr;
 }
 
 bool PetIsHappyValue::Calculate()
