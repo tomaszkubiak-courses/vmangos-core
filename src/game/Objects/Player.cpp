@@ -14860,9 +14860,17 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
 
     // check name limitations
     m_name = fields[2].GetCppString();
-    if (ObjectMgr::CheckPlayerName(m_name) != CHAR_NAME_SUCCESS ||
-       (GetSession()->GetSecurity() == SEC_PLAYER && sObjectMgr.IsReservedName(m_name)))
+    uint8 const nameCheck = ObjectMgr::CheckPlayerName(m_name);
+    bool const nameReserved = GetSession()->GetSecurity() == SEC_PLAYER && sObjectMgr.IsReservedName(m_name);
+    if (nameCheck != CHAR_NAME_SUCCESS || nameReserved)
     {
+        // Say so. Every other refusal in this function logs its reason; this one did not, so a
+        // character whose name the DBC validators reject simply failed to load, forever, with
+        // nothing in the log to explain it - the rename flag set below is the only trace, and
+        // it looks like the cause rather than the consequence.
+        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "%s has an unusable name \"%s\" (CheckPlayerName=%u, reserved=%u), refusing to load and flagging it for rename.",
+                 guid.GetString().c_str(), m_name.c_str(), uint32(nameCheck), uint32(nameReserved));
+
         CharacterDatabase.PExecute("UPDATE `characters` SET `character_flags` = `character_flags` | '%u' WHERE `guid` ='%u'",
                                    uint32(CHARACTER_FLAG_RENAME), guid.GetCounter());
         return false;

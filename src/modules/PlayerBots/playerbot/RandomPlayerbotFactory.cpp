@@ -531,6 +531,7 @@ void RandomPlayerbotFactory::EnsureNamesInitialized()
     }
 
     std::unordered_map<std::string, bool> used;
+    uint32 rejectedNames = 0;
 
     do
     {
@@ -538,11 +539,27 @@ void RandomPlayerbotFactory::EnsureNamesInitialized()
         NameRaceAndGender rg = static_cast<NameRaceAndGender>(fields[0].GetUInt8());
         std::string bname = fields[1].GetString();
         uint32 guidlo = fields[2].GetUInt32();
+
+        // Drop names the core will not accept. ai_playerbot_names is a bulk-generated list and
+        // nothing has ever measured it against ObjectMgr::CheckPlayerName, which runs the
+        // profanity and reserved-name regexes out of NamesProfanity.dbc and NamesReserved.dbc.
+        // A bot handed such a name is created happily and then refused by Player::LoadFromDB on
+        // every single login attempt, forever - it can never enter the world, and before the
+        // logging added alongside this change it did so without saying why.
+        if (ObjectMgr::CheckPlayerName(bname) != CHAR_NAME_SUCCESS)
+        {
+            ++rejectedNames;
+            continue;
+        }
+
         if (!guidlo)
             freeNames[rg].push_back(bname);
         allNames[rg].push_back(bname);
         used[bname] = false;
     } while (result->NextRow());
+
+    if (rejectedNames)
+        sLog.outString("Skipped %u bot names the core would refuse to load a character under.", rejectedNames);
 
     // Generate extra names for missing race/gender combos
     if (allNames.count(NameRaceAndGender::DwarfMale) == 0)
