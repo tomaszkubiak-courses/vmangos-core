@@ -1,7 +1,7 @@
 #pragma once
 //
 // BotActionLog — opt-in per-bot detailed action log. Each bot summoned while
-// AiPlayerbot.EnableActionLog=1 gets its own file under logs/bots/, with a
+// AiPlayerbot.EnableActionLog=1 gets its own file under <LogsDir>/bots/, with a
 // timestamped event stream covering lifecycle, casts, auras, state and target
 // changes. One event per line, `[timestamp] [TAG] key=val key=val`. Files are
 // fflush()'d on every write so a crash doesn't lose the trail. Gated behind
@@ -10,6 +10,7 @@
 
 #include "Common.h"
 #include <cstdio>
+#include <string>
 #include <unordered_map>
 
 class Player;
@@ -21,7 +22,7 @@ class BotActionLog
 {
 public:
     // Open a log file for this bot. Idempotent (returns existing handle
-    // if already open). Creates `logs/bots/` if missing. Returns null on
+    // if already open). Creates the `bots/` directory if missing. Returns null on
     // I/O error (caller must tolerate null and skip logging).
     static std::FILE* Open(PlayerbotAI* ai);
 
@@ -66,7 +67,11 @@ private:
     // Helper: build the per-bot log path. `<botname>_<sessionId>_<date>.log`.
     static std::string BuildPath(Player* bot);
 
-    // Helper: ensure `logs/bots/` exists. Cheap (CreateDirectory ignores
+    // Helper: the directory the per-bot files go in — the server's LogsDir
+    // plus `bots/`, with a trailing separator.
+    static std::string LogDir();
+
+    // Helper: ensure that directory exists. Cheap (CreateDirectory ignores
     // ERROR_ALREADY_EXISTS).
     static void EnsureLogDir();
 };

@@ -14,6 +14,7 @@
 #include "Spells/SpellAuraDefines.h"  // MAX_AURAS
 #include "Spells/SpellMgr.h"
 #include "Log.h"
+#include "Config/Config.h"
 
 #include <chrono>
 #include <cstdarg>
@@ -47,19 +48,26 @@ static void MakeDirIdempotent(const char* path)
 #endif
 }
 
+// Root the per-bot logs where every other log file goes: the server's own
+// LogsDir, the same value BotLog is handed for bots.log. Guessing from the
+// current working directory instead used to write them to a "logs/bots" one
+// level *above* the server directory, since mangosd is started from its
+// install directory rather than from a bin/ subdirectory.
+std::string BotActionLog::LogDir()
+{
+    std::string dir = sConfig.GetStringDefault("LogsDir", "");
+    if (!dir.empty() && dir.back() != '/' && dir.back() != '\\')
+        dir += '/';
+    dir += "bots/";
+    return dir;
+}
+
 void BotActionLog::EnsureLogDir()
 {
-    // mangosd's CWD depends on how it was launched. The typical live-server
-    // layout puts it in bin/ (so logs/ is at ../logs), but CMake test-runs
-    // launch it from the build dir where logs/ is adjacent. Try both;
-    // MakeDirIdempotent silently ignores EEXIST.
-    const char* roots[] = { "../logs", "logs", nullptr };
-    for (int i = 0; roots[i]; ++i)
-    {
-        MakeDirIdempotent(roots[i]);
-        std::string sub = std::string(roots[i]) + "/bots";
-        MakeDirIdempotent(sub.c_str());
-    }
+    std::string dir = LogDir();
+    // Drop the trailing separator: mkdir does not want one.
+    dir.pop_back();
+    MakeDirIdempotent(dir.c_str());
 }
 
 std::string BotActionLog::BuildPath(Player* bot)
@@ -83,7 +91,7 @@ std::string BotActionLog::BuildPath(Player* bot)
     uint32 sessionId = bot->GetSession() ? bot->GetSession()->GetAccountId() : 0u;
 
     std::ostringstream oss;
-    oss << "../logs/bots/"
+    oss << LogDir()
         << bot->GetName() << "_acc" << sessionId << "_" << tsBuf << ".log";
     return oss.str();
 }
@@ -114,18 +122,6 @@ std::FILE* BotActionLog::Open(PlayerbotAI* ai)
     // are unlikely, but append is the right default if one ever happens
     // (e.g. clock-skew, manual file resurrection).
     FILE* f = fopen(path.c_str(), "a");
-    if (!f)
-    {
-        // Fallback: mangosd may have been launched from the layout root rather
-        // than from bin/, in which case ../logs/bots/ doesn't exist but
-        // logs/bots/ does. Retry with the bare path.
-        const char* prefix = "../logs/bots/";
-        std::string alt = path;
-        if (alt.compare(0, std::strlen(prefix), prefix) == 0)
-            alt = alt.substr(3); // drop the "../"
-        f = fopen(alt.c_str(), "a");
-        if (f) path = alt;
-    }
     if (!f)
     {
         SC_LOG("BotActionLog::Open FAILED for bot=%s path=%s",

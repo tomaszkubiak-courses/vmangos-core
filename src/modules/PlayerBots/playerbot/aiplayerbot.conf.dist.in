@@ -266,7 +266,7 @@ AiPlayerbot.RandomBotQuestIds = 7848,3802,5505,6502,7761,9378
 # Bots will chat in say/guild when they invite other bots to groups/raids/guilds
 AiPlayerbot.InviteChat = 1
 
-# Enable per-bot action log files (logs/bots/<botname>_acc<id>_<timestamp>.log)
+# Enable per-bot action log files (<LogsDir>/bots/<botname>_acc<id>_<timestamp>.log)
 # and "[BOT]" prefixed structured log lines in the server log. Useful for
 # diagnosing bot lifecycle issues; off in production. The crash handler also
 # reads a thread-local "last phase" tag set by SC_PHASE when this is on.

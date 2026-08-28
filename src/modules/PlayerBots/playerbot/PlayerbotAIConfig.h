@@ -286,7 +286,7 @@ public:
     bool inviteChat;
     bool botsSilent;
     // Opt-in diagnostic logging: when true, [BOT] log lines and per-bot action
-    // log files (logs/bots/<name>_acc<id>_<timestamp>.log) are emitted. Default
+    // log files (<LogsDir>/bots/<name>_acc<id>_<timestamp>.log) are emitted. Default
     // off so production servers don't pay disk I/O / branch overhead.
     bool enableActionLog;
     // Filename (relative to LogsDir) for the bot subsystem log. When set,
