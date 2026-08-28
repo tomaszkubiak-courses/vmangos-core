@@ -19,6 +19,7 @@
 set (shared_SRCS
     ByteBuffer.h
     Common.h
+    CrashDump.h
     EnumFlag.h
     Errors.h
     Errors.cpp
@@ -84,6 +85,7 @@ set (shared_SRCS
     TimePeriod.h
     ByteBuffer.cpp
     Common.cpp
+    CrashDump.cpp
     Log.cpp
     PosixDaemon.cpp
     ProgressBar.cpp

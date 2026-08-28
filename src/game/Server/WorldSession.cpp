@@ -36,6 +36,7 @@
 #include "MapManager.h"
 #include "SocialMgr.h"
 #include "PlayerBotMgr.h"
+#include "PlayerbotHooks.h"
 #include "PlayerBotAI.h"
 #include "Anticheat.h"
 #include "Language.h"
@@ -130,6 +131,9 @@ void WorldSession::SendPacket(std::unique_ptr<ServerPacket const> packet)
         return;
     }
 
+    if (Playerbot_OnSessionSendPacket(this, buffer))
+        return;
+
     if (!m_socket)
     {
         if (GetBot() && GetBot()->ai)
@@ -150,6 +154,9 @@ void WorldSession::SendPacket(WorldPacket const* packet)
         sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[NETWORK] Packet %s size %u is too large. Not sent [Account %u Player %s]", LookupOpcodeName(packet->GetOpcode()), packet->size(), GetAccountId(), GetPlayerName());
         return;
     }
+
+    if (Playerbot_OnSessionSendPacket(this, *packet))
+        return;
 
     if (!m_socket)
     {
@@ -543,8 +550,24 @@ bool WorldSession::Update(PacketFilter& updater)
 
 bool WorldSession::CanProcessPackets() const
 {
+#ifdef BUILD_PLAYERBOTS
+    if (_player && m_playerbotSession)
+        return true;
+#endif
+
     return ((m_socket && !m_socket->IsClosing()) || (_player && (m_bot || sPlayerBotMgr.IsChatBot(_player->GetGUIDLow()))));
 }
+
+#ifdef BUILD_PLAYERBOTS
+void WorldSession::ProcessQueuedPacketsNow()
+{
+    MapSessionFilter mapUpdater(this);
+    ProcessPackets(mapUpdater);
+
+    WorldSessionFilter worldUpdater(this);
+    ProcessPackets(worldUpdater);
+}
+#endif
 
 void WorldSession::ProcessPackets(PacketFilter& updater)
 {
@@ -617,6 +640,10 @@ void WorldSession::ProcessPackets(PacketFilter& updater)
                     sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "SESSION: received wrong-status-req opcode %s (0x%.4X)", opHandle.name, packet->GetOpcode());
                     break;
             }
+
+            // After the handler, so bots mirror an action their master has already taken.
+            Playerbot_OnPacketHandled(this, *packet);
+
             packetTime = WorldTimer::getMSTimeDiffToNow(packetTime);
             if (sWorld.getConfig(CONFIG_UINT32_PERFLOG_SLOW_PACKET) && packetTime > sWorld.getConfig(CONFIG_UINT32_PERFLOG_SLOW_PACKET))
                 sLog.Out(LOG_PERFORMANCE, LOG_LVL_MINIMAL, "Slow packet opcode %s: %ums. Account %u on IP %s", opHandle.name, packetTime, GetAccountId(), GetRemoteAddress().c_str());
@@ -686,6 +713,8 @@ void WorldSession::LogoutPlayer(bool Save)
         bool inWorld = _player->IsInWorld() && _player->FindMap();
 
         sLog.Player(this, LOG_CHAR, "Logout", LOG_LVL_DETAIL, "");
+
+        Playerbot_OnBeforeLogout(_player);
 
         if (ObjectGuid lootGuid = GetPlayer()->GetLootGuid())
             DoLootRelease(lootGuid);

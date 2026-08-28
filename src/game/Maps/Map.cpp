@@ -1251,6 +1251,28 @@ void Map::Remove(Player* player, bool remove)
     if (!getNGrid(cell.data.Part.grid_x, cell.data.Part.grid_y))
     {
         sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Map::Remove() m_grids was nullptr x:%d, y:%d", cell.data.Part.grid_x, cell.data.Part.grid_y);
+
+        // The grid the player stood in was never loaded, so there is nothing to unlink them
+        // from - but every other piece of teardown still has to happen. Bailing out here left
+        // the map's own containers holding a pointer to the player and the player holding a
+        // pointer back to the map, and when the caller asked for removal the object was
+        // leaked outright, since nothing else deletes it. A player riding a transport over
+        // unloaded terrain reaches this, which is rare for a client but routine for a bot
+        // that logs out mid-journey. Mirror what the invalid-coordinates branch above does.
+        player->ClearUpdateMask(true);
+        RemoveRelocatedUnit(player);
+        RemoveUnitFromMovementUpdate(player);
+        player->m_needUpdateVisibility = false;
+
+        for (ObjectGuidSet::const_iterator it = player->m_visibleGUIDs.begin(); it != player->m_visibleGUIDs.end(); ++it)
+            if (Player* other = GetPlayer(*it))
+                if (other->m_broadcaster)
+                    other->m_broadcaster->RemoveListener(player);
+
+        player->ResetMap();
+        if (remove)
+            DeleteFromWorld(player);
+
         return;
     }
 

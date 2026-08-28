@@ -25,6 +25,7 @@
 #include "Common.h"
 #include "Policies/Singleton.h"
 
+#include <mutex>
 #include <unordered_set>
 
 class Warden;
@@ -210,6 +211,11 @@ class Log : public MaNGOS::Singleton<Log, MaNGOS::ClassLevelLockable<Log, std::m
 
         FILE* OpenLogFile(char const* configFileName, char const* defaultFileName, bool timestampFile, bool overwriteOnOpen) const;
         FILE* logFiles[LOG_TYPE_MAX];
+
+        // A log line is written with several stdio calls in a row - timestamp, header,
+        // body, newline - and world threads log in parallel, so without a lock two
+        // lines interleave and both are corrupted. Held only for the duration of one line.
+        mutable std::mutex m_fileMutex;
 
         // log/console control
         LogLevel m_consoleLevel;

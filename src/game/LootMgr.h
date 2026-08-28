@@ -348,6 +348,9 @@ struct Loot
     void AddLooter(ObjectGuid guid) { m_playersLooting.insert(guid); }
     void RemoveLooter(ObjectGuid guid) { m_playersLooting.erase(guid); }
     bool HasPlayersLooting() const { return !m_playersLooting.empty(); }
+    // Who has this loot open right now. Read by the playerbots module, which must not
+    // release loot it never opened.
+    std::set<ObjectGuid> const& GetLootingPlayers() const { return m_playersLooting; }
 
     void GenerateMoneyLoot(uint32 minAmount, uint32 maxAmount);
     bool FillLoot(uint32 loot_id, LootStore const& store, Player* lootOwner, bool personal, bool noEmptyError = false, WorldObject const* looted = nullptr);

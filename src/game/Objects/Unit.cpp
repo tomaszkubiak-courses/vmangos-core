@@ -7757,6 +7757,15 @@ void Unit::RemoveTauntCaster(ObjectGuid guid)
 
 //======================================================================
 
+Unit* Unit::GetTarget() const
+{
+    ObjectGuid const& guid = GetTargetGuid();
+    if (!guid)
+        return nullptr;
+
+    return GetMap()->GetUnit(guid);
+}
+
 Unit* Unit::GetTauntTarget() const
 {
     // taunters are pushed back, last caster will be at the end

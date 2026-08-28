@@ -39,6 +39,7 @@
 #include "HonorMgr.h"
 #include "PlayerTaxi.h"
 #include "MirrorTimer.h"
+#include "ModuleSlots.h"
 
 #include <string>
 #include <utility>
@@ -869,7 +870,12 @@ class Player final: public Unit
         bool CheckAmmoCompatibility(ItemPrototype const* ammo_proto) const;
         void QuickEquipItem(uint16 pos, Item* pItem);
         void VisualizeItem(uint8 slot, Item* pItem);
+    public:
+        // Refreshes the equipment fields other players inspect. Public because a change to an
+        // item that is already worn - the playerbots module rerolls the random property on
+        // gear it hands a bot - has to be pushed to those fields explicitly.
         void SetVisibleItemSlot(uint8 slot, Item const* pItem);
+    private:
         // in trade, guild bank, mail....
         void RemoveItemDependentAurasAndCasts(Item const* pItem);
         void UpdateEnchantTime(uint32 time);
@@ -1091,6 +1097,10 @@ class Player final: public Unit
         void GiveQuestSourceItemIfNeed(Quest const* pQuest);
 
         uint16 FindQuestSlot(uint32 questId) const;
+    public:
+        // The quest log as the client sees it - what sits in each of its slots. Public
+        // because the playerbots module walks the log the same way the client does, and
+        // clears a slot whose quest it has decided to abandon.
         uint32 GetQuestSlotQuestId(uint16 slot) const { return GetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot * MAX_QUEST_OFFSET + QUEST_ID_OFFSET); }
         void SetQuestSlot(uint16 slot, uint32 questId, uint32 timer = 0)
         {
@@ -1098,6 +1108,7 @@ class Player final: public Unit
             SetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, 0);
             SetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_TIME_OFFSET, timer);
         }
+    private:
         void SetQuestSlotCounter(uint16 slot, uint8 counter, uint8 count)
         {
             uint32 val = GetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET);
@@ -1105,7 +1116,11 @@ class Player final: public Unit
             val |= ((uint32)count << (counter * 6));
             SetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, val);
         }
+    public:
+        // Marks a quest log slot complete or failed, the same field the client reads. Public
+        // alongside GetQuestSlotQuestId / SetQuestSlot above, for the playerbots module.
         void SetQuestSlotState(uint16 slot, uint8 state) { SetByteFlag(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, 3, state); }
+    private:
         void RemoveQuestSlotState(uint16 slot, uint8 state) { RemoveByteFlag(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_COUNT_STATE_OFFSET, 3, state); }
         void SetQuestSlotTimer(uint16 slot, uint32 timer) { SetUInt32Value(PLAYER_QUEST_LOG_1_1 + slot*MAX_QUEST_OFFSET + QUEST_TIME_OFFSET, timer); }
     public:
@@ -1274,6 +1289,10 @@ class Player final: public Unit
         uint32 GetSaveTimer() const { return m_nextSave; }
         void   SetSaveTimer(uint32 timer) { m_nextSave = timer; }
         bool   IsSavingDisabled() const { return m_saveDisabled; }
+        // Player::Create turns saving off, because in this core that path only ever
+        // built temporary bots. Anything creating a character that has to persist
+        // turns it back on.
+        void   SetSavingDisabled(bool disabled) { m_saveDisabled = disabled; }
 
         /*********************************************************/
         /***                    PET SYSTEM                     ***/
@@ -1413,9 +1432,12 @@ class Player final: public Unit
         void UpdateFreeTalentPoints(bool resetIfNeed = true);
         uint32 GetResetTalentsCost() const;
         void UpdateResetTalentsMultiplier() const;
-        uint32 CalculateTalentsPoints() const;
         void SendTalentWipeConfirm(ObjectGuid trainerGuid) const;
     public:
+        // How many talent points this character should have at its level. A pure
+        // calculation with no side effects; public because the playerbots module checks a
+        // talent template against it before applying one.
+        uint32 CalculateTalentsPoints() const;
         uint32 GetFreeTalentPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS1); }
         void SetFreeTalentPoints(uint32 points) { SetUInt32Value(PLAYER_CHARACTER_POINTS1, points); }
         bool ResetTalents(bool noCost = false);
@@ -1538,12 +1560,19 @@ class Player final: public Unit
         /***                   SKILLS SYSTEM                   ***/
         /*********************************************************/
 
-    private:
+    public:
+        // Grants the two profession slots a new character starts with. Public because the
+        // playerbots module builds a character without the create-and-log-in path running.
         void InitPrimaryProfessions();
+    private:
         void UpdateSkillTrainedSpells(uint16 id, uint16 currVal);                                   // learns/unlearns spells dependent on a skill
         void UpdateSpellTrainedSkills(uint32 spellId, bool apply);                                  // learns/unlearns skills dependent on a spell
         void UpdateOldRidingSkillToNew(bool hasEpicMount);
+    public:
+        // Brings weapon and defense skills up to what the character's level allows. Public
+        // because the playerbots module levels a bot in one step and then asks for this.
         void UpdateSkillsForLevel();
+    private:
         SkillStatusMap m_skillStatusMap;
 #if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_10_2
         std::unordered_map<uint16, uint16> m_forgottenSkills;
@@ -1804,6 +1833,9 @@ class Player final: public Unit
         bool  m_undermapPosValid;
 
         uint32 GetHomeBindMap() const { return m_homebind.mapId; }
+        // Where the character's hearthstone sends it. The playerbots module walks a bot
+        // home rather than teleporting it, so it needs the position, not just the map.
+        WorldLocation const& GetHomeBindPosition() const { return m_homebind; }
         uint16 GetHomeBindAreaId() const { return m_homebindAreaId; }
 
         void SendSummonRequest(ObjectGuid summonerGuid, uint32 mapId, uint32 zoneId, float x, float y, float z);
@@ -2145,7 +2177,17 @@ class Player final: public Unit
 
         float GetYellRange() const;
         void Say(char const* text, uint32 const language) const;
+        // Convenience overload. Most callers build the line in a std::string first, and the
+        // playerbots module does so everywhere.
+        void Say(std::string const& text, uint32 const language) const { Say(text.c_str(), language); }
         void Yell(char const* text, uint32 const language) const;
+        // Same convenience overload as Say above, for callers that already hold a string.
+        void Yell(std::string const& text, uint32 const language) const { Yell(text.c_str(), language); }
+        // Whisper to another character, addressed by guid. The chat handlers run whispers
+        // through MasterPlayer, which a bot has no reason to reach for: it has no client of
+        // its own, and whatever it whispers is a Player already in this world.
+        void Whisper(char const* text, uint32 const language, ObjectGuid receiver) const;
+        void Whisper(std::string const& text, uint32 const language, ObjectGuid receiver) const { Whisper(text.c_str(), language, receiver); }
         void TextEmote(char const* text) const;
         void SendSysMessage(int32 entry) const;
         void SendSysMessage(char const* str) const;
@@ -2451,6 +2493,10 @@ class Player final: public Unit
         bool IsGroupVisibleFor(Player const* p) const;
         bool IsInSameGroupWith(Player const* p) const;
         bool IsInSameRaidWith(Player const* p) const { return p == this || (GetGroup() != nullptr && GetGroup() == p->GetGroup()); }
+        // Same question asked of an arbitrary unit, where a pet or a totem counts as its
+        // owner. The playerbots module asks it of whatever it is about to buff or heal,
+        // which is a Unit* far more often than it is a Player*.
+        bool IsInGroup(Unit const* other, bool raid = false) const;
         void UninviteFromGroup();
         static void RemoveFromGroup(Group* group, ObjectGuid guid);
         void RemoveFromGroup() { RemoveFromGroup(GetGroup(), GetObjectGuid()); }
@@ -2490,6 +2536,19 @@ class Player final: public Unit
         static uint32 GetRankFromDB(ObjectGuid guid);
         int GetGuildIdInvited() const { return m_guildIdInvited; }
         static void RemovePetitionsAndSigns(ObjectGuid guid, uint32 exceptPetitionId = 0);
+
+        /*********************************************************/
+        /***                  MODULE STORAGE                   ***/
+        /*********************************************************/
+
+        // Storage an optional module hangs its own per character state off. The core
+        // allocates the pointers and never dereferences them; see ModuleSlots.h.
+    public:
+        void* GetModuleSlot(uint8 slot) const { return slot < MODULE_SLOT_MAX ? m_moduleSlots[slot] : nullptr; }
+        void SetModuleSlot(uint8 slot, void* value) { if (slot < MODULE_SLOT_MAX) m_moduleSlots[slot] = value; }
+        template<class T> T* GetModuleSlotAs(uint8 slot) const { return static_cast<T*>(GetModuleSlot(slot)); }
+    private:
+        void* m_moduleSlots[MODULE_SLOT_MAX] = {};
 };
 
 inline Player* Object::ToPlayer()

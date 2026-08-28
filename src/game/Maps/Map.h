@@ -557,6 +557,10 @@ class Map : public GridRefManager<NGridType>
         // GameObjectCollision
         float GetHeight(float x, float y, float z, bool vmap = true, float maxSearchDist = DEFAULT_HEIGHT_SEARCH) const;
         bool isInLineOfSight(float x1, float y1, float z1, float x2, float y2, float z2, bool checkDynLos = true, bool ignoreM2Model = true) const;
+        // Boats and zeppelins on this map. They update outside the grid system, and the
+        // playerbots module routes travel across them, so it needs to see the list.
+        typedef std::set<GenericTransport*> TransportsContainer;
+        TransportsContainer const& GetTransports() const { return m_transports; }
         // First collision with object
         bool GetLosHitPosition(float srcX, float srcY, float srcZ, float& destX, float& destY, float& destZ, float modifyDist) const;
         // Use navemesh to walk
@@ -699,7 +703,6 @@ class Map : public GridRefManager<NGridType>
         MapStoredObjectTypesContainer m_objectsStore;
 
         // Objects that must update even in inactive grids without activating them
-        typedef std::set<GenericTransport*> TransportsContainer;
         TransportsContainer m_transports;
         TransportsContainer::iterator m_transportsUpdateIter;
         bool m_unloading = false;

@@ -34,6 +34,8 @@
 #include "ArgparserForServer.h"
 
 #include "Crypto/InitializeCrypto.h"
+#include "CrashDump.h"
+#include "Errors.h"
 
 #ifdef WIN32
 #include "ServiceWin32.h"
@@ -62,8 +64,95 @@ std::string realmName;                                      // Name of the realm
 char const* g_mainLogFileName = "Server.log";
 
 // Launch the mangos server
+#ifdef WIN32
+
+#ifdef BUILD_PLAYERBOTS
+// Defined in the playerbots module. SC_PHASE stamps these per thread, so the
+// crashing thread can say which bot subsystem it was in even when the stack has
+// been inlined past recognition.
+namespace ai { namespace botdiag {
+    extern thread_local char const* gLastPhaseTag;
+    extern thread_local char const* gLastPhaseBotName;
+}}
+
+// Kept apart from the filter because it needs __try, which MSVC will not accept
+// in a function that has objects to unwind.
+static void LogLastBotPhase()
+{
+    char const* tag = ai::botdiag::gLastPhaseTag;
+    char const* botName = ai::botdiag::gLastPhaseBotName;
+
+    if (!tag)
+        return;
+
+    // gLastPhaseBotName points into the Player object itself. If a freed Player
+    // is what killed us, reading the name faults too - and that is worth saying
+    // out loud, because it narrows the crash to a use-after-free on the spot.
+    __try
+    {
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Last bot phase on this thread: %s (bot %s)",
+            tag, botName ? botName : "<unknown>");
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER)
+    {
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL,
+            "Last bot phase on this thread: %s (bot name unreadable - the Player it pointed at is gone)", tag);
+    }
+}
+#endif
+
+// An access violation on Windows does not raise SIGSEGV, so Master::_OnSignal
+// never sees it and the process disappears with nothing in the log - which is
+// exactly what a crash under bots looked like. Log the stack on the way out.
+static LONG WINAPI MangosUnhandledExceptionFilter(EXCEPTION_POINTERS* pException)
+{
+    if (pException && pException->ExceptionRecord)
+    {
+        EXCEPTION_RECORD const* record = pException->ExceptionRecord;
+
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Unhandled exception 0x%08X at address 0x%p",
+            uint32(record->ExceptionCode), record->ExceptionAddress);
+
+        // The address the code went for is the whole question on a use-after-free:
+        // a small value is a null dereference, a plausible-looking heap address is
+        // a pointer to something that has been freed, and 0xDDDDDDDDDDDDDDDD and
+        // friends are the debug allocator's fill patterns.
+        if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2)
+        {
+            char const* operation = "read";
+            if (record->ExceptionInformation[0] == 1)
+                operation = "write";
+            else if (record->ExceptionInformation[0] == 8)
+                operation = "execute";
+
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Access violation: %s of address 0x%p",
+                operation, reinterpret_cast<void*>(record->ExceptionInformation[1]));
+        }
+    }
+    else
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Unhandled exception");
+
+#ifdef BUILD_PLAYERBOTS
+    LogLastBotPhase();
+#endif
+
+    MaNGOS::Errors::PrintStacktrace(0, 64);
+
+    if (char const* dumpPath = MaNGOS::CrashDump::Write(pException))
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Crash dump written to %s", dumpPath);
+    else
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Could not write a crash dump");
+
+    return EXCEPTION_CONTINUE_SEARCH; // let Windows report the crash as it would have
+}
+#endif
+
 extern int main(int argc, char **argv)
 {
+#ifdef WIN32
+    SetUnhandledExceptionFilter(&MangosUnhandledExceptionFilter);
+#endif
+
     ServerStartupArguments args;
     {
         // parseResult is std::expected, where the error is the return code, that might be present when invalid args or "--help" is given
@@ -85,6 +174,9 @@ extern int main(int argc, char **argv)
     }
 
     sLog.OpenWorldLogFiles();
+
+    // Before anything can crash, and while reading the config is still safe.
+    MaNGOS::CrashDump::Initialize(sConfig.GetStringDefault("LogsDir", ""));
 
     switch (args.inputServiceMode)
     {

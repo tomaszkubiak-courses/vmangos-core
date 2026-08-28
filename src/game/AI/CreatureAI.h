@@ -204,6 +204,13 @@ class CreatureAI
         // Enables or disables combat movement.
         void SetCombatMovement(bool enabled);
 
+        // React state is kept on the creature here rather than on its AI. These forward to
+        // it, for callers that hold the AI and not the creature - the playerbots module
+        // drives a bot's pet through its AI.
+        void SetReactState(ReactStates state);
+        ReactStates GetReactState() const;
+        bool HasReactState(ReactStates state) const;
+
         // Pointer to controlled by AI creature
         Creature* const m_creature;
         bool SwitchAiAtControl() const { return !m_bUseAiAtControl; }

@@ -1074,6 +1074,11 @@ class Unit : public SpellCaster
 
         // Returns the victim that this unit is currently attacking
         Unit* GetVictim() const { return m_attacking; }
+        // Returns the unit this one has selected (UNIT_FIELD_TARGET). Not the same question
+        // as GetVictim(): a unit can have a target selected without attacking it, and a
+        // creature's victim is set before its target field is. Used by the playerbots
+        // module to read what its target, or its master, is pointed at.
+        Unit* GetTarget() const;
         bool SelectHostileTarget();
         Unit* GetTauntTarget() const;
         void TauntApply(Unit* pVictim);

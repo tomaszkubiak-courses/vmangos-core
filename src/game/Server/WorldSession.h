@@ -843,6 +843,100 @@ class WorldSession
 #endif
         void HandleSelfResOpcode(NullClientPacket const& packet);
 
+#ifdef BUILD_PLAYERBOTS
+        // The playerbots module acts for a character that has no client by building the
+        // packet one would have sent and calling the handler itself, so every handler it
+        // drives needs an entry point taking the unparsed packet. Bodies are generated in
+        // PlayerbotPacketAdapter.cpp; each parses into the struct the real handler wants
+        // and forwards. Not overloads: Opcodes.cpp reads each handler's packet class off
+        // decltype(&WorldSession::HandleXOpcode), which an overload would make ambiguous.
+        void BotHandleCharCreateOpcode(WorldPacket& recvPacket);
+        void BotHandleMoveTeleportAckOpcode(WorldPacket& recvPacket);
+        void BotHandleMoveWorldportAckOpcode(WorldPacket& recvPacket);
+        void BotHandleMountSpecialAnimOpcode(WorldPacket& recvPacket);
+        void BotHandleRepopRequestOpcode(WorldPacket& recvPacket);
+        void BotHandleAutostoreLootItemOpcode(WorldPacket& recvPacket);
+        void BotHandleLootMoneyOpcode(WorldPacket& recvPacket);
+        void BotHandleLootOpcode(WorldPacket& recvPacket);
+        void BotHandleLootReleaseOpcode(WorldPacket& recvPacket);
+        void BotHandleLogoutRequestOpcode(WorldPacket& recvPacket);
+        void BotHandleLogoutCancelOpcode(WorldPacket& recvPacket);
+        void BotHandleAreaTriggerOpcode(WorldPacket& recvPacket);
+        void BotHandleGameObjectUseOpcode(WorldPacket& recvPacket);
+        void BotHandleGroupInviteOpcode(WorldPacket& recvPacket);
+        void BotHandleGroupAcceptOpcode(WorldPacket& recvPacket);
+        void BotHandleGroupSetLeaderOpcode(WorldPacket& recvPacket);
+        void BotHandleGroupDisbandOpcode(WorldPacket& recvPacket);
+#if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_10_2
+        void BotHandleRaidReadyCheckOpcode(WorldPacket& recvPacket);
+#endif
+        void BotHandlePetitionBuyOpcode(WorldPacket& recvPacket);
+        void BotHandlePetitionSignOpcode(WorldPacket& recvPacket);
+        void BotHandlePetitionDeclineOpcode(WorldPacket& recvPacket);
+        void BotHandleOfferPetitionOpcode(WorldPacket& recvPacket);
+        void BotHandleTurnInPetitionOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildInviteOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildRemoveOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildAcceptOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildDeclineOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildPromoteOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildDemoteOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildLeaveOpcode(WorldPacket& recvPacket);
+        void BotHandleGuildLeaderOpcode(WorldPacket& recvPacket);
+        void BotHandleGossipHelloOpcode(WorldPacket& recvPacket);
+        void BotHandleGossipSelectOptionOpcode(WorldPacket& recvPacket);
+        void BotHandleDuelAcceptedOpcode(WorldPacket& recvPacket);
+        void BotHandleDuelCancelledOpcode(WorldPacket& recvPacket);
+        void BotHandleAcceptTradeOpcode(WorldPacket& recvPacket);
+        void BotHandleBeginTradeOpcode(WorldPacket& recvPacket);
+        void BotHandleCancelTradeOpcode(WorldPacket& recvPacket);
+        void BotHandleClearTradeItemOpcode(WorldPacket& recvPacket);
+        void BotHandleInitiateTradeOpcode(WorldPacket& recvPacket);
+        void BotHandleSetTradeGoldOpcode(WorldPacket& recvPacket);
+        void BotHandleSetTradeItemOpcode(WorldPacket& recvPacket);
+        void BotHandleAutoEquipItemOpcode(WorldPacket& recvPacket);
+        void BotHandleSellItemOpcode(WorldPacket& recvPacket);
+        void BotHandleAutoStoreBagItemOpcode(WorldPacket& recvPacket);
+        void BotHandleQuestgiverAcceptQuestOpcode(WorldPacket& recvPacket);
+        void BotHandleTextEmoteOpcode(WorldPacket& recvPacket);
+        void BotHandleReclaimCorpseOpcode(WorldPacket& recvPacket);
+        void BotHandleResurrectResponseOpcode(WorldPacket& recvPacket);
+        void BotHandleSummonResponseOpcode(WorldPacket& recvPacket);
+        void BotHandleJoinChannelOpcode(WorldPacket& recvPacket);
+#if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_6_1
+        void BotHandleBattlemasterJoinOpcode(WorldPacket& recvPacket);
+#endif
+        void BotHandleBattlefieldStatusOpcode(WorldPacket& recvPacket);
+        void BotHandleBattleFieldPortOpcode(WorldPacket& recvPacket);
+#if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_4_2
+        void BotHandleLeaveBattlefieldOpcode(WorldPacket& recvPacket);
+#endif
+        void BotHandleRandomRollOpcode(WorldPacket& recvPacket);
+        void BotHandleResetInstancesOpcode(WorldPacket& recvPacket);
+        void BotHandleSelfResOpcode(WorldPacket& recvPacket);
+        void BotHandleMovementOpcodes(WorldPacket& recvPacket);
+        void BotHandlePetAction(WorldPacket& recvPacket);
+        void BotHandleMoveKnockBackAck(WorldPacket& recvPacket);
+
+        // A character the module drives has no socket, so nothing would otherwise let
+        // its queued packets through CanProcessPackets(). The module marks the session
+        // instead, and can run whatever is queued right away when it needs the effect
+        // before the tick ends - Map::Update does the same thing on its own schedule.
+        void SetPlayerbotSession(bool on) { m_playerbotSession = on; }
+        bool IsPlayerbotSession() const { return m_playerbotSession; }
+        void ProcessQueuedPacketsNow();
+        void SetPlayerLoading(bool on) { m_playerLoading = on; }
+        void BotHandleAuctionSellItem(WorldPacket& recvPacket);
+        void BotHandleAuctionPlaceBid(WorldPacket& recvPacket);
+        void BotHandleMailTakeMoney(WorldPacket& recvPacket);
+        void BotHandleMailTakeItem(WorldPacket& recvPacket);
+        void BotHandleMailDelete(WorldPacket& recvPacket);
+        void BotHandleQueryNextMailTime(WorldPacket& recvPacket);
+        void BotHandleBuybackItem(WorldPacket& recvPacket);
+        void BotHandlePushQuestToParty(WorldPacket& recvPacket);
+        void BotHandlePetAbandon(WorldPacket& recvPacket);
+#endif
+
     private:
         // private trade method
         void MoveItems(Item* myItems[], Item* hisItems[]);
@@ -890,6 +984,9 @@ class WorldSession
         time_t m_logoutTime;                                // when its time to log out character
         bool m_inQueue;                                     // session wait in auth.queue
         bool m_playerLoading;                               // code processed in LoginPlayer
+#ifdef BUILD_PLAYERBOTS
+        bool m_playerbotSession = false;                    // driven by the playerbots module, no socket
+#endif
         bool m_playerLogout;                                // code processed in LogoutPlayer
         bool m_playerRecentlyLogout;
         bool m_playerSave;

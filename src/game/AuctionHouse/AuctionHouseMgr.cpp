@@ -39,8 +39,22 @@
 
 INSTANTIATE_SINGLETON_1(AuctionHouseMgr);
 
+uint32 AuctionEntry::GetItemCount() const
+{
+    Item const* item = sAuctionMgr.GetAItem(itemGuidLow);
+    return item ? item->GetCount() : 0;
+}
+
+int32 AuctionEntry::GetItemRandomPropertyId() const
+{
+    Item const* item = sAuctionMgr.GetAItem(itemGuidLow);
+    return item ? item->GetItemRandomPropertyId() : 0;
+}
+
 bool AuctionHouseObject::RemoveAuction(AuctionEntry* entry)
 {
+    Guard guard(m_lock);
+
     // Clean up multimaps before final erasure
     auto bounds = OrderedAuctionMap.equal_range(entry->buyout);
     for (AuctionMultiMap::iterator itr = bounds.first; itr != bounds.second; ++itr)
@@ -71,6 +85,7 @@ bool AuctionHouseObject::RemoveAuction(AuctionEntry* entry)
 void AuctionHouseObject::AddAuction(AuctionEntry* ah)
 {
     MANGOS_ASSERT(ah);
+    Guard guard(m_lock);
     AuctionsMap[ah->Id] = ah;
     OrderedAuctionMap.insert(std::pair<uint32, AuctionEntry*>(ah->buyout, ah));
     AccountAuctionMap.insert(std::pair<uint32, AuctionEntry*>(ah->ownerAccount, ah));
@@ -622,6 +637,8 @@ AuctionHouseEntry const* AuctionHouseMgr::GetAuctionHouseEntry(uint32 factionTem
 
 void AuctionHouseObject::Update()
 {
+    Guard guard(m_lock);
+
     time_t curTime = sWorld.GetGameTime();
     // Handle expired auctions
     AuctionEntryMap::iterator next;
@@ -676,8 +693,46 @@ void AuctionHouseObject::Update()
     }
 }
 
+std::vector<AuctionSnapshot> AuctionHouseObject::GetAuctionsSnapshot() const
+{
+    Guard guard(m_lock);
+
+    std::vector<AuctionSnapshot> snapshot;
+    snapshot.reserve(AuctionsMap.size());
+
+    for (const auto& itr : AuctionsMap)
+    {
+        AuctionEntry const* entry = itr.second;
+        if (!entry)
+            continue;
+
+        AuctionSnapshot snap;
+        snap.Id = entry->Id;
+        snap.itemGuidLow = entry->itemGuidLow;
+        snap.itemTemplate = entry->itemTemplate;
+        // The stack size lives on the item, not on the auction.
+        Item const* item = sAuctionMgr.GetAItem(entry->itemGuidLow);
+        snap.itemCount = item ? item->GetCount() : 0;
+        snap.owner = entry->owner;
+        snap.ownerAccount = entry->ownerAccount;
+        snap.bidder = entry->bidder;
+        snap.startbid = entry->startbid;
+        snap.bid = entry->bid;
+        snap.buyout = entry->buyout;
+        snap.deposit = entry->deposit;
+        snap.houseId = entry->GetHouseId();
+        snap.depositTime = entry->depositTime;
+        snap.expireTime = entry->expireTime;
+        snapshot.push_back(snap);
+    }
+
+    return snapshot;
+}
+
 void AuctionHouseObject::BuildListBidderItems(WorldPacket& data, Player* player, uint32 listfrom, uint32& count, uint32& totalcount)
 {
+    Guard guard(m_lock);
+
     for (const auto& itr : AuctionsMap)
     {
         AuctionEntry* auctionEntry = itr.second;
@@ -694,6 +749,8 @@ void AuctionHouseObject::BuildListBidderItems(WorldPacket& data, Player* player,
 
 void AuctionHouseObject::BuildListOwnerItems(WorldPacket& data, Player* player, uint32 listfrom, uint32& count, uint32& totalcount)
 {
+    Guard guard(m_lock);
+
     auto bounds = AccountAuctionMap.equal_range(player->GetSession()->GetAccountId());
     for (auto itr = bounds.first; itr != bounds.second; ++itr)
     {
@@ -712,6 +769,8 @@ void AuctionHouseObject::BuildListAuctionItems(WorldPacket& data, Player* player
         AuctionHouseClientQuery const& query,
         uint32& count, uint32& totalcount)
 {
+    Guard guard(m_lock);
+
     // Happening often, and easy to deal with
     if (query.auctionMainCategory == 0xffffffff && query.auctionSubCategory == 0xffffffff && query.auctionSlotID == 0xffffffff &&
         query.quality == 0xffffffff && query.levelmin == 0x00 && query.levelmax == 0x00 && query.usable == 0x00 && query.wsearchedname.empty())

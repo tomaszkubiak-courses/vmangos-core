@@ -53,7 +53,7 @@ DBCStorage <ChatChannelsEntry> sChatChannelsStore(ChatChannelsEntryfmt);
 DBCStorage <CharacterFacialHairStylesEntry> sCharacterFacialHairStylesStore(CharacterFacialHairStylesfmt);
 std::unordered_map<uint32, CharacterFacialHairStylesEntry const*> sCharFacialHairMap;
 DBCStorage <CharSectionsEntry> sCharSectionsStore(CharSectionsEntryfmt);
-std::multimap<uint32, CharSectionsEntry const*> sCharSectionMap;
+CharSectionsMap sCharSectionMap;
 DBCStorage <ChrClassesEntry> sChrClassesStore(ChrClassesEntryfmt);
 DBCStorage <ChrRacesEntry> sChrRacesStore(ChrRacesEntryfmt);
 DBCStorage <CinematicSequencesEntry> sCinematicSequencesStore(CinematicSequencesEntryfmt);

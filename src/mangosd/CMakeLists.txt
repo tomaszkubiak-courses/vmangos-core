@@ -102,6 +102,12 @@ else()
   )
 endif()
 
+if(BUILD_PLAYERBOTS)
+  # Supplies the bodies for the hooks in src/game/PlayerbotHooks.h, which the core calls
+  # unconditionally; PlayerbotStubs.cpp covers the same symbols when this is off.
+  target_link_libraries(${EXECUTABLE_NAME} playerbots)
+endif()
+
 if(WIN32)
   target_link_libraries(${EXECUTABLE_NAME}
     optimized ${MYSQL_LIBRARY}

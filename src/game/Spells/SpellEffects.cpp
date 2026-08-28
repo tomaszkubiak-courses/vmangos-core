@@ -4494,6 +4494,14 @@ void Spell::EffectScriptEffect(SpellEffectIndex effIdx)
                     break;
                 }
 
+                // No seal was up - nothing to judge. The loop above leaves spellId2
+                // at zero then, and casting that reached CastSpell as spell id 0,
+                // which only logged an error. Bots judge without a seal often
+                // enough to fill the log with it; a player's client never lets the
+                // cast start in the first place.
+                if (!spellId2)
+                    return;
+
                 m_caster->CastSpell(unitTarget, spellId2, true);
                 return;
             }

@@ -73,6 +73,7 @@
 #include "ZoneScript.h"
 #include "ZoneScriptMgr.h"
 #include "PlayerBotMgr.h"
+#include "PlayerbotHooks.h"
 #include "PlayerBotAI.h"
 #include "AccountMgr.h"
 #include "Anticheat.h"
@@ -1243,6 +1244,9 @@ void Player::Update(uint32 update_diff, uint32 p_time)
     Unit::Update(update_diff, p_time);
     if (m_AI)
         m_AI->UpdateAI(p_time);
+    // Inside the delay-teleport window, so a teleport a module starts is deferred the
+    // same way one from PlayerAI is.
+    Playerbot_OnPlayerUpdate(this, update_diff);
     SetCanDelayTeleport(false);
 
     time_t now = time(nullptr);
@@ -3090,6 +3094,24 @@ bool Player::IsGroupVisibleFor(Player const* p) const
         case 2:
             return GetTeam() == p->GetTeam();
     }
+}
+
+bool Player::IsInGroup(Unit const* other, bool raid) const
+{
+    if (!other)
+        return false;
+
+    Player const* player = other->ToPlayer();
+    if (!player)
+    {
+        if (Unit const* owner = other->GetCharmerOrOwner())
+            player = owner->ToPlayer();
+    }
+
+    if (!player)
+        return false;
+
+    return raid ? IsInSameRaidWith(player) : IsInSameGroupWith(player);
 }
 
 bool Player::IsInSameGroupWith(Player const* p) const
@@ -14838,9 +14860,17 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
 
     // check name limitations
     m_name = fields[2].GetCppString();
-    if (ObjectMgr::CheckPlayerName(m_name) != CHAR_NAME_SUCCESS ||
-       (GetSession()->GetSecurity() == SEC_PLAYER && sObjectMgr.IsReservedName(m_name)))
+    uint8 const nameCheck = ObjectMgr::CheckPlayerName(m_name);
+    bool const nameReserved = GetSession()->GetSecurity() == SEC_PLAYER && sObjectMgr.IsReservedName(m_name);
+    if (nameCheck != CHAR_NAME_SUCCESS || nameReserved)
     {
+        // Say so. Every other refusal in this function logs its reason; this one did not, so a
+        // character whose name the DBC validators reject simply failed to load, forever, with
+        // nothing in the log to explain it - the rename flag set below is the only trace, and
+        // it looks like the cause rather than the consequence.
+        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "%s has an unusable name \"%s\" (CheckPlayerName=%u, reserved=%u), refusing to load and flagging it for rename.",
+                 guid.GetString().c_str(), m_name.c_str(), uint32(nameCheck), uint32(nameReserved));
+
         CharacterDatabase.PExecute("UPDATE `characters` SET `character_flags` = `character_flags` | '%u' WHERE `guid` ='%u'",
                                    uint32(CHARACTER_FLAG_RENAME), guid.GetCounter());
         return false;
@@ -17517,6 +17547,20 @@ void Player::Say(char const* text, uint32 const language) const
     ChatHandler::BuildChatPacket(data, CHAT_MSG_SAY, text, Language(language), GetChatTag(), GetObjectGuid(), GetName());
     float range = std::min(sWorld.getConfig(CONFIG_FLOAT_LISTEN_RANGE_SAY), GetYellRange());
     SendMessageToSetInRange(&data, range, true);
+}
+
+void Player::Whisper(char const* text, uint32 const language, ObjectGuid receiver) const
+{
+    Player* target = ObjectAccessor::FindPlayer(receiver);
+    if (!target || !target->GetSession())
+        return;
+
+    // Whispers are always readable, addon traffic aside.
+    uint32 lang = (language != LANG_ADDON) ? uint32(LANG_UNIVERSAL) : language;
+
+    WorldPacket data;
+    ChatHandler::BuildChatPacket(data, CHAT_MSG_WHISPER, text, Language(lang), GetChatTag(), GetObjectGuid(), GetName());
+    target->GetSession()->SendPacket(&data);
 }
 
 float Player::GetYellRange() const
@@ -22914,6 +22958,7 @@ if (IsPlayerLoggingEnabledToDB(logType, logLevel))                            \
 #define LOG_TO_FILE_HELPER(logLevel,logType,subType,session,accountId,format,ap) \
 if (logFiles[logType] && m_fileLevel >= logLevel)                             \
 {                                                                             \
+    std::lock_guard<std::mutex> logGuard(m_fileMutex);                        \
     OutTimestamp(logFiles[logType]);                                          \
     if (logLevel == LOG_LVL_ERROR)                                            \
         fputs("ERROR: ", logFiles[logType]);                                  \

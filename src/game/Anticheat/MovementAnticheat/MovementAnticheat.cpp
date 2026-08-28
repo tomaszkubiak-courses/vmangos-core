@@ -142,7 +142,13 @@ uint32 MovementAnticheat::Finalize(Player* pPlayer, std::stringstream& reason)
     uint32 result = ComputeCheatAction(reason);
 
     // Log data
-    if (sWorld.getConfig(CONFIG_BOOL_AC_MOVEMENT_LOG_DATA) && pPlayer && pPlayer->IsInWorld())
+    // Nothing detected this tick means there is nothing to record. Writing the line anyway
+    // buries the real detections: a well behaved session emits one empty entry every
+    // CHEATS_UPDATE_INTERVAL for as long as it is online.
+    bool const anythingToReport = m_clientDesync != 0 || m_overspeedDistance > 0.0f ||
+                                  result != CHEAT_ACTION_NONE || reason.rdbuf()->in_avail();
+
+    if (anythingToReport && sWorld.getConfig(CONFIG_BOOL_AC_MOVEMENT_LOG_DATA) && pPlayer && pPlayer->IsInWorld())
     {
         sLog.Player(m_session, LOG_ANTICHEAT, "Movement", LOG_LVL_BASIC, "DesyncMs %d DesyncDist %f Cheats %s",
             m_clientDesync, m_overspeedDistance, reason.rdbuf()->in_avail() ? reason.str().c_str() : "");

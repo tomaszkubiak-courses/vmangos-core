@@ -131,6 +131,10 @@ class BattleGroundWS : public BattleGround
         /* BG Flags */
         ObjectGuid GetAllianceFlagPickerGuid() const{ return m_flagKeepers[BG_TEAM_ALLIANCE]; }
         ObjectGuid GetHordeFlagPickerGuid() const   { return m_flagKeepers[BG_TEAM_HORDE]; }
+        // Same two guids, asked for by team index rather than by name, for callers that
+        // carry the index around - the playerbots module decides what to do about a flag
+        // from the team it is looking at, not from a fixed side.
+        ObjectGuid GetFlagCarrierGuid(BattleGroundTeamIndex teamIdx) const { return m_flagKeepers[teamIdx]; }
         void SetAllianceFlagPicker(ObjectGuid guid) { m_flagKeepers[BG_TEAM_ALLIANCE] = guid; }
         void SetHordeFlagPicker(ObjectGuid guid)    { m_flagKeepers[BG_TEAM_HORDE] = guid; }
         void ClearAllianceFlagPicker()              { m_flagKeepers[BG_TEAM_ALLIANCE].Clear(); }
