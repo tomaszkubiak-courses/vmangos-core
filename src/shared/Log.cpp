@@ -342,6 +342,7 @@ std::string Log::GetTimestampStr()
 #define LOG_TO_FILE_HELPER(logLevel,logType,format,ap) \
 if (logFiles[logType] && m_fileLevel >= logLevel)                             \
 {                                                                             \
+    std::lock_guard<std::mutex> logGuard(m_fileMutex);                        \
     if (logType != LOG_DBERRFIX)                                              \
     {                                                                         \
         OutTimestamp(logFiles[logType]);                                      \
