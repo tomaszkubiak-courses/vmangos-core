@@ -8,9 +8,13 @@
 
 PlayerbotTextMgr::PlayerbotTextMgr()
 {
-    for (uint8 i = 1; i < MAX_LOCALE; ++i)
+    // GetIndexForLocale returns -1 for a locale the world DB has no strings for, and this
+    // singleton is built before the locale tables are loaded, so indexing by it wrote past
+    // the front of the array and left the real entries uninitialised. Clear the whole array
+    // instead; the index lookup belongs in the accessors, where the result can be checked.
+    for (uint8 i = 0; i < MAX_LOCALE; ++i)
     {
-        botTextLocalePriority[sObjectMgr.GetIndexForLocale(LocaleConstant(i))] = 0;
+        botTextLocalePriority[i] = 0;
     }
 }
 
@@ -211,11 +215,14 @@ int32 PlayerbotTextMgr::GetLocalePriority()
     int32 topLocale = -1;
     uint32 tempCheck = 0;
 
-    // if no real players online, reset top locale
+    // If no real players are online there is no locale to follow, so fall back to the
+    // untranslated name. That is -1, not 0: locale index 0 is whichever locale the world DB
+    // happened to supply first, koKR in a full `locales_*` dump, and bots have no socket, so
+    // GetActiveSessionCount() is zero on a bot-only server and this is the usual path.
     if (!sWorld.GetActiveSessionCount())
     {
         ResetLocalePriority();
-        return 0;
+        return -1;
     }
 
     for (uint8 i = 1; i < MAX_LOCALE; ++i)
@@ -238,6 +245,10 @@ void PlayerbotTextMgr::ResetLocalePriority()
 {
     for (uint8 i = 1; i < MAX_LOCALE; ++i)
     {
-        botTextLocalePriority[sObjectMgr.GetIndexForLocale(LocaleConstant(i))] = 0;
+        int32 locale_idx = sObjectMgr.GetIndexForLocale(LocaleConstant(i));
+        if (locale_idx < 0)
+            continue;
+
+        botTextLocalePriority[locale_idx] = 0;
     }
 }
