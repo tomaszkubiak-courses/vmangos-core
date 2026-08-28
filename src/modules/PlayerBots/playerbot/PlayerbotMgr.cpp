@@ -221,8 +221,13 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(std::unique_ptr<QueryResult> 
     {
         sLog.outError("[PlayerBots] HandlePlayerBotLoginCallback: bot %u failed to enter world",
                       info.botGuid.GetCounter());
-        // botSession leaks here — but only on failure; LogoutPlayerBot would do the cleanup
-        // in the success path normally. Acceptable for smoke testing; fix if needed.
+
+        // The session owns whatever HandlePlayerLogin managed to build - it may hold a Player
+        // that never reached the world - and nothing else will ever see it: it was never added
+        // to sWorld.m_sessions, and LogoutPlayerBot only reaches sessions of bots that logged
+        // in. Its destructor logs the half-loaded player out, so deleting it here is the whole
+        // cleanup. Leaving it behind leaked a WorldSession per failed login.
+        delete botSession;
         return;
     }
 
