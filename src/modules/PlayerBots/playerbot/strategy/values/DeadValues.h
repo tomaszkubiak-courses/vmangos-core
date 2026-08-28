@@ -18,6 +18,10 @@ namespace ai
     public:
         GuidPosition Calculate() override;
         WorldSafeLocsEntry const* GetAnotherAppropriateClosestGraveyard() const;
+        // Last resort for positions whose zone has no graveyard linked to it at all - open
+        // water, and anything else the terrain resolves to an unlinked zone. Nearest usable
+        // graveyard on the same map, no zone or level filtering.
+        WorldSafeLocsEntry const* GetClosestGraveyardOnMap(WorldPosition const& refPosition) const;
     };
 
     class BestGraveyardValue : public GuidPositionCalculatedValue

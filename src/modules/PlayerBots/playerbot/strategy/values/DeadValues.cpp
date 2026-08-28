@@ -44,6 +44,19 @@ GuidPosition GraveyardValue::Calculate()
 
     if (!ClosestGrave)
     {
+        // GetClosestGraveYard only ever looks at graveyards linked to the area or zone the
+        // position falls in. Out at sea, and anywhere else the terrain resolves to a zone with
+        // no game_graveyard_zone row, it finds nothing at all - and an empty GuidPosition is
+        // the position 0,0,0, which callers then try to walk or teleport to. Bots that drowned
+        // crossing open water could not reach any graveyard from there, resurrected on their
+        // corpse in the middle of the ocean and drowned again on a loop. Fall back to the
+        // nearest graveyard on the same map that the bot's team is allowed to use, ignoring
+        // the zone link entirely.
+        ClosestGrave = GetClosestGraveyardOnMap(refPosition);
+    }
+
+    if (!ClosestGrave)
+    {
         sLog.outDetail(
             "ERROR: Unable to find closest graveyard in GraveyardValue, will return GuidPosition() which is 0,0,0 - bot #%d %s:%d <%s>",
             bot->GetGUIDLow(),
@@ -55,6 +68,39 @@ GuidPosition GraveyardValue::Calculate()
     }
 
     return GuidPosition(0, ClosestGrave);
+}
+
+WorldSafeLocsEntry const* GraveyardValue::GetClosestGraveyardOnMap(WorldPosition const& refPosition) const
+{
+    WorldSafeLocsEntry const* entryNear = nullptr;
+    float distNear = std::numeric_limits<float>::max();
+
+    for (auto const& mapValues : sObjectMgr.GetGraveYardMap())
+    {
+        GraveYardData const& graveyardData = mapValues.second;
+
+        // Neutral graveyards carry TEAM_NONE here, the same value GetClosestGraveYardForArea
+        // treats as "usable by anyone".
+        if (graveyardData.team != TEAM_NONE && graveyardData.team != bot->GetTeam())
+            continue;
+
+        WorldSafeLocsEntry const* graveyardCoreEntry = sWorldSafeLocsStore.LookupEntry(graveyardData.safeLocId);
+        if (!graveyardCoreEntry)
+            continue;
+
+        if (graveyardCoreEntry->map_id != refPosition.getMapId())
+            continue;
+
+        float dist = WorldPosition(refPosition).sqDistance(graveyardCoreEntry);
+
+        if (dist < distNear)
+        {
+            distNear = dist;
+            entryNear = graveyardCoreEntry;
+        }
+    }
+
+    return entryNear;
 }
 
 WorldSafeLocsEntry const* GraveyardValue::GetAnotherAppropriateClosestGraveyard() const
