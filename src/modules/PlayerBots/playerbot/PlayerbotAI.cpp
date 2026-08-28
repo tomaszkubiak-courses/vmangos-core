@@ -857,7 +857,7 @@ bool PlayerbotAI::IsInRaid()
     bool inRaidFight = false;
     if (IsSafe(bot))
     {
-        const Map* map = bot->GetMap();
+        const Map* map = bot->FindMap();
         if (map && (map->IsDungeon() || map->IsRaid()))
         {
             inRaidFight = true;
@@ -2765,7 +2765,12 @@ Unit* PlayerbotAI::GetUnit(ObjectGuid guid)
     if (!guid)
         return NULL;
 
-    Map* map = bot->GetMap();
+    // FindMap, not GetMap, here and at every sibling lookup below. GetMap asserts on a bot with
+    // no map and MANGOS_ASSERT throws in this core (PrintStacktraceAndThrow), so a bot that is
+    // mid-teleport or on its way out takes the exception up through the whole value tree - a loot
+    // check reaching GetCreature is enough - with nothing to catch it, and the process ends.
+    // The null test right below has always been here; it simply could never fire.
+    Map* map = bot->FindMap();
     if (!map)
         return NULL;
 
@@ -2796,7 +2801,7 @@ Creature* PlayerbotAI::GetCreature(ObjectGuid guid) const
     if (!guid)
         return NULL;
 
-    Map* map = bot->GetMap();
+    Map* map = bot->FindMap();
     if (!map)
         return NULL;
 
@@ -2808,7 +2813,7 @@ Creature* PlayerbotAI::GetAnyTypeCreature(ObjectGuid guid) const
     if (!guid)
         return NULL;
 
-    Map* map = bot->GetMap();
+    Map* map = bot->FindMap();
     if (!map)
         return NULL;
 
@@ -2820,7 +2825,7 @@ GameObject* PlayerbotAI::GetGameObject(ObjectGuid guid)
     if (!guid)
         return NULL;
 
-    Map* map = bot->GetMap();
+    Map* map = bot->FindMap();
     if (!map)
         return NULL;
 
@@ -2850,7 +2855,7 @@ WorldObject* PlayerbotAI::GetWorldObject(ObjectGuid guid)
     if (!guid)
         return NULL;
 
-    Map* map = bot->GetMap();
+    Map* map = bot->FindMap();
     if (!map)
         return NULL;
 
@@ -4882,7 +4887,8 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
 
         if (ObjectGuid guid = bot->m_ObjectSlotGuid[slot])
         {
-            if (GameObject* obj = bot ? bot->GetMap()->GetGameObject(guid) : nullptr)
+            Map* const botMap = bot ? bot->FindMap() : nullptr;
+            if (GameObject* obj = botMap ? botMap->GetGameObject(guid) : nullptr)
             {
                 //Object is not mine because I created an object with same guid on different map. 
                 //Make object mine, remove it from my list and give it back to the original owner.
