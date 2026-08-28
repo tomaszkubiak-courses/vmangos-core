@@ -464,17 +464,9 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
             return UnMount();
         }
 
-        ai->RemoveShapeshift();
-
-        bool wasMoving = sServerFacade.isMoving(bot);
-
-        if (wasMoving)
-        {
-            ai->StopMoving();
-        }
-
-        bool didMount = false;
-
+        // Everything below stops the bot before it mounts. Do the checks that can reject this
+        // mount first: a bot carrying a mount it cannot use where it is standing used to be
+        // halted on every tick and then never mounted, so it never got anywhere.
         if (!mount.IsValidLocation(bot))
         {
             if (ai->HasStrategy("debug mount", BotState::BOT_STATE_NON_COMBAT))
@@ -490,7 +482,27 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
                     ai->TellPlayerNoFacing(requester, "Bot does not have this mount.", PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, true, false);
                 continue;
             }
+        }
+        else if (!ai->HasSpell(mount.GetSpellId()))
+        {
+            if (ai->HasStrategy("debug mount", BotState::BOT_STATE_NON_COMBAT))
+                ai->TellPlayerNoFacing(requester, "Bot does not have this mount spell.", PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, true, false);
+            continue;
+        }
 
+        ai->RemoveShapeshift();
+
+        bool wasMoving = sServerFacade.isMoving(bot);
+
+        if (wasMoving)
+        {
+            ai->StopMoving();
+        }
+
+        bool didMount = false;
+
+        if (mount.IsItem())
+        {
             if (UseItem(requester, mount.GetItemProto()->ItemId))
             {
                 SetDuration(3000U); // 3s
@@ -504,12 +516,6 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
         }
         else
         {
-            if (!ai->HasSpell(mount.GetSpellId()))
-            {
-                if (ai->HasStrategy("debug mount", BotState::BOT_STATE_NON_COMBAT))
-                    ai->TellPlayerNoFacing(requester, "Bot does not have this mount spell.", PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, true, false);
-                continue;
-            }
             uint32 castDuration;
             if (ai->CastSpell(mount.GetSpellId(), bot, nullptr, true, &castDuration))
             {
