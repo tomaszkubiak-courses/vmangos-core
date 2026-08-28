@@ -275,22 +275,25 @@ AiPlayerbot.InviteChat = 1
 # Redirect all bot subsystem log output to a dedicated file so the main
 # server.log stays clean. Path is relative to the server's LogsDir setting.
 #
-# Off by default, and that is deliberate. With a file set, BotLog writes and
-# flushes every line it is handed, and BotLog::outDetail has no level gate at
-# all - unlike outDebug, which honours BotLogDebug below. BotLog also reports
-# HasLogLevelOrHigher() as always true, so level checks in bot code do not
-# apply either. On a busy server the file reaches tens of gigabytes overnight;
-# the loudest single writer is ahbot/ItemBag.cpp, one line per item that fits
-# no category, on every auction house pass.
-#
-# Left empty, bot output falls through to the core logger, where LogFileLevel
-# applies and DETAIL is dropped at level 1. Set a filename only while actually
+# Off by default. With a file set, BotLog writes and flushes every line that
+# passes BotLogLevel below, so even at the default level the file is a steady
+# writer on a populated server. Left empty, bot output falls through to the
+# core logger, where LogFileLevel applies. Set a filename only while actually
 # diagnosing something, and watch its size.
 AiPlayerbot.BotLogFile =
 
-# Write DEBUG-level messages to the bot log. Disabled by default. Note that
-# this gate only covers outDebug; outString, outInfo, outDetail, outError,
-# outBasic and outErrorDb are written regardless whenever BotLogFile is set.
+# How verbose the bot log file is, the same scale the core log uses:
+# error, minimal, basic, detail, debug (0-4 also accepted). Default basic.
+#
+# Anything above basic is a diagnostic setting, not a production one. detail
+# turns on the per-item stat weight lines in RandomItemMgr and the per-item
+# category lines in ahbot/ItemBag.cpp, which between them produced 740 MB in
+# 93 minutes on a 200-bot server before this cap existed.
+# AiPlayerbot.BotLogLevel = basic
+
+# Shorthand for BotLogLevel = debug, kept for older configs. Setting it raises
+# the level to debug, which also lets detail through - debug is the noisier of
+# the two, so the two settings cannot disagree.
 # AiPlayerbot.BotLogDebug = 0
 
 # The summon command can be used without restriction by non-gms.

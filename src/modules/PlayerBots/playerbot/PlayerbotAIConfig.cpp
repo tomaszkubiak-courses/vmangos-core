@@ -589,7 +589,9 @@ bool PlayerbotAIConfig::Initialize()
     {
         std::string logsDir = sConfig.GetStringDefault("LogsDir", "");
         bool botLogDebug = config.GetBoolDefault("AiPlayerbot.BotLogDebug", false);
-        BotLog::Instance().Initialize(botLogFile.c_str(), logsDir.c_str(), botLogDebug);
+        std::string botLogLevel = config.GetStringDefault("AiPlayerbot.BotLogLevel", "basic");
+        BotLog::Instance().Initialize(botLogFile.c_str(), logsDir.c_str(), botLogDebug,
+                                      BotLog::ParseLevel(botLogLevel.c_str(), LOG_LVL_BASIC));
     }
     enableOffSpecStrategies = config.GetBoolDefault("AiPlayerbot.EnableOffSpecStrategies", true);
     useWanderAsDefaultFollowStrategy = config.GetBoolDefault("AiPlayerbot.UseWanderAsDefaultFollowStrategy", true);

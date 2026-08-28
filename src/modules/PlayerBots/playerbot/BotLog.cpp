@@ -12,7 +12,35 @@ BotLog& BotLog::Instance()
     return s_instance;
 }
 
-void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnabled)
+LogLevel BotLog::ParseLevel(const char* value, LogLevel fallback)
+{
+    if (!value || value[0] == '\0')
+        return fallback;
+
+    struct LevelName { const char* name; LogLevel level; };
+    static LevelName const names[] =
+    {
+        { "error",   LOG_LVL_ERROR   },
+        { "minimal", LOG_LVL_MINIMAL },
+        { "basic",   LOG_LVL_BASIC   },
+        { "detail",  LOG_LVL_DETAIL  },
+        { "debug",   LOG_LVL_DEBUG   },
+    };
+
+    for (auto const& entry : names)
+    {
+        if (!strcmp(value, entry.name))
+            return entry.level;
+    }
+
+    // Also accept the raw numeric form, matching the core log's LogLevel config.
+    if (value[0] >= '0' && value[0] <= '4' && value[1] == '\0')
+        return LogLevel(value[0] - '0');
+
+    return fallback;
+}
+
+void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnabled, LogLevel level)
 {
     if (!logFile || logFile[0] == '\0')
         return;  // empty → fall through to MaNGOS::Singleton<Log>::Instance() on every call
@@ -48,15 +76,25 @@ void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnab
 #endif
     char tsBuf[32];
     std::strftime(tsBuf, sizeof(tsBuf), "%Y-%m-%d %H:%M:%S", &lt);
-    m_debugEnabled = debugEnabled;
-    fprintf(m_file, "\n# ---- BotLog session started %s ----\n", tsBuf);
+    // BotLogDebug predates BotLogLevel and is kept as a shorthand for the most
+    // verbose setting. Debug is by definition noisier than detail, so asking for
+    // it raises the level rather than sitting beside it as a second gate.
+    m_level = (debugEnabled && level < LOG_LVL_DEBUG) ? LOG_LVL_DEBUG : level;
+    m_debugEnabled = m_level >= LOG_LVL_DEBUG;
+    fprintf(m_file, "\n# ---- BotLog session started %s (level %d) ----\n", tsBuf, int(level));
     fflush(m_file);
 }
 
 // Format the message into a fixed buffer, then route to file or sLog.
 // Using a macro to keep the call-sites DRY while still being able to do
 // va_start / va_end in the caller function (va_list can't cross helpers cleanly).
+//
+// log_level is what the line costs to print, and the file branch checks it
+// against the configured level before writing. Callers that arrive through the
+// LOG macros in Log.h were already filtered by HasLogLevelOrHigher; the many
+// that call out*() directly are only filtered here.
 #define BOTLOG_IMPL(prefix, log_type, log_level)                    \
+    if (m_file && (log_level) > m_level) return;        \
     char _msg[4096];                                    \
     va_list _ap;                                        \
     va_start(_ap, fmt);                                 \
@@ -79,6 +117,7 @@ void BotLog::Initialize(const char* logFile, const char* logsDir, bool debugEnab
 // localtime_r is POSIX; use localtime_s on Windows
 #undef BOTLOG_IMPL
 #define BOTLOG_IMPL(prefix, log_type, log_level)                    \
+    if (m_file && (log_level) > m_level) return;        \
     char _msg[4096];                                    \
     va_list _ap;                                        \
     va_start(_ap, fmt);                                 \

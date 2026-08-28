@@ -291,11 +291,13 @@ public:
     bool enableActionLog;
     // Filename (relative to LogsDir) for the bot subsystem log. When set,
     // all sLog calls from bot .cpp files are redirected there instead of
-    // writing to the main server log. Default: empty = disabled, because
-    // BotLog::outDetail has no level gate and the file grows by the gigabyte
-    // on a populated server. Note that the config parser drops keys with an
-    // empty value, so "AiPlayerbot.BotLogFile =" in the conf file cannot turn
-    // this off on its own - the default here has to be the off value too.
+    // writing to the main server log. How much of that reaches the file is
+    // capped by AiPlayerbot.BotLogLevel (default basic); before that cap
+    // existed the file grew by the gigabyte on a populated server, which is
+    // why this still defaults to empty = disabled. Note that the config parser
+    // drops keys with an empty value, so "AiPlayerbot.BotLogFile =" in the
+    // conf file cannot turn this off on its own - the default here has to be
+    // the off value too.
     std::string botLogFile;
     bool enableOffSpecStrategies;
     bool useWanderAsDefaultFollowStrategy;
