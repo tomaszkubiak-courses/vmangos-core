@@ -20,6 +20,12 @@
 
 using namespace ai;
 
+//How often MinimalMove tries to board the same flight path before giving up on that leg and
+//continuing over land. Boarding for an unobserved bot can fail permanently - the leg's source
+//node is not in its taximask and there is no flightmaster nearby to learn it from - so retries
+//have to be bounded or the bot never advances its path again.
+static const uint32 MINIMAL_MOVE_TAXI_ATTEMPTS = 3;
+
 void MovementAction::CreateWp(Player* wpOwner, float x, float y, float z, float o, uint32 entry, bool important)
 {
     float dist = wpOwner->GetDistance(x, y, z);
@@ -319,8 +325,6 @@ bool MovementAction::MoveOnTransport(PlayerbotAI* ai, GenericTransport* transpor
 
     uint32 radius = 20;
 
-    GenericTransport* botTrans = bot->GetTransport();
-
     std::vector<WorldPosition> path;
 
     WorldPosition transPos = botPos.RandomPointOnTrans(transport, 20.0f, doTeleport ? nullptr : bot, path);
@@ -342,8 +346,10 @@ bool MovementAction::MoveOnTransport(PlayerbotAI* ai, GenericTransport* transpor
         return true;
     }
 
-    bot->SetTransport(botTrans);
-
+    // Nothing re-attaches the previously ridden transport here. This used to save
+    // bot->GetTransport() above and restore it right before boarding the new vessel, so a
+    // dock-to-dock transfer silently left the bot attached to the old one. RandomPointOnTrans
+    // restores that transport itself, and AddPassenger attaches the vessel just boarded.
     if (path.empty())
     {
         path = WorldPosition(transport).getPathStepFrom(botPos, bot);
@@ -497,6 +503,17 @@ bool MovementAction::UseTransport(PlayerbotAI* ai, uint32 entry, WorldPosition d
 
     if (transport && dockPosition.mapId == bot->GetMapId() && dockPosition.sqDistance2d(transport) < INTERACTION_DISTANCE * INTERACTION_DISTANCE)
     {
+        // Walking aboard a vessel that has not stopped at the dock lands the bot in the water,
+        // where it drowns - the Menethil dock deaths, corpses left floating at the waterline
+        // with no killer and full health. Board only once the vessel is stationary. Teleporting
+        // aboard is unaffected, since it places the bot on the deck directly.
+        if (!doTeleport && transport->IsMoving())
+        {
+            ai->TellDebug(ai->GetMaster(), "Waiting for transport " + transportName + " to stop before boarding.", "debug move");
+
+            return false;
+        }
+
         MoveOnTransport(ai, transport, doTeleport);
 
         return true;
@@ -550,11 +567,38 @@ bool MovementAction::MinimalMove(PlayerbotAI* ai)
             return true;
         }
 
-        bool didTaxi = UseTaxi(ai, nextStep->entry, false);
+        const uint32 taxiEntry = nextStep->entry;
+
+        if (lastMove.taxiFailEntry != taxiEntry) //Failures are counted per leg.
+        {
+            lastMove.taxiFailEntry = taxiEntry;
+            lastMove.taxiFailCount = 0;
+        }
+
+        bool didTaxi = UseTaxi(ai, taxiEntry, false);
+
+        if (!didTaxi && ++lastMove.taxiFailCount < MINIMAL_MOVE_TAXI_ATTEMPTS) //We did not board, so keep the flight path and try again later.
+        {
+            ai->TellDebug(ai->GetMaster(), "Failed to board taxi " + std::to_string(taxiEntry) + " (attempt " + std::to_string(lastMove.taxiFailCount) + "). Retrying flight path.", "debug move");
+
+            return true;
+        }
+
+        //Either we boarded or we are out of attempts. Boarding can fail for good - an unknown
+        //taxi node with no flightmaster around to learn it from - so drop the leg rather than
+        //wedge on it: the rest of the path is then walked or teleported as if there were no
+        //flight path. That was the unconditional behaviour before, and UseTaxi's return value
+        //was computed and thrown away, so a boarding failure was invisible and the bot simply
+        //carried on overland without ever flying.
+        if (!didTaxi)
+            ai->TellDebug(ai->GetMaster(), "Failed to board taxi " + std::to_string(taxiEntry) + " " + std::to_string(lastMove.taxiFailCount) + " times. Skipping flight path.", "debug move");
+
+        lastMove.taxiFailEntry = 0;
+        lastMove.taxiFailCount = 0;
 
         for (auto& step : path)
         {
-            if (step.type == PathNodeType::NODE_FLIGHTPATH && step.entry == nextStep->entry)
+            if (step.type == PathNodeType::NODE_FLIGHTPATH && step.entry == taxiEntry)
                 continue;
 
             lastMove.lastPath.cutTo(step, false); //Remove path until next walk or taxi.
@@ -1154,7 +1198,18 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
     if (movePath.empty())
     {
         lastMove.setPath(movePath);
-        return true; // Path collapsed — will rebuild next tick.
+
+        // makeShortCut discards the whole path when the bot is further than reactDistance
+        // from every walkable point on it. That is usually transient, so the first couple of
+        // collapses still report success and the next tick builds a fresh path. A run of them
+        // is not transient: the destination cannot be reached from here, and claiming success
+        // forever hides that from the caller. A ghost whose corpse sat behind unreachable
+        // ground spent ten minutes re-issuing an identical MoveTo nine times a second,
+        // because FindCorpseAction only falls back to the spirit healer when MoveTo fails.
+        if (++lastMove.pathCollapseCount < 3)
+            return true;
+
+        return false;
     }
 
 
@@ -1283,25 +1338,33 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
         startPos.sqDistance2d(WorldPosition(0, IF_AH_X, IF_AH_Y, 0)) < CHECK_RADIUS * CHECK_RADIUS && 
         !movePath.empty())
     {
-        // Calculate total XY distance and total Z change in path
+        // Measure the climb, not the height change. This used to accumulate fabs(dZ), so a bot
+        // walking DOWN the auction house steps scored exactly as high as one climbing through
+        // the roof, and every report this produced was a descent: bot at z=728 heading to a
+        // target at z=715 over eight yards of ground, flagged twenty times in one run. Sum only
+        // the upward segments, and require enough horizontal travel that a single steep step
+        // cannot trip the ratio.
         float totalXY = 0.0f;
-        float totalZ = 0.0f;
-        float maxZDelta = 0.0f;
+        float totalRise = 0.0f;
+        float maxRise = 0.0f;
         WorldPosition prevPos = startPos;
-        
+
         for (const auto& point : movePath.getPointPath())
         {
             float dXY = sqrtf(prevPos.sqDistance2d(WorldPosition(0, point.x, point.y, 0)));
-            float dZ = fabs(point.z - prevPos.z);
+            float dZ = point.z - prevPos.z;
             totalXY += dXY;
-            totalZ += dZ;
-            if (dZ > maxZDelta) maxZDelta = dZ;
+            if (dZ > 0.0f)
+            {
+                totalRise += dZ;
+                if (dZ > maxRise) maxRise = dZ;
+            }
             prevPos = point;
         }
-        
-        // Check if Z change is abnormally large compared to XY (climbing through roof)
-        // Normal walking should have Z/X ratio < 0.5, roof climbing can be > 2.0
-        bool isAbnormalClimb = (totalZ > 5.0f && totalXY > 0.1f && totalZ / totalXY > 1.5f) || maxZDelta > 50.0f;
+
+        // Check if the climb is abnormally large compared to XY (climbing through roof).
+        // Normal walking should have a rise/XY ratio well under 0.5; roof climbing exceeds 2.0.
+        bool isAbnormalClimb = (totalRise > 5.0f && totalXY > 5.0f && totalRise / totalXY > 1.5f) || maxRise > 50.0f;
         
         if (isAbnormalClimb)
         {
@@ -1311,8 +1374,8 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
             sLog.outError("[BOT PATH BUG] Bot pos: %.1f,%.1f,%.1f (map %d). Target: %.1f,%.1f,%.1f", 
                 bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), bot->GetMapId(),
                 movePath.getBack().x, movePath.getBack().y, movePath.getBack().z);
-            sLog.outError("[BOT PATH BUG] Path stats: %u points, XY=%.1f, Z_total=%.1f, maxZ_delta=%.1f, ratio=%.2f",
-                (uint32)movePath.getPointPath().size(), totalXY, totalZ, maxZDelta, totalXY > 0 ? totalZ/totalXY : 0);
+            sLog.outError("[BOT PATH BUG] Path stats: %u points, XY=%.1f, rise_total=%.1f, max_rise=%.1f, ratio=%.2f",
+                (uint32)movePath.getPointPath().size(), totalXY, totalRise, maxRise, totalXY > 0 ? totalRise/totalXY : 0);
             sLog.outError("[BOT PATH BUG] Route type: %s (lastPath empty: %s, detailedMove: %s)",
                 isFromLastPath ? "REUSED from lastPath" : "FRESH route",
                 lastMove.lastPath.empty() ? "yes" : "no",
@@ -1321,10 +1384,17 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
             // Log first few path points
             char pathBuf[512];
             snprintf(pathBuf, sizeof(pathBuf), "[BOT PATH BUG] Path points: ");
-            int logCount = std::min((int)movePath.getPointPath().size(), 5);
+            // Hold the vector. getPointPath() returns BY VALUE, so `getPointPath()[i]` handed out
+            // a reference into a temporary that died at the end of that very statement - the next
+            // line then read freed memory, two lines apart inside this function. Binding a const&
+            // to the result of operator[] does not extend the vector's lifetime; only binding to
+            // the temporary itself would. It also rebuilt the whole vector on every call, so
+            // printing five points cost six rebuilds.
+            std::vector<WorldPosition> const pathPoints = movePath.getPointPath();
+            int logCount = std::min((int)pathPoints.size(), 5);
             for (int i = 0; i < logCount; i++)
             {
-                const auto& p = movePath.getPointPath()[i];
+                WorldPosition const& p = pathPoints[i];
                 char pointBuf[64];
                 snprintf(pointBuf, sizeof(pointBuf), "[#%d: %.1f,%.1f,%.1f] ", i, p.x, p.y, p.z);
                 strncat(pathBuf, pointBuf, sizeof(pathBuf) - strlen(pathBuf) - 1);
@@ -1333,6 +1403,8 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
         }
     }
     // END DEBUG
+
+    lastMove.pathCollapseCount = 0;
 
     DispatchMovement(movePath, generatePath, masterWalking);
 

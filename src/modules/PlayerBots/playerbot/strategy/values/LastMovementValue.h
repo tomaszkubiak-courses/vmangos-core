@@ -27,6 +27,9 @@ namespace ai
             lastPath = other.lastPath;
             lastMoveShort = other.lastMoveShort;
             nextTeleport = other.nextTeleport;
+            pathCollapseCount = other.pathCollapseCount;
+            taxiFailEntry = other.taxiFailEntry;
+            taxiFailCount = other.taxiFailCount;
             fleeCount = other.fleeCount;
             lastFleeAttempt = other.lastFleeAttempt;
             moveEvent = Event();
@@ -43,6 +46,9 @@ namespace ai
             lastFleeAttempt = 0;
             lastMoveShort = WorldPosition();
             nextTeleport = 0;
+            pathCollapseCount = 0;
+            taxiFailEntry = 0;
+            taxiFailCount = 0;
             moveEvent = Event();
         }
 
@@ -81,6 +87,15 @@ namespace ai
         TravelPath lastPath;
         WorldPosition lastMoveShort;
         time_t nextTeleport;
+        // How many times in a row TravelPath::makeShortCut has thrown the freshly built path
+        // away. One collapse is normal and the next tick rebuilds; a run of them means the
+        // destination cannot be reached from where the bot is standing, and MoveTo2 has to
+        // say so instead of reporting success it did not achieve. See MoveTo2.
+        uint32 pathCollapseCount;
+        // Which flight path leg MinimalMove last failed to board, and how many times running.
+        // Counted per leg so a retry budget on one leg does not carry over to the next.
+        uint32 taxiFailEntry;
+        uint32 taxiFailCount;
         Event moveEvent;
     };
 
