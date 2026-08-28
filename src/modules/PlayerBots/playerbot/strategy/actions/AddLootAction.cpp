@@ -158,13 +158,15 @@ bool AddAllLootAction::AddLoot(Player* requester, ObjectGuid guid)
         lootDistanceToUse = sPlayerbotAIConfig.lootDistance;
     }
 
+    // A random bot has no master, and GetDistance2d returns 0 for a null unit, so measuring
+    // from the requester alone let every unattended bot past the range cap.
     float botDist = sServerFacade.GetDistance2d(bot, wo);
-    float masterDist = sServerFacade.GetDistance2d(requester, wo);
-    if (sServerFacade.IsDistanceGreaterThan(masterDist, lootDistanceToUse))
+    float rangeDist = requester ? sServerFacade.GetDistance2d(requester, wo) : botDist;
+    if (sServerFacade.IsDistanceGreaterThan(rangeDist, lootDistanceToUse))
     {
         ai->TellDebug(requester, "Outside of loot range: " + std::to_string(lootDistanceToUse), "debug loot");
-        sLog.outDebug("[BOT LOOT] %s: AddLoot reject guid=%lu (range: masterDist=%.1f > cap=%.1f; botDist=%.1f)",
-            bot->GetName(), guid.GetRawValue(), masterDist, lootDistanceToUse, botDist);
+        sLog.outDebug("[BOT LOOT] %s: AddLoot reject guid=%lu (range: dist=%.1f > cap=%.1f; botDist=%.1f)",
+            bot->GetName(), guid.GetRawValue(), rangeDist, lootDistanceToUse, botDist);
         return false;
     }
 
@@ -220,8 +222,8 @@ bool AddAllLootAction::AddLoot(Player* requester, ObjectGuid guid)
     }
 
     bool added = AI_VALUE(LootObjectStack*, "available loot")->Add(guid);
-    sLog.outDebug("[BOT LOOT] %s: AddLoot queued guid=%lu (botDist=%.1f masterDist=%.1f cap=%.1f added=%d)",
-        bot->GetName(), guid.GetRawValue(), botDist, masterDist, lootDistanceToUse, added ? 1 : 0);
+    sLog.outDebug("[BOT LOOT] %s: AddLoot queued guid=%lu (botDist=%.1f rangeDist=%.1f cap=%.1f added=%d)",
+        bot->GetName(), guid.GetRawValue(), botDist, rangeDist, lootDistanceToUse, added ? 1 : 0);
     return added;
 }
 
@@ -269,7 +271,8 @@ bool AddGatheringLootAction::AddLoot(Player* requester, ObjectGuid guid)
         gatheringDistanceToUse = sPlayerbotAIConfig.gatheringDistance;
     }
 
-    if (sServerFacade.IsDistanceGreaterThan(sServerFacade.GetDistance2d(requester, wo), gatheringDistanceToUse))
+    // As above: fall back to the bot's own distance when there is no master to measure from.
+    if (sServerFacade.IsDistanceGreaterThan(sServerFacade.GetDistance2d(requester ? requester : bot, wo), gatheringDistanceToUse))
     {
         return false;
     }
