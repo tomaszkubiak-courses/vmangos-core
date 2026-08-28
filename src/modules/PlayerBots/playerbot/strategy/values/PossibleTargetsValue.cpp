@@ -9,8 +9,79 @@
 #include "Maps/GridNotifiersImpl.h"
 #include "Maps/CellImpl.h"
 
+#ifdef _WIN32
+#include <excpt.h>
+#include "CrashDump.h"
+#include "Errors.h"
+#endif
+
 using namespace ai;
 using namespace MaNGOS;
+
+#ifdef _WIN32
+namespace
+{
+    // 0xC0000005, spelled out so this file does not have to pull in windows.h.
+    unsigned long const kAccessViolation = 0xC0000005;
+
+    // Dumps are capped: a corrupt grid faults on every bot on the map, every
+    // tick, and an uncapped handler would fill the disk in a minute.
+    unsigned int const kMaxReports = 3;
+    unsigned int g_reportCount = 0;
+
+    int ReportTargetScanFault(unsigned long code, void* exceptionPointers, Player* player)
+    {
+        if (code != kAccessViolation)
+            return EXCEPTION_CONTINUE_SEARCH; // not ours - let it reach the process filter
+
+        ++g_reportCount;
+
+        if (g_reportCount > kMaxReports)
+        {
+            sLog.outError("PossibleTargetsValue: target scan faulted again (occurrence %u), bot %s",
+                g_reportCount, player ? player->GetName() : "<null>");
+            return EXCEPTION_EXECUTE_HANDLER;
+        }
+
+        // Runs before the stack unwinds, so the trace below is the faulting one
+        // and not this handler's.
+        if (player)
+        {
+            sLog.outError("PossibleTargetsValue: access violation scanning targets for bot %s "
+                          "(guid %u, map %u, zone %u, at %.2f %.2f %.2f)",
+                player->GetName(), player->GetGUIDLow(),
+                player->GetMapId(), player->GetZoneId(),
+                player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+        }
+        else
+            sLog.outError("PossibleTargetsValue: access violation scanning targets for a null bot");
+
+        MaNGOS::Errors::PrintStacktrace(0, 64);
+
+        if (char const* dumpPath = MaNGOS::CrashDump::Write(exceptionPointers))
+            sLog.outError("PossibleTargetsValue: crash dump written to %s", dumpPath);
+
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // The visit gets a frame of its own because MSVC will not accept __try in a
+    // function that has objects to unwind, and because catching the fault here
+    // keeps the searcher and the target list - which do have destructors - out of
+    // the unwind path entirely.
+    bool VisitTargetsGuarded(Player* player, UnitListSearcher<AnyUnfriendlyUnitInObjectRangeCheck>& searcher, float range)
+    {
+        __try
+        {
+            Cell::VisitAllObjects(player, searcher, range);
+            return true;
+        }
+        __except (ReportTargetScanFault(GetExceptionCode(), GetExceptionInformation(), player))
+        {
+            return false;
+        }
+    }
+}
+#endif
 
 std::list<ObjectGuid> PossibleTargetsValue::Calculate()
 {
@@ -50,9 +121,29 @@ bool PossibleTargetsValue::AcceptUnit(Unit* unit)
 
 void PossibleTargetsValue::FindPossibleTargets(Player* player, std::list<Unit*>& targets, float range)
 {
+    if (!player || !player->IsInWorld() || !player->GetMap())
+        return;
+
     MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck u_check(player, player, range);
     MaNGOS::UnitListSearcher<MaNGOS::AnyUnfriendlyUnitInObjectRangeCheck> searcher(targets, u_check);
+
+#ifdef _WIN32
+    // This scan walks every unit the grid holds and dereferences each one. A
+    // stale entry - a Unit freed while it was still linked into a cell - is read
+    // here rather than where it was freed, so the crash names this function and
+    // says nothing about who left the pointer behind. Catching the fault turns
+    // that into a log line that names the bot, the map and the position, and
+    // leaves a dump behind to identify the object.
+    //
+    // Surviving an access violation means continuing on a process that may
+    // already be damaged. That is the deliberate trade while the cause is being
+    // narrowed: the alternative here is not a healthy server, it is the same
+    // crash with less to go on.
+    if (!VisitTargetsGuarded(player, searcher, range))
+        targets.clear();
+#else
     Cell::VisitAllObjects(player, searcher, range);
+#endif
 }
 
 bool PossibleTargetsValue::IsFriendly(Unit* target, Player* player)
