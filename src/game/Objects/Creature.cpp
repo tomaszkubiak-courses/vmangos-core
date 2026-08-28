@@ -511,7 +511,23 @@ void Creature::ToggleUnitFlagsFromStaticFlags()
     else
         RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_NOT_SELECTABLE);
 
-    if (HasStaticFlag(CREATURE_STATIC_FLAG_CAN_SWIM))
+    // Fall back on inhabit_type when the template does not carry CREATURE_STATIC_FLAG_CAN_SWIM.
+    // Without UNIT_FLAG_USE_SWIM_ANIMATION a creature is treated as unable to leave the sea
+    // floor: PathFinder::BuildPolyPath refuses BuildUnderwaterPath for it and hands back an
+    // ordinary navmesh path, which under water follows the ground, and GetRandomPoint likewise
+    // skips its swimming branch. The result is a mob that walks the bottom, cannot rise to a
+    // player swimming above it, and cannot be reached by one either.
+    //
+    // The flag is only ever authored in static_flags1, and the world DB has it on 34 of 37
+    // water-only creatures but on just 847 of 6638 amphibious ones - so nearly every creature
+    // that lives on land and in water, the Makrura and Surf Crawlers of Durotar among them, is
+    // stranded on the bottom. Deriving it from inhabit_type restores the behaviour the rest of
+    // the core already assumes and does not override a template that sets the static flag.
+    //
+    // Giants are the deliberate exception: they are meant to walk underwater rather than swim,
+    // which is why GetRandomPoint's own giant carve-out keys off this same flag.
+    if (HasStaticFlag(CREATURE_STATIC_FLAG_CAN_SWIM) ||
+        (CanSwim() && GetCreatureInfo()->type != CREATURE_TYPE_GIANT))
         SetFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_USE_SWIM_ANIMATION);
     else
         RemoveFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_USE_SWIM_ANIMATION);
