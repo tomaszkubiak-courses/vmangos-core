@@ -30,6 +30,14 @@ namespace ai
         void RequestPull(Unit* target, bool resetTime = true);
         bool IsPullPendingToStart() const { return pendingToStart; }
         bool HasPullStarted() const { return pullStartTime > 0; }
+
+        // True once the pull action itself has actually gone off. Between the
+        // request and that point the pull is only an intention, and an
+        // intention that turns out to be uncastable has to be abandoned rather
+        // than left to time out - see PullEndTrigger.
+        bool HasPullBeenPerformed() const { return pullPerformed; }
+        void OnPullPerformed() { pullPerformed = true; }
+
         void OnPullStarted();
         void OnPullEnded();
         ReactStates GetPetReactState() const { return petReactState; }
@@ -47,6 +55,7 @@ namespace ai
         std::string pullActionName; //shoot
         std::string preActionName;
         bool pendingToStart;
+        bool pullPerformed;
         time_t pullStartTime;
         ReactStates petReactState;
     };

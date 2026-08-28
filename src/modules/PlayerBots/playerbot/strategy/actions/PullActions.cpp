@@ -197,6 +197,7 @@ bool PullAction::Execute(Event& event)
                 if (ai->DoSpecificAction(actionName, event, true))
                 {
                     strategy->RequestPull(target); //extend pull timer to walk back.
+                    strategy->OnPullPerformed();   //after RequestPull, which clears the flag
                     return true;
                 }
                 else

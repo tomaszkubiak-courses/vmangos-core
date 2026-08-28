@@ -57,12 +57,25 @@ bool ShouldPullTrigger::IsActive()
 
 bool PullEndTrigger::IsActive()
 {
-    const PullStrategy* strategy = PullStrategy::Get(ai);
+    PullStrategy* strategy = PullStrategy::Get(ai);
     if (strategy && strategy->HasPullStarted())
     {
         Unit* target = strategy->GetTarget();
         if (target)
         {
+            // A pull that has not gone off yet and can no longer be performed is
+            // over now, not in fifteen seconds. PullMultiplier holds every other
+            // action at zero relevance for as long as a pull target is set, so a
+            // pull the bot cannot cast costs it the whole of its rotation and its
+            // movement until the timeout below expires - and the next tick simply
+            // requests the pull again. Once the pull action has actually gone off
+            // the checks further down own the ending, so that the pull back
+            // behaviour still gets to run.
+            if (!strategy->HasPullBeenPerformed() && !strategy->CanDoPullAction(target))
+            {
+                return true;
+            }
+
             // Check if the pull is taking too long
             const time_t secondsSincePullStarted = time(0) - strategy->GetPullStartTime();
             if (secondsSincePullStarted >= strategy->GetMaxPullTime())

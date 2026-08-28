@@ -28,6 +28,7 @@ PullStrategy::PullStrategy(PlayerbotAI* ai, std::string pullAction, std::string 
 , pullActionName(pullAction)
 , preActionName(prePullAction)
 , pendingToStart(false)
+, pullPerformed(false)
 , pullStartTime(0)
 , petReactState(REACT_DEFENSIVE)
 {
@@ -208,7 +209,13 @@ bool PullStrategy::CanDoPullAction(Unit* target)
         Unit* previousTarget = GetTarget();
         SetTarget(target);
 
-        canPull = ai->CanDoSpecificAction("pull action", true, false);
+        // Ask whether the pull action is possible, not only whether it is useful.
+        // Skipping the possibility check let a bot claim a pull it could never
+        // cast - no ammo, spell not known - and PullMultiplier then held its whole
+        // action set at zero relevance until the pull timed out, fifteen seconds
+        // later, over and over. PullAction::isPossible ignores range, so a target
+        // that is merely far away still counts as pullable.
+        canPull = ai->CanDoSpecificAction("pull action", true, true);
 
         // Restore the previous pull target
         SetTarget(previousTarget);
@@ -226,6 +233,7 @@ void PullStrategy::OnPullStarted()
 void PullStrategy::OnPullEnded()
 {
     pullStartTime = 0;
+    pullPerformed = false;
     SetTarget(nullptr);
 }
 
@@ -236,6 +244,7 @@ void PullStrategy::RequestPull(Unit* target, bool resetTime)
     if(resetTime)
     {
         pullStartTime = time(0);
+        pullPerformed = false;
     }
 }
 
