@@ -15,11 +15,7 @@ public:
         creators["evocation"] = &evocation;
         creators["remove curse"] = &remove_curse;
         creators["remove curse on party"] = &remove_curse_on_party;
-        creators["frostfire bolt"] = &frostfire_bolt;
-        creators["dragon's breath"] = &dragons_breath;
         creators["blast wave"] = &blast_wave;
-        creators["invisibility"] = &invisibility;
-        creators["molten armor"] = &molten_armor;
         creators["mage armor"] = &mage_armor;
         creators["ice armor"] = &ice_armor;
     }
@@ -35,7 +31,6 @@ private:
 
     ACTION_NODE_A(remove_curse_on_party, "remove curse on party", "remove lesser curse on party");
 
-    ACTION_NODE_A(frostfire_bolt, "frostfire bolt", "fireball");
 
     static ActionNode* dragons_breath(PlayerbotAI* ai)
     {
@@ -53,9 +48,7 @@ private:
             /*C*/ NextAction::array(0, new NextAction("flamestrike", 71.0f), NULL));
     }
 
-    ACTION_NODE_A(invisibility, "invisibility", "lesser invisibility");
 
-    ACTION_NODE_A(molten_armor, "molten armor", "mage armor");
 
     ACTION_NODE_A(mage_armor, "mage armor", "ice armor");
 
@@ -180,14 +173,6 @@ void MagePveStrategy::InitDeadTriggers(std::list<TriggerNode*>& triggers)
 void MageRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     ClassRaidStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "high threat",
-        NextAction::array(0, new NextAction("invisibility", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "multiple attackers",
-        NextAction::array(0, new NextAction("invisibility", ACTION_INTERRUPT), NULL)));
 
     triggers.push_back(new TriggerNode(
         "has aggro",
@@ -513,10 +498,6 @@ void MageStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("blink", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "spellsteal",
-        NextAction::array(0, new NextAction("spellsteal", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "target critical health",
         NextAction::array(0, new NextAction("fire blast", ACTION_HIGH + 1), NULL)));
 
@@ -607,14 +588,6 @@ void MagePveStrategy::InitDeadTriggers(std::list<TriggerNode*>& triggers)
 void MageRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     ClassRaidStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "high threat",
-        NextAction::array(0, new NextAction("invisibility", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "multiple attackers",
-        NextAction::array(0, new NextAction("invisibility", ACTION_INTERRUPT), NULL)));
 
     triggers.push_back(new TriggerNode(
         "has aggro",
@@ -740,18 +713,12 @@ void MageBuffPveStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BuffPveStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "molten armor",
-        NextAction::array(0, new NextAction("molten armor", ACTION_HIGH), NULL)));
 }
 
 void MageBuffPveStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BuffPveStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "molten armor",
-        NextAction::array(0, new NextAction("molten armor", ACTION_NORMAL), NULL)));
 }
 
 void MageBuffRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -936,10 +903,6 @@ void MageStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("blink", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "spellsteal",
-        NextAction::array(0, new NextAction("spellsteal", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "target critical health",
         NextAction::array(0, new NextAction("fire blast", ACTION_HIGH + 1), NULL)));
 
@@ -1032,14 +995,6 @@ void MageRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     ClassRaidStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "high threat",
-        NextAction::array(0, new NextAction("invisibility", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "multiple attackers",
-        NextAction::array(0, new NextAction("invisibility", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "has aggro",
         NextAction::array(0, new NextAction("shoot", ACTION_HIGH), NULL)));
 }
@@ -1104,10 +1059,6 @@ void MageBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     BuffStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "mirror image",
-        NextAction::array(0, new NextAction("mirror image", ACTION_HIGH + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "fire ward",
         NextAction::array(0, new NextAction("fire ward", ACTION_HIGH), NULL)));
 
@@ -1167,18 +1118,12 @@ void MageBuffPveStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BuffPveStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "molten armor",
-        NextAction::array(0, new NextAction("molten armor", ACTION_HIGH), NULL)));
 }
 
 void MageBuffPveStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BuffPveStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "molten armor",
-        NextAction::array(0, new NextAction("molten armor", ACTION_NORMAL), NULL)));
 }
 
 void MageBuffRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)

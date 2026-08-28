@@ -27,4 +27,12 @@ namespace ai
     public:
         FourHorsemanEndFightTrigger(PlayerbotAI* ai) : EndBossFightTrigger(ai, "end four horseman fight", "four horseman", 16062) {}
     };
+
+    // See the note on VoidZoneMoveAwayAction: creature 16697 is the Four Horsemen's
+    // void zone, not Netherspite's.
+    class VoidZoneTooCloseTrigger : public CloseToCreatureHazardTrigger
+    {
+    public:
+        VoidZoneTooCloseTrigger(PlayerbotAI* ai) : CloseToCreatureHazardTrigger(ai, "void zone too close", 16697, 5.0f, 99999999.0f) {}
+    };
 }

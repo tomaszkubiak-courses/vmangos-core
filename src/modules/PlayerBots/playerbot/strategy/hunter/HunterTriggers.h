@@ -21,12 +21,6 @@ namespace ai
         AspectOfTheWildTrigger(PlayerbotAI* ai) : BuffTrigger(ai, "aspect of the wild") {}
     };
 
-    class AspectOfTheViperTrigger : public BuffTrigger
-    {
-    public:
-        AspectOfTheViperTrigger(PlayerbotAI* ai) : BuffTrigger(ai, "aspect of the viper") {}
-    };
-
     class AspectOfThePackTrigger : public BuffTrigger
     {
     public:
@@ -49,17 +43,6 @@ namespace ai
     {
     public:
         AspectOfTheCheetahTrigger(PlayerbotAI* ai) : BuffTrigger(ai, "aspect of the cheetah") {}
-    };
-
-    class AspectOfTheDragonhawkTrigger : public BuffTrigger
-    {
-    public:
-        AspectOfTheDragonhawkTrigger(PlayerbotAI* ai) : BuffTrigger(ai, "aspect of the dragonhawk") {}
-    
-        bool IsActive() override
-        {
-            return BuffTrigger::IsActive() && !ai->HasAura("aspect of the hawk", bot);
-        }
     };
 
     BEGIN_TRIGGER(HuntersPetDeadTrigger, Trigger)
@@ -299,19 +282,13 @@ private:
         }
     };
 
-    CAN_CAST_TRIGGER(ChimeraShotCanCastTrigger, "chimera shot");
-    CAN_CAST_TRIGGER(ExplosiveShotCanCastTrigger, "explosive shot");
     CAN_CAST_TRIGGER(MultishotCanCastTrigger, "multi-shot");
-    CAN_CAST_TRIGGER(SteadyShotCanCastTrigger, "steady shot");
-    BOOST_TRIGGER(KillCommandBoostTrigger, "kill command");
     SNARE_TRIGGER(IntimidationSnareTrigger, "intimidation");
     CAN_CAST_TRIGGER(CounterattackCanCastTrigger, "counterattack");
     SNARE_TRIGGER(WybernStingSnareTrigger, "wyvern sting");
     CAN_CAST_TRIGGER(MongooseBiteCastTrigger, "mongoose bite");
     BOOST_TRIGGER(BestialWrathBoostTrigger, "bestial wrath");
 
-    INTERRUPT_TRIGGER(SilencingShotInterruptTrigger, "silencing shot");
-    INTERRUPT_HEALER_TRIGGER(SilencingShotInterruptHealerTrigger, "silencing shot");
 
     class ViperStingTrigger : public DebuffTrigger
     {

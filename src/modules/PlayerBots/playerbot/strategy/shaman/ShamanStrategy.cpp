@@ -15,11 +15,9 @@ public:
         creators["lesser healing wave"] = &lesser_healing_wave;
         creators["lesser healing wave on party"] = &lesser_healing_wave_on_party;
         creators["earth shock"] = &earth_shock;
-        creators["wind shear"] = &wind_shear;
     }
 
 private:
-    ACTION_NODE_A(wind_shear, "wind shear", "earth shock");
 
     ACTION_NODE_A(earth_shock, "earth shock", "flame shock");
 
@@ -187,13 +185,6 @@ void ShamanCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     CcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "wind shear",
-        NextAction::array(0, new NextAction("wind shear", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "wind shear on enemy healer",
-        NextAction::array(0, new NextAction("wind shear on enemy healer", ACTION_INTERRUPT), NULL)));
 }
 
 void ShamanCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -667,13 +658,6 @@ void ShamanCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     CcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "wind shear",
-        NextAction::array(0, new NextAction("wind shear", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "wind shear on enemy healer",
-        NextAction::array(0, new NextAction("wind shear on enemy healer", ACTION_INTERRUPT), NULL)));
 }
 
 void ShamanCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -937,13 +921,6 @@ void ShamanBoostStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BoostStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "heroism",
-        NextAction::array(0, new NextAction("heroism", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "bloodlust",
-        NextAction::array(0, new NextAction("bloodlust", ACTION_HIGH), NULL)));
 }
 
 void ShamanBoostStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1046,9 +1023,6 @@ void ShamanStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
             NextAction::array(0, new NextAction("set totembars on levelup", ACTION_HIGH), NULL)));
     }
 
-    triggers.push_back(new TriggerNode(
-        "totemic recall",
-        NextAction::array(0, new NextAction("totemic recall", ACTION_NORMAL), NULL)));
 }
 
 void ShamanStrategy::InitReactionTriggers(std::list<TriggerNode*>& triggers)
@@ -1173,13 +1147,6 @@ void ShamanCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     CcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "wind shear",
-        NextAction::array(0, new NextAction("wind shear", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "wind shear on enemy healer",
-        NextAction::array(0, new NextAction("wind shear on enemy healer", ACTION_INTERRUPT), NULL)));
 }
 
 void ShamanCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1230,18 +1197,6 @@ void ShamanCureStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("cure disease on party", ACTION_DISPEL), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "cleanse spirit poison",
-        NextAction::array(0, new NextAction("cleanse spirit", ACTION_DISPEL), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "cleanse spirit disease",
-        NextAction::array(0, new NextAction("cleanse spirit", ACTION_DISPEL), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "cleanse spirit curse",
-        NextAction::array(0, new NextAction("cleanse spirit", ACTION_DISPEL), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "party member cleanse spirit poison",
         NextAction::array(0, new NextAction("cleanse spirit poison on party", ACTION_DISPEL), NULL)));
 
@@ -1273,18 +1228,6 @@ void ShamanCureStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers
     triggers.push_back(new TriggerNode(
         "party member cure disease",
         NextAction::array(0, new NextAction("cure disease on party", ACTION_DISPEL), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "cleanse spirit poison",
-        NextAction::array(0, new NextAction("cleanse spirit", ACTION_DISPEL), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "cleanse spirit disease",
-        NextAction::array(0, new NextAction("cleanse spirit", ACTION_DISPEL), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "cleanse spirit curse",
-        NextAction::array(0, new NextAction("cleanse spirit", ACTION_DISPEL), NULL)));
 
     triggers.push_back(new TriggerNode(
         "party member cleanse spirit poison",
@@ -1491,13 +1434,6 @@ void ShamanBoostStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BoostStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "heroism",
-        NextAction::array(0, new NextAction("heroism", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "bloodlust",
-        NextAction::array(0, new NextAction("bloodlust", ACTION_HIGH), NULL)));
 }
 
 void ShamanBoostStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1537,30 +1473,18 @@ void ShamanBoostRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& tri
 
 void ShamanTotemBarElementsStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "call of the elements",
-        NextAction::array(0, new NextAction("call of the elements", ACTION_HIGH), NULL)));
 }
 
 void ShamanTotemBarAncestorsStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "call of the ancestors",
-        NextAction::array(0, new NextAction("call of the ancestors", ACTION_HIGH), NULL)));
 }
 
 void ShamanTotemBarSpiritsStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "call of the ancestors",
-        NextAction::array(0, new NextAction("call of the spirits", ACTION_HIGH), NULL)));
 }
 
 #endif
 
 void ShamanManualTotemStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_HIGH), NULL)));
 }

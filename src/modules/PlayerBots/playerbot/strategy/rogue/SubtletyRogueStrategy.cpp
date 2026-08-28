@@ -440,10 +440,6 @@ void SubtletyRogueStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
     RogueStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "enemy out of melee",
-        NextAction::array(0, new NextAction("shadowstep", ACTION_HIGH + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "eviscerate",
         NextAction::array(0, new NextAction("eviscerate", ACTION_HIGH + 2), NULL)));
 
@@ -746,10 +742,6 @@ void SubtletyRogueCcRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>&
 void SubtletyRogueStealthStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     RogueStealthStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "enemy out of melee",
-        NextAction::array(0, new NextAction("shadowstep", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "very often",
@@ -851,10 +843,6 @@ void SubtletyRogueStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
     RogueStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "enemy out of melee",
-        NextAction::array(0, new NextAction("shadowstep", ACTION_HIGH + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "eviscerate",
         NextAction::array(0, new NextAction("eviscerate", ACTION_HIGH + 2), NULL)));
 
@@ -1157,10 +1145,6 @@ void SubtletyRogueCcRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>&
 void SubtletyRogueStealthStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     RogueStealthStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "enemy out of melee",
-        NextAction::array(0, new NextAction("shadowstep", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "very often",

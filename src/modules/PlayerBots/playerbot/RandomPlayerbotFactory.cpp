@@ -118,18 +118,6 @@ RandomPlayerbotFactory::RandomPlayerbotFactory(uint32 accountId) : accountId(acc
     availableRaces[CLASS_DRUID].push_back(RACE_NIGHTELF);
     availableRaces[CLASS_DRUID].push_back(RACE_TAUREN);
 
-#ifdef MANGOSBOT_TWO
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_NIGHTELF);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_TAUREN);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_HUMAN);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_ORC);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_UNDEAD);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_TROLL);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_BLOODELF);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_DRAENEI);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_GNOME);
-    availableRaces[CLASS_DEATH_KNIGHT].push_back(RACE_DWARF);
-#endif
 }
 
 bool RandomPlayerbotFactory::isAvailableRace(uint8 cls, uint8 race)
@@ -160,9 +148,6 @@ bool RandomPlayerbotFactory::isAvailableRole(uint8 cls, BotRoles role)
     switch (cls)
     {
         case CLASS_WARRIOR:
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT:
-#endif
             return role == BotRoles::BOT_ROLE_TANK || role == BotRoles::BOT_ROLE_DPS;
         case CLASS_PALADIN:
         case CLASS_DRUID:

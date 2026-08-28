@@ -253,27 +253,16 @@ namespace ai
         public:
             TriggerFactoryInternal()
             {
-                creators["wind shear"] = [](PlayerbotAI* ai) { return new WindShearInterruptSpellTrigger(ai); };
                 creators["purge"] = [](PlayerbotAI* ai) { return new PurgeTrigger(ai); };
                 creators["shaman weapon"] = [](PlayerbotAI* ai) { return new ShamanWeaponTrigger(ai); };
-                creators["water shield"] = [](PlayerbotAI* ai) { return new WaterShieldTrigger(ai); };
                 creators["lightning shield"] = [](PlayerbotAI* ai) { return new LightningShieldTrigger(ai); };
                 creators["water breathing"] = [](PlayerbotAI* ai) { return new WaterBreathingTrigger(ai); };
                 creators["water walking"] = [](PlayerbotAI* ai) { return new WaterWalkingTrigger(ai); };
                 creators["water breathing on party"] = [](PlayerbotAI* ai) { return new WaterBreathingOnPartyTrigger(ai); };
                 creators["water walking on party"] = [](PlayerbotAI* ai) { return new WaterWalkingOnPartyTrigger(ai); };
-                creators["cleanse spirit poison"] = [](PlayerbotAI* ai) { return new CleanseSpiritPoisonTrigger(ai); };
-                creators["cleanse spirit curse"] = [](PlayerbotAI* ai) { return new CleanseSpiritCurseTrigger(ai); };
-                creators["cleanse spirit disease"] = [](PlayerbotAI* ai) { return new CleanseSpiritDiseaseTrigger(ai); };
-                creators["party member cleanse spirit poison"] = [](PlayerbotAI* ai) { return new PartyMemberCleanseSpiritPoisonTrigger(ai); };
-                creators["party member cleanse spirit curse"] = [](PlayerbotAI* ai) { return new PartyMemberCleanseSpiritCurseTrigger(ai); };
-                creators["party member cleanse spirit disease"] = [](PlayerbotAI* ai) { return new PartyMemberCleanseSpiritDiseaseTrigger(ai); };
                 creators["shock"] = [](PlayerbotAI* ai) { return new ShockTrigger(ai); };
                 creators["frost shock snare"] = [](PlayerbotAI* ai) { return new FrostShockSnareTrigger(ai); };
-                creators["heroism"] = [](PlayerbotAI* ai) { return new HeroismTrigger(ai); };
-                creators["bloodlust"] = [](PlayerbotAI* ai) { return new BloodlustTrigger(ai); };
                 creators["maelstrom weapon"] = [](PlayerbotAI* ai) { return new MaelstromWeaponTrigger(ai); };
-                creators["wind shear on enemy healer"] = [](PlayerbotAI* ai) { return new WindShearInterruptEnemyHealerSpellTrigger(ai); };
                 creators["cure poison"] = [](PlayerbotAI* ai) { return new CurePoisonTrigger(ai); };
                 creators["party member cure poison"] = [](PlayerbotAI* ai) { return new PartyMemberCurePoisonTrigger(ai); };
                 creators["cure disease"] = [](PlayerbotAI* ai) { return new CureDiseaseTrigger(ai); };
@@ -283,11 +272,6 @@ namespace ai
                 creators["earth totem"] = [](PlayerbotAI* ai) { return new EarthTotemTrigger(ai); };
                 creators["water totem"] = [](PlayerbotAI* ai) { return new WaterTotemTrigger(ai); };
                 creators["air totem"] = [](PlayerbotAI* ai) { return new AirTotemTrigger(ai); };
-                creators["call of the elements"] = [](PlayerbotAI* ai) { return new TotemsAreNotSummonedTrigger(ai); };
-                creators["call of the ancestors"] = [](PlayerbotAI* ai) { return new TotemsAreNotSummonedTrigger(ai); };
-                creators["call of the spirits"] = [](PlayerbotAI* ai) { return new TotemsAreNotSummonedTrigger(ai); };
-                creators["totemic recall"] = [](PlayerbotAI* ai) { return new ReadyToRemoveTotemsTrigger(ai); };
-                creators["earth shield on party tank"] = [](PlayerbotAI* ai) { return new PartyTankEarthShieldTrigger(ai); };
                 creators["chain lightning"] = [](PlayerbotAI* ai) { return new ChainLightningTrigger(ai); };
                 creators["stormstrike"] = [](PlayerbotAI* ai) { return new StormstrikeTrigger(ai); };
             }
@@ -298,13 +282,11 @@ namespace ai
         public:
             AiObjectContextInternal()
             {
-                creators["water shield"] = [](PlayerbotAI* ai) { return new CastWaterShieldAction(ai); };
                 creators["lightning shield"] = [](PlayerbotAI* ai) { return new CastLightningShieldAction(ai); };
                 creators["strength of earth totem"] = [](PlayerbotAI* ai) { return new CastStrengthOfEarthTotemAction(ai); };
                 creators["flametongue totem"] = [](PlayerbotAI* ai) { return new CastFlametongueTotemAction(ai); };
                 creators["searing totem"] = [](PlayerbotAI* ai) { return new CastSearingTotemAction(ai); };
                 creators["magma totem"] = [](PlayerbotAI* ai) { return new CastMagmaTotemAction(ai); };
-                creators["totem of wrath"] = [](PlayerbotAI* ai) { return new CastTotemOfWrathAction(ai); };
                 creators["windfury totem"] = [](PlayerbotAI* ai) { return new CastWindfuryTotemAction(ai); };
                 creators["stoneskin totem"] = [](PlayerbotAI* ai) { return new CastStoneskinTotemAction(ai); };
                 creators["stoneclaw totem"] = [](PlayerbotAI* ai) { return new CastStoneclawTotemAction(ai); };
@@ -317,63 +299,41 @@ namespace ai
                 creators["tremor totem"] = [](PlayerbotAI* ai) { return new CastTremorTotemAction(ai); };
                 creators["tranquil air totem"] = [](PlayerbotAI* ai) { return new CastTranquilAirTotemAction(ai); };
                 creators["healing stream totem"] = [](PlayerbotAI* ai) { return new CastHealingStreamTotemAction(ai); };
-                creators["wrath of air totem"] = [](PlayerbotAI* ai) { return new CastWrathOfAirTotemAction(ai); };
                 creators["frost resistance totem"] = [](PlayerbotAI* ai) { return new CastFrostResistanceTotemAction(ai); };
                 creators["fire resistance totem"] = [](PlayerbotAI* ai) { return new CastFireResistanceTotemAction(ai); };
                 creators["nature resistance totem"] = [](PlayerbotAI* ai) { return new CastNatureResistanceTotemAction(ai); };
                 creators["disease cleansing totem"] = [](PlayerbotAI* ai) { return new CastDiseaseCleansingTotemAction(ai); };
                 creators["poison cleansing totem"] = [](PlayerbotAI* ai) { return new CastPoisonCleansingTotemAction(ai); };
-                creators["wind shear"] = [](PlayerbotAI* ai) { return new CastWindShearAction(ai); };
-                creators["wind shear on enemy healer"] = [](PlayerbotAI* ai) { return new CastWindShearOnEnemyHealerAction(ai); };
                 creators["rockbiter weapon"] = [](PlayerbotAI* ai) { return new CastRockbiterWeaponAction(ai); };
                 creators["flametongue weapon"] = [](PlayerbotAI* ai) { return new CastFlametongueWeaponAction(ai); };
                 creators["frostbrand weapon"] = [](PlayerbotAI* ai) { return new CastFrostbrandWeaponAction(ai); };
                 creators["windfury weapon"] = [](PlayerbotAI* ai) { return new CastWindfuryWeaponAction(ai); };
-                creators["earthliving weapon"] = [](PlayerbotAI* ai) { return new CastEarthlivingWeaponAction(ai); };
                 creators["purge"] = [](PlayerbotAI* ai) { return new CastPurgeAction(ai); };
                 creators["healing wave"] = [](PlayerbotAI* ai) { return new CastHealingWaveAction(ai); };
                 creators["lesser healing wave"] = [](PlayerbotAI* ai) { return new CastLesserHealingWaveAction(ai); };
                 creators["healing wave on party"] = [](PlayerbotAI* ai) { return new CastHealingWaveOnPartyAction(ai); };
                 creators["lesser healing wave on party"] = [](PlayerbotAI* ai) { return new CastLesserHealingWaveOnPartyAction(ai); };
-                creators["earth shield"] = [](PlayerbotAI* ai) { return new CastEarthShieldAction(ai); };
-                creators["earth shield on party"] = [](PlayerbotAI* ai) { return new CastEarthShieldOnPartyAction(ai); };
                 creators["chain heal"] = [](PlayerbotAI* ai) { return new CastChainHealAction(ai); };
-                creators["riptide"] = [](PlayerbotAI* ai) { return new CastRiptideAction(ai); };
-                creators["riptide on party"] = [](PlayerbotAI* ai) { return new CastRiptideOnPartyAction(ai); };
                 creators["stormstrike"] = [](PlayerbotAI* ai) { return new CastStormstrikeAction(ai); };
-                creators["lava lash"] = [](PlayerbotAI* ai) { return new CastLavaLashAction(ai); };
-                creators["fire nova"] = [](PlayerbotAI* ai) { return new CastFireNovaAction(ai); };
                 creators["ancestral spirit"] = [](PlayerbotAI* ai) { return new CastAncestralSpiritAction(ai); };
                 creators["water walking"] = [](PlayerbotAI* ai) { return new CastWaterWalkingAction(ai); };
                 creators["water breathing"] = [](PlayerbotAI* ai) { return new CastWaterBreathingAction(ai); };
                 creators["water walking on party"] = [](PlayerbotAI* ai) { return new CastWaterWalkingOnPartyAction(ai); };
                 creators["water breathing on party"] = [](PlayerbotAI* ai) { return new CastWaterBreathingOnPartyAction(ai); };
-                creators["cleanse spirit"] = [](PlayerbotAI* ai) { return new CastCleanseSpiritAction(ai); };
-                creators["cleanse spirit poison on party"] = [](PlayerbotAI* ai) { return new CastCleanseSpiritPoisonOnPartyAction(ai); };
-                creators["cleanse spirit disease on party"] = [](PlayerbotAI* ai) { return new CastCleanseSpiritDiseaseOnPartyAction(ai); };
-                creators["cleanse spirit curse on party"] = [](PlayerbotAI* ai) { return new CastCleanseSpiritCurseOnPartyAction(ai); };
                 creators["flame shock"] = [](PlayerbotAI* ai) { return new CastFlameShockAction(ai); };
                 creators["earth shock"] = [](PlayerbotAI* ai) { return new CastEarthShockAction(ai); };
                 creators["frost shock"] = [](PlayerbotAI* ai) { return new CastFrostShockAction(ai); };
                 creators["chain lightning"] = [](PlayerbotAI* ai) { return new CastChainLightningAction(ai); };
                 creators["lightning bolt"] = [](PlayerbotAI* ai) { return new CastLightningBoltAction(ai); };
-                creators["thunderstorm"] = [](PlayerbotAI* ai) { return new CastThunderstormAction(ai); };
-                creators["heroism"] = [](PlayerbotAI* ai) { return new CastHeroismAction(ai); };
-                creators["bloodlust"] = [](PlayerbotAI* ai) { return new CastBloodlustAction(ai); };
                 creators["cure disease"] = [](PlayerbotAI* ai) { return new CastCureDiseaseAction(ai); };
                 creators["cure disease on party"] = [](PlayerbotAI* ai) { return new CastCureDiseaseOnPartyAction(ai); };
                 creators["cure poison"] = [](PlayerbotAI* ai) { return new CastCurePoisonAction(ai); };
                 creators["cure poison on party"] = [](PlayerbotAI* ai) { return new CastCurePoisonOnPartyAction(ai); };
                 creators["ghost wolf"] = [](PlayerbotAI* ai) { return new CastGhostWolfAction(ai); };
-                creators["call of the elements"] = [](PlayerbotAI* ai) { return new CastCallOfTheElements(ai); };
-                creators["call of the ancestors"] = [](PlayerbotAI* ai) { return new CastCallOfTheAncestors(ai); };
-                creators["call of the spirits"] = [](PlayerbotAI* ai) { return new CastCallOfTheSpirits(ai); };
-                creators["totemic recall"] = [](PlayerbotAI* ai) { return new CastTotemicRecall(ai); };
                 creators["set totembars on levelup"] = [](PlayerbotAI* ai) { return new SetTotemBars(ai); };
                 creators["update pve strats"] = [](PlayerbotAI* ai) { return new UpdateShamanPveStrategiesAction(ai); };
                 creators["update pvp strats"] = [](PlayerbotAI* ai) { return new UpdateShamanPvpStrategiesAction(ai); };
                 creators["update raid strats"] = [](PlayerbotAI* ai) { return new UpdateShamanRaidStrategiesAction(ai); };
-                creators["earth shield on party tank"] = [](PlayerbotAI* ai) { return new CastEarthShieldOnPartyTankAction(ai); };
             }
         };
     };

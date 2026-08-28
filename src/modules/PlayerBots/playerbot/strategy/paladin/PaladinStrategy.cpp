@@ -975,9 +975,6 @@ void PaladinBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BuffStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "often",
-        NextAction::array(0, new NextAction("avenging wrath", ACTION_HIGH + 1), NULL)));
 }
 
 void PaladinBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1536,9 +1533,6 @@ void PaladinBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     BuffStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "often",
-        NextAction::array(0, new NextAction("avenging wrath", ACTION_HIGH + 1), NULL)));
 }
 
 void PaladinBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1810,26 +1804,8 @@ void PaladinBlessingRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>&
 
 void PaladinManualAuraStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_NORMAL), NULL)));
 }
 
 void PaladinManualBlessingStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "greater " + triggerName + " on party",
-        NextAction::array(0, new NextAction("greater " + actionName + " on party", ACTION_NORMAL + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        triggerName + " on party",
-        NextAction::array(0, new NextAction(actionName + " on party", ACTION_NORMAL + 2), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "greater " + triggerName,
-        NextAction::array(0, new NextAction("greater " + actionName, ACTION_NORMAL + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_NORMAL), NULL)));
 }

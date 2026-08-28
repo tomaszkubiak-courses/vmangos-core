@@ -8,24 +8,6 @@ namespace ai
 
     BUFF_ACTION_U(CastPreparationAction, "preparation", !bot->IsSpellReady(sSpellMgr.GetSpellEntry(14177)) || !bot->IsSpellReady(sSpellMgr.GetSpellEntry(2983)) || !bot->IsSpellReady(sSpellMgr.GetSpellEntry(2094)));
 
-    class CastShadowstepAction : public CastSpellAction 
-    {
-    public:
-        CastShadowstepAction(PlayerbotAI* ai) : CastSpellAction(ai, "shadowstep") {}
-
-        virtual bool isPossible() { return true; }
-
-        virtual bool isUseful() override
-        {
-            return bot->HasSpell(36554) && bot->IsSpellReady(sSpellMgr.GetSpellEntry(36554));
-        }
-
-        virtual bool Execute(Event& event) override
-        {
-            return bot->CastSpell(GetTarget(), 36554, TRIGGERED_OLD_TRIGGERED);
-        }
-    };
-
 	class CastEvasionAction : public CastBuffSpellAction
 	{
 	public:
@@ -135,12 +117,6 @@ namespace ai
 		CastFeintAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "feint") {}
 	};
 
-	class CastDismantleAction : public CastSpellAction
-	{
-	public:
-		CastDismantleAction(PlayerbotAI* ai) : CastSpellAction(ai, "dismantle") {}
-	};
-
 	class CastDistractAction : public CastSpellAction
 	{
 	public:
@@ -189,12 +165,6 @@ namespace ai
 		CastAdrenalineRushAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "adrenaline rush") {}
 	};
 
-	class CastKillingSpreeAction : public CastBuffSpellAction
-	{
-	public:
-		CastKillingSpreeAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "killing spree") {}
-	};
-
     class CastKickOnEnemyHealerAction : public CastSpellOnEnemyHealerAction
     {
     public:
@@ -205,18 +175,6 @@ namespace ai
 
     private:
         std::string GetReachActionName() override { return "reach melee"; }
-    };
-
-    class CastTricksOfTheTradeOnPartyAction : public BuffOnPartyAction 
-    {
-    public:
-        CastTricksOfTheTradeOnPartyAction(PlayerbotAI* ai) : BuffOnPartyAction(ai, "tricks of the trade") {}
-    };
-
-    class CastCloakOfShadowsAction : public CastCureSpellAction
-    {
-    public:
-        CastCloakOfShadowsAction(PlayerbotAI* ai) : CastCureSpellAction(ai, "cloak of shadows") {}
     };
 
     class CastSapAction : public CastMeleeSpellAction
@@ -295,12 +253,6 @@ namespace ai
     {
     public:
         CastSinisterStrikeAction(PlayerbotAI* ai) : CastComboAction(ai, "sinister strike") {}
-    };
-
-    class CastMutilateAction : public CastComboAction
-    {
-    public:
-        CastMutilateAction(PlayerbotAI* ai) : CastComboAction(ai, "mutilate") {}
     };
 
     class CastRiposteAction : public CastComboAction

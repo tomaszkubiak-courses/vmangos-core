@@ -6,10 +6,6 @@ using namespace ai;
 
 void RacialsStrategy::InitNonCombatTriggers(std::list<TriggerNode*> &triggers)
 {
-	triggers.push_back(new TriggerNode(
-		"low health", 
-		NextAction::array(0, new NextAction("gift of the naaru", 71.0f), NULL)));
-
     triggers.push_back(new TriggerNode(
         "melee medium aoe",
         NextAction::array(0, new NextAction("war stomp", 71.0f), NULL)));

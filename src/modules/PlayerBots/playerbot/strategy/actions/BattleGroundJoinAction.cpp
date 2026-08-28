@@ -2,7 +2,6 @@
 
 #include "playerbot/playerbot.h"
 #include "playerbot/PlayerbotAI.h"
-#include "LfgActions.h"
 #include "playerbot/AiFactory.h"
 //#include "playerbot/PlayerbotAIConfig.h"
 //#include "playerbot/strategy/ItemVisitors.h"
@@ -635,10 +634,6 @@ bool BGJoinAction::isUseful()
     if (bot->GetLevel() < 10)
         return false;
 
-#ifdef MANGOSBOT_TWO
-    if (bot->GetClass() == CLASS_DEATH_KNIGHT && bot->GetLevel() < 60)
-        return false;
-#endif
 
     // do not try if with player master or in combat/group
     if (GetBotAI(bot)->HasActivePlayerMaster())

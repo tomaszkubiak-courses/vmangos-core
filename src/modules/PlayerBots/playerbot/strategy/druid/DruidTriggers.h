@@ -166,13 +166,6 @@ namespace ai
         virtual bool IsActive() override { return !ai->HasAnyAuraOf(bot, "bear form", "dire bear form", NULL); }
     };
 
-    class TreeFormTrigger : public BuffTrigger
-    {
-    public:
-        TreeFormTrigger(PlayerbotAI* ai) : BuffTrigger(ai, "tree of life") {}
-        virtual bool IsActive() override { return !ai->HasAura("tree of life", bot); }
-    };
-
     class MoonkinFormTrigger : public BuffTrigger
     {
     public:
@@ -199,27 +192,6 @@ namespace ai
         EclipseLunarTrigger(PlayerbotAI* ai) : HasAuraTrigger(ai, "eclipse (lunar)") {}
     };
 
-    // TurtleWoW Balance redesign: Eclipse capstone (talent 320, spell 51444).
-    // Wrath crit → "Arcane Eclipse" buff (spell 51443) → boosts Arcane damage
-    //   → bot pivots to spam Starfire during the ~10 sec window.
-    // Starfire crit → "Nature Eclipse" buff (spell 51442) → boosts Nature damage
-    //   → bot pivots to spam Wrath during the ~10 sec window.
-    // Each Eclipse has a 30-sec internal cooldown; only one active at a time.
-    // Spell names in spell_template:
-    //   51442 "Nature Eclipse"  (school 3 Nature, durationIndex 8 ~30 sec)
-    //   51443 "Arcane Eclipse"  (school 6 Arcane, durationIndex 8 ~30 sec)
-    class HasArcaneEclipseTrigger : public HasAuraTrigger
-    {
-    public:
-        HasArcaneEclipseTrigger(PlayerbotAI* ai) : HasAuraTrigger(ai, "arcane eclipse") {}
-    };
-
-    class HasNatureEclipseTrigger : public HasAuraTrigger
-    {
-    public:
-        HasNatureEclipseTrigger(PlayerbotAI* ai) : HasAuraTrigger(ai, "nature eclipse") {}
-    };
-
     class BashInterruptEnemyHealerSpellTrigger : public InterruptEnemyHealerTrigger
     {
     public:
@@ -242,19 +214,6 @@ namespace ai
         {
             return AI_VALUE2(uint8, "health", "self target") >= sPlayerbotAIConfig.mediumHealth &&
                    AI_VALUE2(uint8, "rage", "self target") < 20;
-        }
-    };
-
-    class LacerateTrigger : public DebuffTrigger
-    {
-    public:
-        LacerateTrigger(PlayerbotAI* ai) : DebuffTrigger(ai, "lacerate") {}
-
-    private:
-        bool IsActive() override
-        {
-            Unit* target = GetTarget();
-            return target && !ai->HasAura("lacerate", target, true) && !HasMaxDebuffs();
         }
     };
 
@@ -411,24 +370,6 @@ namespace ai
             }
 
             return false;
-        }
-    };
-
-    class LifebloomTankTrigger : public Trigger
-    {
-    public:
-        explicit LifebloomTankTrigger(PlayerbotAI* ai) : Trigger(ai, "lifebloom", 1) {}
-
-        Value<Unit*>* GetTargetValue() override;
-        bool IsActive() override
-        {
-            Unit* target = GetTarget();
-            return target
-                && ai->IsTank((Player*)target)                                          //target is tank 
-                && target->IsAlive()                                                    //target is alive
-                && !ai->HasAura("lifebloom", target, true, true, -1, false, 2000, 8)    //target dont have max stacked aura or aura will expire soon
-                && ai->CanCastSpell("lifebloom", target, 0)                             //bot can cast spell
-                && !target->GetAttackers().empty();                                     //target have attackers
         }
     };
 

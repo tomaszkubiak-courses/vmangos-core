@@ -11,7 +11,6 @@ public:
     ElementalShamanStrategyActionNodeFactory()
     {
         creators["flametongue weapon"] = &flametongue_weapon;
-        creators["totem of wrath"] = &totem_of_wrath;
         creators["searing totem"] = &searing_totem;
         creators["strength of earth totem"] = &strength_of_earth_totem;
         creators["windfury totem"] = &windfury_totem;
@@ -21,13 +20,12 @@ public:
 private:
     ACTION_NODE_A(flametongue_weapon, "flametongue weapon", "windfury weapon");
 
-    ACTION_NODE_A(totem_of_wrath, "totem of wrath", "searing totem");
 
     ACTION_NODE_A(searing_totem, "searing totem", "flametongue totem");
 
     ACTION_NODE_A(strength_of_earth_totem, "strength of earth totem", "stoneskin totem");
 
-    ACTION_NODE_A(windfury_totem, "windfury totem", "wrath of air totem");
+    ACTION_NODE_A(windfury_totem, "windfury totem", "grace of air totem");
    
     ACTION_NODE_A(mana_spring_totem, "mana spring totem", "healing stream totem");
 };
@@ -102,9 +100,6 @@ void ElementalShamanPvpStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
         "chain lightning",
         NextAction::array(0, new NextAction("chain lightning", ACTION_HIGH + 1), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "target of attacker close",
-        NextAction::array(0, new NextAction("fire nova", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanPvpStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -304,10 +299,6 @@ void ElementalShamanTotemsStrategy::InitCombatTriggers(std::list<TriggerNode*>& 
         NextAction::array(0, new NextAction("windfury totem", ACTION_HIGH + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "air totem",
-        NextAction::array(0, new NextAction("wrath of air totem", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "water totem",
         NextAction::array(0, new NextAction("mana spring totem", ACTION_HIGH), NULL)));
 
@@ -321,7 +312,7 @@ void ElementalShamanTotemsStrategy::InitCombatTriggers(std::list<TriggerNode*>& 
 
     triggers.push_back(new TriggerNode(
         "fire totem",
-        NextAction::array(0, new NextAction("totem of wrath", ACTION_HIGH), NULL)));
+        NextAction::array(0, new NextAction("searing totem", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanTotemsStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -546,9 +537,6 @@ void ElementalShamanPvpStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
         "chain lightning",
         NextAction::array(0, new NextAction("chain lightning", ACTION_HIGH + 1), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "target of attacker close",
-        NextAction::array(0, new NextAction("fire nova", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanPvpStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -748,10 +736,6 @@ void ElementalShamanTotemsStrategy::InitCombatTriggers(std::list<TriggerNode*>& 
         NextAction::array(0, new NextAction("windfury totem", ACTION_HIGH + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "air totem",
-        NextAction::array(0, new NextAction("wrath of air totem", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "water totem",
         NextAction::array(0, new NextAction("mana spring totem", ACTION_HIGH), NULL)));
 
@@ -765,7 +749,7 @@ void ElementalShamanTotemsStrategy::InitCombatTriggers(std::list<TriggerNode*>& 
 
     triggers.push_back(new TriggerNode(
         "fire totem",
-        NextAction::array(0, new NextAction("totem of wrath", ACTION_HIGH), NULL)));
+        NextAction::array(0, new NextAction("searing totem", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanTotemsStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -813,18 +797,12 @@ void ElementalShamanBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& tr
 {
     ShamanBuffStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "water shield",
-        NextAction::array(0, new NextAction("water shield", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     ShamanBuffStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "water shield",
-        NextAction::array(0, new NextAction("water shield", ACTION_NORMAL), NULL)));
 }
 
 void ElementalShamanBuffPveStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -994,9 +972,6 @@ void ElementalShamanPvpStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
         "chain lightning",
         NextAction::array(0, new NextAction("chain lightning", ACTION_HIGH + 1), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "target of attacker close",
-        NextAction::array(0, new NextAction("fire nova", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanPvpStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1196,10 +1171,6 @@ void ElementalShamanTotemsStrategy::InitCombatTriggers(std::list<TriggerNode*>& 
         NextAction::array(0, new NextAction("windfury totem", ACTION_HIGH + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "air totem",
-        NextAction::array(0, new NextAction("wrath of air totem", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "water totem",
         NextAction::array(0, new NextAction("mana spring totem", ACTION_HIGH), NULL)));
 
@@ -1213,7 +1184,7 @@ void ElementalShamanTotemsStrategy::InitCombatTriggers(std::list<TriggerNode*>& 
 
     triggers.push_back(new TriggerNode(
         "fire totem",
-        NextAction::array(0, new NextAction("totem of wrath", ACTION_HIGH), NULL)));
+        NextAction::array(0, new NextAction("searing totem", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanTotemsStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1261,18 +1232,12 @@ void ElementalShamanBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& tr
 {
     ShamanBuffStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "water shield",
-        NextAction::array(0, new NextAction("water shield", ACTION_HIGH), NULL)));
 }
 
 void ElementalShamanBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     ShamanBuffStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "water shield",
-        NextAction::array(0, new NextAction("water shield", ACTION_NORMAL), NULL)));
 }
 
 void ElementalShamanBuffPveStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)

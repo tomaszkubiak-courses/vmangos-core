@@ -880,19 +880,8 @@ void PlayerbotHolder::OnBotLogin(Player * const bot)
         }
     }
 
-    if (!bot->HasItemCount(6948, 1)
-#ifdef MANGOSBOT_TWO
-        && !bot->HasItemCount(40582, 1)
-#endif
-        )
-    {
-#ifdef MANGOSBOT_TWO
-        if (bot->GetClass() == CLASS_DEATH_KNIGHT && bot->GetMapId() == 609)
-            bot->StoreNewItemInBestSlots(40582, 1);
-        else
-#endif
-            bot->StoreNewItemInBestSlots(6948, 1);
-    }
+    if (!bot->HasItemCount(6948, 1))
+        bot->StoreNewItemInBestSlots(6948, 1);
 }
 
 std::string PlayerbotHolder::ProcessBotCommand(std::string cmd, ObjectGuid guid, ObjectGuid masterguid, bool admin, uint32 masterAccountId, uint32 masterGuildId, const std::string param)
@@ -1184,9 +1173,6 @@ std::string PlayerbotHolder::ListBots(Player* master, const std::string param)
     classNames[CLASS_SHAMAN] = "Shaman";
     classNames[CLASS_WARLOCK] = "Warlock";
     classNames[CLASS_WARRIOR] = "Warrior";
-#ifdef MANGOSBOT_TWO
-    classNames[CLASS_DEATH_KNIGHT] = "DeathKnight";
-#endif
 
     std::map<std::string, std::string> online;
     std::list<std::string> names;

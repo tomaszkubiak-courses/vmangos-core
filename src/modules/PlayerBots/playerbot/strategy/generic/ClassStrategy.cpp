@@ -33,10 +33,6 @@ void ClassStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     /*
     triggers.push_back(new TriggerNode(
-        "vehicle near",
-        NextAction::array(0, new NextAction("enter vehicle", 10.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "very often",
         NextAction::array(0, new NextAction("use lightwell", 80.0f), NULL)));
     */
@@ -45,6 +41,11 @@ void ClassStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
         "very often",
         NextAction::array(0, new NextAction("check mount state", ACTION_IDLE), new NextAction("check values", ACTION_IDLE), NULL)));
 
+    // The Dark Portal only leads anywhere from TBC onwards. On a vanilla build every
+    // action behind these three is an unconditional "return false" (TravelAction.cpp)
+    // and "at dark portal outland" checks area 3539, which does not exist - so the
+    // triggers are evaluated on every non-combat tick and can never fire.
+#ifndef MANGOSBOT_ZERO
     triggers.push_back(new TriggerNode(
         "near dark portal",
         NextAction::array(0, new NextAction("move to dark portal", ACTION_IDLE), NULL)));
@@ -56,6 +57,7 @@ void ClassStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "at dark portal outland",
         NextAction::array(0, new NextAction("move from dark portal", ACTION_IDLE), NULL)));
+#endif
 }
 
 void ClassStrategy::InitReactionTriggers(std::list<TriggerNode*>& triggers)
@@ -502,10 +504,6 @@ void ClassStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 void ClassStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     /*
-    triggers.push_back(new TriggerNode(
-        "vehicle near",
-        NextAction::array(0, new NextAction("enter vehicle", 10.0f), NULL)));
-
     triggers.push_back(new TriggerNode(
         "very often",
         NextAction::array(0, new NextAction("use lightwell", 80.0f), NULL)));
@@ -973,10 +971,6 @@ void ClassStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 void ClassStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     /*
-    triggers.push_back(new TriggerNode(
-        "vehicle near",
-        NextAction::array(0, new NextAction("enter vehicle", 10.0f), NULL)));
-
     triggers.push_back(new TriggerNode(
         "very often",
         NextAction::array(0, new NextAction("use lightwell", 80.0f), NULL)));

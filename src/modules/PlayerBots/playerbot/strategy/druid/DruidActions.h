@@ -74,12 +74,6 @@ namespace ai
 	BUFF_PARTY_ACTION(CastMarkOfTheWildOnPartyAction, "mark of the wild");
 	GREATER_BUFF_PARTY_ACTION(CastGiftOfTheWildOnPartyAction, "gift of the wild");
 
-	class CastSurvivalInstinctsAction : public CastBuffSpellAction 
-	{
-	public:
-		CastSurvivalInstinctsAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "survival instincts") {}
-	};
-
 	class CastThornsAction : public CastBuffSpellAction 
 	{
 	public:
@@ -103,12 +97,6 @@ namespace ai
 	{
 	public:
 		CastWrathAction(PlayerbotAI* ai) : CastSpellAction(ai, "wrath") {}
-	};
-
-	class CastStarfallAction : public CastSpellAction
-	{
-	public:
-		CastStarfallAction(PlayerbotAI* ai) : CastSpellAction(ai, "starfall") {}
 	};
 
 	class CastHurricaneAction : public CastSpellAction
@@ -194,10 +182,10 @@ namespace ai
 	CURE_ACTION(CastRemoveCurseAction, "remove curse");
 	CURE_PARTY_ACTION(CastRemoveCurseOnPartyAction, "remove curse", DISPEL_CURSE);
 
-    class CastBarskinAction : public CastBuffSpellAction
+    class CastBarkskinAction : public CastBuffSpellAction
     {
     public:
-        CastBarskinAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "barskin") {}
+        CastBarkskinAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "barkskin") {}
     };
 
     class CastInnervateAction : public CastSpellTargetAction
@@ -268,12 +256,6 @@ namespace ai
 		CastCatFormAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "cat form") {}
 	};
 
-	class CastTreeFormAction : public CastBuffSpellAction
-	{
-	public:
-		CastTreeFormAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "tree of life") {}
-	};
-
 	class CastMoonkinFormAction : public CastBuffSpellAction
 	{
 	public:
@@ -325,22 +307,10 @@ namespace ai
 		virtual bool Execute(Event& event);
 	};
 
-    class CastFeralChargeCatAction : public CastReachTargetSpellAction
-    {
-    public:
-        CastFeralChargeCatAction(PlayerbotAI* ai) : CastReachTargetSpellAction(ai, "feral charge - cat", 1.5f) {}
-    };
-
     class CastCowerAction : public CastBuffSpellAction
     {
     public:
         CastCowerAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "cower") {}
-    };
-
-    class CastBerserkAction : public CastBuffSpellAction
-    {
-    public:
-        CastBerserkAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "berserk") {}
     };
 
     class CastTigersFuryAction : public CastBuffSpellAction
@@ -359,18 +329,6 @@ namespace ai
     {
     public:
         CastClawAction(PlayerbotAI* ai) : CastMeleeSpellAction(ai, "claw") {}
-    };
-
-    class CastMangleCatAction : public CastMeleeSpellAction
-    {
-    public:
-        CastMangleCatAction(PlayerbotAI* ai) : CastMeleeSpellAction(ai, "mangle (cat)") {}
-    };
-
-    class CastSwipeCatAction : public CastMeleeSpellAction
-    {
-    public:
-        CastSwipeCatAction(PlayerbotAI* ai) : CastMeleeSpellAction(ai, "swipe (cat)") {}
     };
 
     class CastFerociousBiteAction : public CastMeleeSpellAction
@@ -535,12 +493,6 @@ namespace ai
         CastDemoralizingRoarAction(PlayerbotAI* ai) : CastMeleeDebuffSpellAction(ai, "demoralizing roar") {}
     };
 
-    class CastMangleBearAction : public CastMeleeSpellAction
-    {
-    public:
-        CastMangleBearAction(PlayerbotAI* ai) : CastMeleeSpellAction(ai, "mangle (bear)") {}
-    };
-
     class CastSwipeBearAction : public CastMeleeSpellAction
     {
     public:
@@ -549,12 +501,6 @@ namespace ai
 #else
         CastSwipeBearAction(PlayerbotAI* ai) : CastMeleeSpellAction(ai, "swipe") {}
 #endif
-    };
-
-    class CastLacerateAction : public CastMeleeSpellAction
-    {
-    public:
-        CastLacerateAction(PlayerbotAI* ai) : CastMeleeSpellAction(ai, "lacerate") {}
     };
 
     class CastBashOnEnemyHealerAction : public CastSpellOnEnemyHealerAction
@@ -579,14 +525,6 @@ namespace ai
     {
     public:
         CastEnrageAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "enrage") {}
-    };
-
-    class CastLifebloomAction : public CastSpellAction
-    {
-    public:
-        explicit CastLifebloomAction(PlayerbotAI* ai) : CastSpellAction(ai, "lifebloom") {}
-
-        std::string GetTargetName() override { return "party tank without lifebloom"; }
     };
 
     class UpdateDruidPveStrategiesAction : public UpdateStrategyDependenciesAction

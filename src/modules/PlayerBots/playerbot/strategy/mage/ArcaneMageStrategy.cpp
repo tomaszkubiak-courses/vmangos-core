@@ -10,15 +10,11 @@ class ArcaneMageStrategyActionNodeFactory : public NamedObjectFactory<ActionNode
 public:
     ArcaneMageStrategyActionNodeFactory()
     {
-        creators["arcane blast"] = &arcane_blast;
-        creators["arcane barrage"] = &arcane_barrage;
         creators["arcane missiles"] = &arcane_missiles;
     }
 
 private:
-    ACTION_NODE_A(arcane_blast, "arcane blast", "arcane missiles");
 
-    ACTION_NODE_A(arcane_barrage, "arcane barrage", "arcane missiles");
 
     ACTION_NODE_A(arcane_missiles, "arcane missiles", "shoot");
 };
@@ -381,9 +377,6 @@ void ArcaneMageStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     MageStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "arcane blast",
-        NextAction::array(0, new NextAction("arcane blast", ACTION_NORMAL), NULL)));
 }
 
 void ArcaneMageStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -726,10 +719,6 @@ NextAction** ArcaneMageStrategy::GetDefaultCombatActions()
 void ArcaneMageStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     MageStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "arcane blast",
-        NextAction::array(0, new NextAction("arcane blast", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "missile barrage",

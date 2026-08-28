@@ -13,7 +13,6 @@ public:
         creators["aimed shot"] = &aimed_shot;
         creators["rapid fire"] = &rapid_fire;
         creators["aspect of the pack"] = &aspect_of_the_pack;
-        creators["aspect of the dragonhawk"] = &aspect_of_the_dragonhawk;
         creators["wing clip"] = &wing_clip;
         creators["intimidation"] = &intimidation;
         creators["scatter shot"] = &scatter_shot;
@@ -28,7 +27,6 @@ private:
 
     ACTION_NODE_A(aspect_of_the_pack, "aspect of the pack", "aspect of the cheetah");
 
-    ACTION_NODE_A(aspect_of_the_dragonhawk, "aspect of the dragonhawk", "aspect of the hawk");
 
     ACTION_NODE_A(wing_clip, "wing clip", "raptor strike");
 
@@ -545,14 +543,6 @@ void HunterStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "hunter's mark",
         NextAction::array(0, new NextAction("hunter's mark", ACTION_NORMAL + 6), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "kill command",
-        NextAction::array(0, new NextAction("kill command", ACTION_NORMAL + 6), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "steady shot",
-        NextAction::array(0, new NextAction("steady shot", ACTION_NORMAL + 5), NULL)));
 
     triggers.push_back(new TriggerNode(
         "enemy is close",
@@ -1381,16 +1371,10 @@ void HunterStingRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigge
 
 void HunterAspectStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "aspect of the dragonhawk",
-        NextAction::array(0, new NextAction("aspect of the dragonhawk", ACTION_HIGH + 5), NULL)));
 }
 
 void HunterAspectStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "aspect of the dragonhawk",
-        NextAction::array(0, new NextAction("aspect of the dragonhawk", ACTION_NORMAL), NULL)));
 }
 
 void HunterAspectPvpStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1448,21 +1432,12 @@ void HunterManualStingStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
 {
     if (ai->HasStrategy("aoe", BotState::BOT_STATE_COMBAT))
     {
-        triggers.push_back(new TriggerNode(
-            triggerName + " on attacker",
-            NextAction::array(0, new NextAction(actionName + " on attacker", ACTION_HIGH + 1), NULL)));
     }
 
-    triggers.push_back(new TriggerNode(
-        "no stings",
-        NextAction::array(0, new NextAction(actionName, ACTION_HIGH), NULL)));
 }
 
 void HunterManualAspectStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_HIGH), NULL)));
 }
 
 void HunterManualAspectStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

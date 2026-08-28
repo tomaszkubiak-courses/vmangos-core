@@ -38,25 +38,15 @@ namespace ai
 
     DEBUFF_TRIGGER_A(CorruptionTrigger, "corruption");
     DEBUFF_TRIGGER(SiphonLifeTrigger, "siphon life");
-    DEBUFF_TRIGGER(UnstableAfflictionTrigger, "unstable affliction");
 
     INTERRUPT_TRIGGER(DeathCoilInterruptTrigger, "death coil");
     INTERRUPT_HEALER_TRIGGER(DeathCoilInterruptTHealerTrigger, "death coil");
     SNARE_TRIGGER(DeathCoilSnareTrigger, "death coil");
-    SNARE_TRIGGER(ShadowfurySnareTrigger, "shadowfury");
-    INTERRUPT_TRIGGER(ShadowfuryInterruptTrigger, "shadowfury");
 
     class CorruptionOnAttackerTrigger : public DebuffOnAttackerTrigger
     {
     public:
         CorruptionOnAttackerTrigger(PlayerbotAI* ai) : DebuffOnAttackerTrigger(ai, "corruption") {}
-        bool IsActive() override;
-    };
-
-    class SeedOfCorruptionOnAttackerTrigger : public DebuffOnAttackerTrigger
-    {
-    public:
-        SeedOfCorruptionOnAttackerTrigger(PlayerbotAI* ai) : DebuffOnAttackerTrigger(ai, "seed of corruption") {}
         bool IsActive() override;
     };
 
@@ -120,12 +110,6 @@ namespace ai
     {
     public:
         SiphonLifeOnAttackerTrigger(PlayerbotAI* ai) : DebuffOnAttackerTrigger(ai, "siphon life") {}
-    };
-
-    class UnstableAfflictionOnAttackerTrigger : public DebuffOnAttackerTrigger
-    {
-    public:
-        UnstableAfflictionOnAttackerTrigger(PlayerbotAI* ai) : DebuffOnAttackerTrigger(ai, "unstable affliction") {}
     };
 
     DEBUFF_TRIGGER(ImmolateTrigger, "immolate");

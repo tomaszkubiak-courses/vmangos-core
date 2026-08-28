@@ -860,10 +860,6 @@ void ArmsWarriorAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
     WarriorAoeStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("bladestorm", ACTION_HIGH + 5), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "melee light aoe",
         NextAction::array(0, new NextAction("sweeping strikes", ACTION_HIGH + 4), NULL)));
 }

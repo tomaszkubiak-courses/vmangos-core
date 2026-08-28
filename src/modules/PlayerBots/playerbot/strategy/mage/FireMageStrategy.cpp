@@ -395,10 +395,6 @@ void FireMageStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("scorch", ACTION_NORMAL + 4), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "living bomb",
-        NextAction::array(0, new NextAction("living bomb", ACTION_NORMAL + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "fire spells locked",
         NextAction::array(0, new NextAction("frostbolt", ACTION_NORMAL), NULL)));
 }
@@ -493,10 +489,6 @@ void FireMageRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& triggers)
 void FireMageAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     MageAoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "living bomb",
-        NextAction::array(0, new NextAction("living bomb", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "ranged medium aoe",
@@ -647,10 +639,6 @@ void FireMageBoostRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& t
 void FireMageCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     MageCcStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "enemy too close for spell",
-        NextAction::array(0, new NextAction("dragon's breath", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
         "enemy ten yards",
@@ -757,14 +745,6 @@ void FireMageStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     MageStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "living bomb",
-        NextAction::array(0, new NextAction("living bomb", ACTION_NORMAL + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "hot streak",
-        NextAction::array(0, new NextAction("pyroblast", ACTION_NORMAL + 2), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "no improved scorch",
         NextAction::array(0, new NextAction("scorch", ACTION_NORMAL + 1), NULL)));
 
@@ -863,10 +843,6 @@ void FireMageRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& triggers)
 void FireMageAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     MageAoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "living bomb",
-        NextAction::array(0, new NextAction("living bomb", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "ranged medium aoe",
@@ -1017,10 +993,6 @@ void FireMageBoostRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& t
 void FireMageCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     MageCcStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "enemy too close for spell",
-        NextAction::array(0, new NextAction("dragon's breath", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
         "enemy ten yards",

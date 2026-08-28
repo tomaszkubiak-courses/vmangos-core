@@ -4,7 +4,6 @@
 #include "SharedValueContext.h"
 #include "ItemUsageValue.h"
 #include "playerbot/TravelMgr.h"
-#include "playerbot/strategy/deathknight/DKActions.h"
 
 using namespace ai;
 
@@ -664,8 +663,6 @@ bool CanUseItemOn::Calculate()
             return guidP.IsCreature() && guidP.GetEntry() == 13016;                                                                 //Deeprun Rat
         case 52566:                                                                                                                 //Motivate-a-Tron (currently broken?)
             return guidP.IsCreature() && guidP.GetEntry() == 39623;                                                                 //Gnome Citizen
-        case 38607:                                                                                                                 //Battle-worn Sword
-            return guidP.IsGameObject() && (std::find(RUNEFORGES.begin(), RUNEFORGES.end(), guidP.GetEntry()) != RUNEFORGES.end()); //Runeforge
         case 39253:                                                                                                                 //Gift of the Harester
             return guidP.IsCreature() && guidP.GetEntry() == 28819;                                                                 //Scarlet Miner
         case 39645:                                                                                                                 //Makeshift Cover

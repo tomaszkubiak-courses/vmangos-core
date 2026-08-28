@@ -9,18 +9,12 @@ class AssassinationRogueStrategyActionNodeFactory : public NamedObjectFactory<Ac
 public:
     AssassinationRogueStrategyActionNodeFactory()
     {
-        creators["mutilate front"] = &mutilate_front;
-        creators["mutilate back"] = &mutilate_back;
-        creators["mutilate"] = &mutilate;
         creators["backstab"] = &backstab;
     }
 
 private:
-    ACTION_NODE_A(mutilate_front, "mutilate", "sinister strike");
 
-    ACTION_NODE_A(mutilate_back, "mutilate", "backstab");
 
-    ACTION_NODE_A(mutilate, "mutilate", "sinister strike");
 
     ACTION_NODE_A(backstab, "backstab", "sinister strike");
 };
@@ -50,11 +44,11 @@ void AssassinationRogueStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
 
     triggers.push_back(new TriggerNode(
         "behind target",
-        NextAction::array(0, new NextAction("mutilate back", ACTION_NORMAL + 1), NULL)));
+        NextAction::array(0, new NextAction("backstab", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "not behind target",
-        NextAction::array(0, new NextAction("mutilate front", ACTION_NORMAL), NULL)));
+        NextAction::array(0, new NextAction("sinister strike", ACTION_NORMAL), NULL)));
 }
 
 void AssassinationRogueStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -445,11 +439,11 @@ void AssassinationRogueStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
 
     triggers.push_back(new TriggerNode(
         "behind target",
-        NextAction::array(0, new NextAction("mutilate back", ACTION_NORMAL + 1), NULL)));
+        NextAction::array(0, new NextAction("backstab", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "not behind target",
-        NextAction::array(0, new NextAction("mutilate front", ACTION_NORMAL), NULL)));
+        NextAction::array(0, new NextAction("sinister strike", ACTION_NORMAL), NULL)));
 }
 
 void AssassinationRogueStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -840,11 +834,11 @@ void AssassinationRogueStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
 
     triggers.push_back(new TriggerNode(
         "behind target",
-        NextAction::array(0, new NextAction("mutilate back", ACTION_NORMAL + 1), NULL)));
+        NextAction::array(0, new NextAction("backstab", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "not behind target",
-        NextAction::array(0, new NextAction("mutilate front", ACTION_NORMAL), NULL)));
+        NextAction::array(0, new NextAction("sinister strike", ACTION_NORMAL), NULL)));
 }
 
 void AssassinationRogueStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

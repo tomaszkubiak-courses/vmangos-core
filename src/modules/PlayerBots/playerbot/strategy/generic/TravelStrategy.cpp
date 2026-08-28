@@ -74,9 +74,6 @@ void TravelStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
     for (auto& [condition, purpose, relevance] : PurposeActions)
     {
         std::string trigger = condition.empty() ? "val::need travel purpose::" + std::to_string((uint32)purpose) : condition;
-        triggers.push_back(new TriggerNode(
-            trigger,
-            NextAction::array(0, new NextAction("request travel target::" + std::to_string((uint32)purpose), relevance), NULL)));
     }
 
     //Specific named exceptions
@@ -101,9 +98,6 @@ void TravelStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 
     for (auto& [trigger, action, relevance] : StringActions)
     {
-        triggers.push_back(new TriggerNode(
-            trigger,
-            NextAction::array(0, new NextAction(action, relevance), NULL)));
     }
 
     triggers.push_back(new TriggerNode(

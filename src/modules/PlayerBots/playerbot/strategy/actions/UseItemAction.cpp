@@ -211,8 +211,8 @@ bool RequiresItemToUse(const ItemPrototype* itemProto, PlayerbotAI* ai, Player* 
     if (itemExceptions.find(itemProto->ItemId) != itemExceptions.end())
         return false;
 
-    // Required items                                  Hearthstone, Scourgestone
-    const std::unordered_set<uint32> itemsRequired = { 6948, 40582 };
+    // Required items                                  Hearthstone
+    const std::unordered_set<uint32> itemsRequired = { 6948 };
     if (itemsRequired.find(itemProto->ItemId) != itemsRequired.end())
         return true;
 
@@ -1277,12 +1277,7 @@ bool UseHearthStoneAction::Execute(Event& event)
     ai->RemoveShapeshift();
 
     if (!bot->HasItemCount(6948, 1)) //Hearthstone
-    {
-        if (!bot->HasItemCount(40582, 1)) //Scourgestone
-            return false;
-
-        event = Event(event.getSource(), "scourgestone");
-    }
+        return false;
 
     const bool used = UseAction::Execute(event);
     if (used)
@@ -1297,14 +1292,9 @@ bool UseHearthStoneAction::Execute(Event& event)
 
 bool UseHearthStoneAction::isUseful() 
 {
-    uint32 spellId = 8690;
+    const uint32 spellId = 8690;
     if (!bot->HasItemCount(6948, 1)) //Hearthstone
-    {
-        if (!bot->HasItemCount(40582, 1)) //Scourgestone
-            return false;
-
-        spellId = 54403;
-    }
+        return false;
 
     if (!ai->HasActivePlayerMaster() && ai->IsGroupLeader()) //Only hearthstone if entire group can use it.
     {

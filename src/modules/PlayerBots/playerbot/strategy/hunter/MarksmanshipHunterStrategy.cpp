@@ -597,13 +597,6 @@ void MarksmanshipHunterCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
 {
     HunterCcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "silencing shot",
-        NextAction::array(0, new NextAction("silencing shot", ACTION_INTERRUPT + 4), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "silencing shot on enemy healer",
-        NextAction::array(0, new NextAction("silencing shot on enemy healer", ACTION_INTERRUPT + 3), NULL)));
 }
 
 void MarksmanshipHunterCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -723,9 +716,6 @@ void MarksmanshipHunterStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
 {
     HunterStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "chimera shot",
-        NextAction::array(0, new NextAction("chimera shot", ACTION_NORMAL + 3), NULL)));
 }
 
 void MarksmanshipHunterStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -961,13 +951,6 @@ void MarksmanshipHunterCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
 {
     HunterCcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "silencing shot",
-        NextAction::array(0, new NextAction("silencing shot", ACTION_INTERRUPT + 4), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "silencing shot on enemy healer",
-        NextAction::array(0, new NextAction("silencing shot on enemy healer", ACTION_INTERRUPT + 3), NULL)));
 }
 
 void MarksmanshipHunterCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

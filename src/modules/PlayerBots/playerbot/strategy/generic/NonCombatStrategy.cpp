@@ -11,6 +11,11 @@ void NonCombatStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
         "very often",
         NextAction::array(0, new NextAction("check mount state", 1.0f), new NextAction("check values", 1.0f), NULL)));
 
+    // The Dark Portal only leads anywhere from TBC onwards. On a vanilla build every
+    // action behind these three is an unconditional "return false" (TravelAction.cpp)
+    // and "at dark portal outland" checks area 3539, which does not exist - so the
+    // triggers are evaluated on every non-combat tick and can never fire.
+#ifndef MANGOSBOT_ZERO
     triggers.push_back(new TriggerNode(
         "near dark portal",
         NextAction::array(0, new NextAction("move to dark portal", 1.0f), NULL)));
@@ -22,12 +27,9 @@ void NonCombatStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "at dark portal outland",
         NextAction::array(0, new NextAction("move from dark portal", 1.0f), NULL)));
+#endif
 
     /*
-    triggers.push_back(new TriggerNode(
-        "vehicle near",
-        NextAction::array(0, new NextAction("enter vehicle", 10.0f), NULL)));
-
     triggers.push_back(new TriggerNode(
         "very often",
         NextAction::array(0, new NextAction("use lightwell", 80.0f), NULL)));
@@ -86,19 +88,8 @@ void NoWarStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("faction", 1.0f), NULL)));
 }
 
-void GlyphStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
-{
-    triggers.push_back(new TriggerNode(
-        "apply glyphs",
-        NextAction::array(0, new NextAction("auto set glyph", 1.0f), NULL)));
-}
-
 void FishStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "val::can fish",
-        NextAction::array(0, new NextAction("move to fish" + modifier, 5.0f), new NextAction("fish" + modifier, 10.0f), NULL)));
-
     triggers.push_back(new TriggerNode(
         "val::can open fishing dobber",
         NextAction::array(0, new NextAction("use fishing bobber", 99.0f), NULL)));

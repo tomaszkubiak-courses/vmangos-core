@@ -20,13 +20,10 @@ namespace ai
     BUFF_PARTY_ACTION(CastDivineSpiritOnPartyAction, "divine spirit");
     GREATER_BUFF_PARTY_ACTION(CastPrayerOfSpiritOnPartyAction, "prayer of spirit");
     //disc 2.4.3
-    SPELL_ACTION(CastMassDispelAction, "mass dispel");
 
     // disc talents
     BUFF_ACTION(CastInnerFocusAction, "inner focus");
     // disc 2.4.3 talents
-    BUFF_ACTION(CastPainSuppressionAction, "pain suppression");
-    PROTECT_ACTION(CastPainSuppressionProtectAction, "pain suppression");
 
     // holy
     HEAL_ACTION(CastLesserHealAction, "lesser heal");
@@ -40,12 +37,9 @@ namespace ai
     HEAL_ACTION(CastRenewAction, "renew");
     HEAL_HOT_PARTY_ACTION(CastRenewOnPartyAction, "renew");
     // holy 2.4.3
-    HEAL_PARTY_ACTION(CastPrayerOfMendingAction, "prayer of mending");
-    HEAL_PARTY_ACTION(CastBindingHealAction, "binding heal");
     
     BUFF_ACTION(CastPrayerOfHealingAction, "prayer of healing");
     AOE_HEAL_ACTION(CastLightwellAction, "lightwell");
-    AOE_HEAL_ACTION(CastCircleOfHealingAction, "circle of healing");
 
     SPELL_ACTION(CastSmiteAction, "smite");
     SPELL_ACTION(CastHolyNovaAction, "holy nova");
@@ -70,8 +64,6 @@ namespace ai
     BUFF_PARTY_ACTION(CastShadowProtectionOnPartyAction, "shadow protection");
     GREATER_BUFF_PARTY_ACTION(CastPrayerOfShadowProtectionAction, "prayer of shadow protection");
     // shadow 2.4.3
-    BUFF_ACTION(CastShadowfiendAction, "shadowfiend");
-    SPELL_ACTION(CastShadowWordDeathAction, "shadow word: death");
 
     // shadow talents
     SPELL_ACTION(CastMindFlayAction, "mind flay");
@@ -80,8 +72,6 @@ namespace ai
     SPELL_ACTION(CastSilenceAction, "silence");
     ENEMY_HEALER_ACTION(CastSilenceOnEnemyHealerAction, "silence");
     // shadow talents 2.4.3
-    RANGED_DEBUFF_ACTION(CastVampiricTouchAction, "vampiric touch");
-    RANGED_DEBUFF_ENEMY_ACTION(CastVampiricTouchActionOnAttacker, "vampiric touch on attacker");
 
     // racials
     RANGED_DEBUFF_ACTION(CastDevouringPlagueAction, "devouring plague");
@@ -92,9 +82,6 @@ namespace ai
     SPELL_ACTION_U(CastStarshardsAction, "starshards", (AI_VALUE2(uint8, "mana", "self target") > 50 && AI_VALUE(Unit*, "current target") && AI_VALUE2(float, "distance", "current target") > 15.0f));
     BUFF_ACTION(CastElunesGraceAction, "elune's grace");
     BUFF_ACTION(CastFeedbackAction, "feedback");
-    BUFF_ACTION(CastSymbolOfHopeAction, "symbol of hope");
-    SPELL_ACTION(CastConsumeMagicAction, "consume magic");
-    SNARE_ACTION(CastChastiseAction, "chastise");
 
     class CastRemoveShadowformAction : public Action 
     {

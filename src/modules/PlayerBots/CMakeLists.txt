@@ -43,10 +43,14 @@ set(LIBRARY_SRCS
     ${CMAKE_CURRENT_SOURCE_DIR}/botpch.cpp
 )
 
+# playerbot/strategy/deathknight is absent, unlike in the donor's build file, because the
+# directory is gone. The Death Knight class does not exist before 3.0 and this tree only
+# ever builds vanilla, so the class AI and every reference to it were deleted rather than
+# guarded. Recovering it means going back to the donor, not to an #ifdef here.
 foreach(subdir strategy strategy/actions strategy/generic strategy/triggers strategy/values
                strategy/druid strategy/hunter strategy/mage strategy/paladin strategy/priest
                strategy/rogue strategy/shaman strategy/warlock strategy/warrior
-               strategy/deathknight strategy/tests)
+               strategy/tests)
   file(GLOB subdir_SRCS ${CMAKE_CURRENT_SOURCE_DIR}/playerbot/${subdir}/*.cpp
                         ${CMAKE_CURRENT_SOURCE_DIR}/playerbot/${subdir}/*.h)
   string(REPLACE "/" "\\\\" group_name ${subdir})

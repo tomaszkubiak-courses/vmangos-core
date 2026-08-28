@@ -200,14 +200,11 @@ namespace ai
                 creators["frost trap"] = [](PlayerbotAI* ai) { return new FrostTrapTrigger(ai); };
                 creators["explosive trap"] = [](PlayerbotAI* ai) { return new ExplosiveTrapTrigger(ai); };
                 creators["rapid fire"] = [](PlayerbotAI* ai) { return new RapidFireTrigger(ai); };
-                creators["kill command"] = [](PlayerbotAI* ai) { return new KillCommandBoostTrigger(ai); };
                 creators["aspect of the hawk"] = [](PlayerbotAI* ai) { return new AspectOfTheHawkTrigger(ai); };
                 creators["aspect of the wild"] = [](PlayerbotAI* ai) { return new AspectOfTheWildTrigger(ai); };
-                creators["aspect of the viper"] = [](PlayerbotAI* ai) { return new AspectOfTheViperTrigger(ai); };
                 creators["aspect of the monkey"] = [](PlayerbotAI* ai) { return new AspectOfTheMonkeyTrigger(ai); };
                 creators["aspect of the beast"] = [](PlayerbotAI* ai) { return new AspectOfTheBeastTrigger(ai); };
                 creators["aspect of the cheetah"] = [](PlayerbotAI* ai) { return new AspectOfTheCheetahTrigger(ai); };
-                creators["aspect of the dragonhawk"] = [](PlayerbotAI* ai) { return new AspectOfTheDragonhawkTrigger(ai); };
                 creators["aspect of the pack"] = [](PlayerbotAI* ai) { return new AspectOfThePackTrigger(ai); };
                 creators["trueshot aura"] = [](PlayerbotAI* ai) { return new TrueshotAuraTrigger(ai); };
                 creators["serpent sting on attacker"] = [](PlayerbotAI* ai) { return new SerpentStingOnAttackerTrigger(ai); };
@@ -222,10 +219,7 @@ namespace ai
                 creators["switch to ranged"] = [](PlayerbotAI* ai) { return new SwitchToRangedTrigger(ai); };
                 creators["feign death"] = [](PlayerbotAI* ai) { return new FeignDeathTrigger(ai); };
                 creators["scatter shot on snare target"] = [](PlayerbotAI* ai) { return new ScatterShotSnareTrigger(ai); };
-                creators["chimera shot"] = [](PlayerbotAI* ai) { return new ChimeraShotCanCastTrigger(ai); };
-                creators["explosive shot"] = [](PlayerbotAI* ai) { return new ExplosiveShotCanCastTrigger(ai); };
                 creators["multi-shot"] = [](PlayerbotAI* ai) { return new MultishotCanCastTrigger(ai); };
-                creators["steady shot"] = [](PlayerbotAI* ai) { return new SteadyShotCanCastTrigger(ai); };
                 creators["intimidation on snare target"] = [](PlayerbotAI* ai) { return new IntimidationSnareTrigger(ai); };
                 creators["counterattack"] = [](PlayerbotAI* ai) { return new CounterattackCanCastTrigger(ai); };
                 creators["wyvern sting"] = [](PlayerbotAI* ai) { return new WybernStingSnareTrigger(ai); };
@@ -233,8 +227,6 @@ namespace ai
                 creators["viper sting"] = [](PlayerbotAI* ai) { return new ViperStingTrigger(ai); };
                 creators["aimed shot"] = [](PlayerbotAI* ai) { return new AimedShotTrigger(ai); };
                 creators["bestial wrath"] = [](PlayerbotAI* ai) { return new BestialWrathBoostTrigger(ai); };
-                creators["silencing shot interrupt"] = [](PlayerbotAI* ai) { return new SilencingShotInterruptTrigger(ai); };
-                creators["silencing shot on enemy healer"] = [](PlayerbotAI* ai) { return new SilencingShotInterruptHealerTrigger(ai); };
                 creators["no pet"] = [](PlayerbotAI* ai) { return new HunterNoPet(ai); };
                 creators["stealthed nearby"] = [](PlayerbotAI* ai) { return new StealthedNearbyTrigger(ai); };
             }
@@ -248,8 +240,6 @@ namespace ai
                 creators["auto shot"] = [](PlayerbotAI* ai) { return new CastAutoShotAction(ai); };
                 creators["equip ammo"] = [](PlayerbotAI* ai) { return new HunterEquipAmmoAction(ai); };
                 creators["aimed shot"] = [](PlayerbotAI* ai) { return new CastAimedShotAction(ai); };
-                creators["chimera shot"] = [](PlayerbotAI* ai) { return new CastChimeraShotAction(ai); };
-                creators["explosive shot"] = [](PlayerbotAI* ai) { return new CastExplosiveShotAction(ai); };
                 creators["arcane shot"] = [](PlayerbotAI* ai) { return new CastArcaneShotAction(ai); };
                 creators["tranquilizing shot"] = [](PlayerbotAI* ai) { return new CastTranquilizingShotAction(ai); };
                 creators["concussive shot"] = [](PlayerbotAI* ai) { return new CastConcussiveShotAction(ai); };
@@ -268,17 +258,14 @@ namespace ai
                 creators["call pet"] = [](PlayerbotAI* ai) { return new CastCallPetAction(ai); };
                 creators["black arrow"] = [](PlayerbotAI* ai) { return new CastBlackArrow(ai); };
                 creators["rapid fire"] = [](PlayerbotAI* ai) { return new CastRapidFireAction(ai); };
-                creators["kill command"] = [](PlayerbotAI* ai) { return new CastKillCommandAction(ai); };
                 creators["boost"] = [](PlayerbotAI* ai) { return new CastRapidFireAction(ai); };
                 creators["readiness"] = [](PlayerbotAI* ai) { return new CastReadinessAction(ai); };
                 creators["aspect of the monkey"] = [](PlayerbotAI* ai) { return new CastAspectOfTheMonkeyAction(ai); };
                 creators["aspect of the hawk"] = [](PlayerbotAI* ai) { return new CastAspectOfTheHawkAction(ai); };
                 creators["aspect of the wild"] = [](PlayerbotAI* ai) { return new CastAspectOfTheWildAction(ai); };
-                creators["aspect of the viper"] = [](PlayerbotAI* ai) { return new CastAspectOfTheViperAction(ai); };
                 creators["aspect of the pack"] = [](PlayerbotAI* ai) { return new CastAspectOfThePackAction(ai); };
                 creators["aspect of the cheetah"] = [](PlayerbotAI* ai) { return new CastAspectOfTheCheetahAction(ai); };
                 creators["aspect of the beast"] = [](PlayerbotAI* ai) { return new CastAspectOfTheBeastAction(ai); };
-                creators["aspect of the dragonhawk"] = [](PlayerbotAI* ai) { return new CastAspectOfTheDragonhawkAction(ai); };
                 creators["remove aspect of the cheetah"] = [](PlayerbotAI* ai) { return new RemoveBuffAction(ai, "aspect of the cheetah"); };
                 creators["trueshot aura"] = [](PlayerbotAI* ai) { return new CastTrueshotAuraAction(ai); };
                 creators["feign death"] = [](PlayerbotAI* ai) { return new CastFeignDeathAction(ai); };
@@ -297,10 +284,7 @@ namespace ai
                 creators["wyvern sting"] = [](PlayerbotAI* ai) { return new WyvernStingSnareAction(ai); };
                 creators["mongoose bite"] = [](PlayerbotAI* ai) { return new MongooseBiteAction(ai); };
                 creators["black arrow on snare target"] = [](PlayerbotAI* ai) { return new CastBlackArrowSnareAction(ai); };
-                creators["silencing shot"] = [](PlayerbotAI* ai) { return new CastSilencingShotAction(ai); };
-                creators["silencing shot on enemy healer"] = [](PlayerbotAI* ai) { return new CastSilencingShotOnHealerAction(ai); };
                 creators["readiness"] = [](PlayerbotAI* ai) { return new CastReadinessAction(ai); };
-                creators["steady shot"] = [](PlayerbotAI* ai) { return new CastSteadyShotAction(ai); };
                 creators["tame beast"] = [](PlayerbotAI* ai) { return new TameBeastAction(ai); };
                 creators["flare"] = [](PlayerbotAI* ai) { return new CastFlareAction(ai); };
                 creators["immolation trap"] = [](PlayerbotAI* ai) { return new CastImmolationTrapAction(ai); };
