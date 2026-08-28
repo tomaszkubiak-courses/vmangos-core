@@ -473,27 +473,50 @@ void PlayerbotMgr::CancelLogout()
 }
 
 std::mutex PlayerbotHolder::m_queuedLogoutsMutex;
-std::vector<std::pair<PlayerbotHolder*, uint32>> PlayerbotHolder::m_queuedLogouts;
+std::vector<PlayerbotHolder::QueuedLogout> PlayerbotHolder::m_queuedLogouts;
+thread_local uint32 PlayerbotHolder::m_botUpdateDepth = 0;
 
-void PlayerbotHolder::QueueLogout(PlayerbotHolder* holder, uint32 guid)
+PlayerbotHolder::BotUpdateScope::BotUpdateScope()
+{
+    ++m_botUpdateDepth;
+}
+
+PlayerbotHolder::BotUpdateScope::~BotUpdateScope()
+{
+    --m_botUpdateDepth;
+}
+
+bool PlayerbotHolder::IsInsideBotUpdate()
+{
+    return m_botUpdateDepth != 0;
+}
+
+void PlayerbotHolder::QueueLogout(PlayerbotHolder* holder, uint32 guid, bool allowInstant, bool forDelete)
 {
     if (!holder)
         return;
 
     std::lock_guard<std::mutex> lock(m_queuedLogoutsMutex);
 
-    for (auto const& queued : m_queuedLogouts)
+    for (auto& queued : m_queuedLogouts)
     {
-        if (queued.first == holder && queued.second == guid)
+        if (queued.holder == holder && queued.guid == guid)
+        {
+            // Already asked for. A delete outranks a plain logout, and an instant
+            // one outranks a request the bot gets to acknowledge, so the strongest
+            // request wins rather than the first one in.
+            queued.allowInstant = queued.allowInstant || allowInstant;
+            queued.forDelete = queued.forDelete || forDelete;
             return;
+        }
     }
 
-    m_queuedLogouts.emplace_back(holder, guid);
+    m_queuedLogouts.push_back(QueuedLogout{ holder, guid, allowInstant, forDelete });
 }
 
 void PlayerbotHolder::ProcessQueuedLogouts()
 {
-    std::vector<std::pair<PlayerbotHolder*, uint32>> logouts;
+    std::vector<QueuedLogout> logouts;
 
     {
         std::lock_guard<std::mutex> lock(m_queuedLogoutsMutex);
@@ -501,13 +524,26 @@ void PlayerbotHolder::ProcessQueuedLogouts()
     }
 
     for (auto const& queued : logouts)
-        queued.first->LogoutPlayerBot(queued.second);
+        queued.holder->LogoutPlayerBot(queued.guid, queued.allowInstant, queued.forDelete);
 }
 
 void PlayerbotHolder::LogoutPlayerBot(uint32 guid, bool allowInstant, bool forDelete)
 {
     SC_LOG("LogoutPlayerBot entry guid=%u allowInstant=%d forDelete=%d",
            guid, (int)allowInstant, (int)forDelete);
+
+    // The instant path below deletes the bot's Player. Doing that from inside a
+    // bot's AI update frees an object the map thread is still walking, and the
+    // damage does not stop at the Player either - it stays in the map's grid,
+    // where the next bot to look for targets reads it. Hand the request to the
+    // world tick, which runs after every map has finished.
+    if (IsInsideBotUpdate())
+    {
+        SC_LOG("LogoutPlayerBot guid=%u deferred - called from inside a bot update", guid);
+        QueueLogout(this, guid, allowInstant, forDelete);
+        return;
+    }
+
     Player* bot = GetPlayerBot(guid);
     if (bot)
     {

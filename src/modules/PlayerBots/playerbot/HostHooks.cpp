@@ -207,6 +207,12 @@ void Playerbot_OnPlayerUpdate(Player* player, uint32 diff)
     if (!player || !sPlayerbotAIConfig.enabled)
         return;
 
+    // Everything below runs from Player::Update on a map thread, with the map
+    // still walking its player list and its grids. Nothing reached from here may
+    // delete a Player; LogoutPlayerBot checks for this scope and defers to the
+    // world tick instead of freeing the object out from under the map.
+    PlayerbotHolder::BotUpdateScope updateScope;
+
     if (PlayerbotAI* ai = GetBotAI(player))
     {
         SC_PHASE("Playerbot_OnPlayerUpdate/ai.UpdateAI", player->GetName());

@@ -38,8 +38,30 @@ public:
     // as soon as the hook returns. Anything running under a bot's update asks for
     // the logout here instead; the world tick performs it once every map has
     // finished updating.
-    static void QueueLogout(PlayerbotHolder* holder, uint32 guid);
+    //
+    // LogoutPlayerBot defers to this by itself whenever IsInsideBotUpdate() is
+    // set, so a call site does not have to know where it is running from. The
+    // map threads are not the only callers - commands, the login manager and the
+    // random bot manager all reach the same code - and only the thread itself can
+    // tell which case it is in.
+    static void QueueLogout(PlayerbotHolder* holder, uint32 guid, bool allowInstant = true, bool forDelete = false);
     static void ProcessQueuedLogouts();
+
+    // Set while this thread is inside a bot's AI update. Deleting a Player from
+    // under that is what BotUpdateScope exists to prevent.
+    static bool IsInsideBotUpdate();
+
+    // Marks the current thread as being inside a bot update for as long as it
+    // lives. Held by the Player::Update hook, which is the only entry point into
+    // bot AI from a map thread.
+    struct BotUpdateScope
+    {
+        BotUpdateScope();
+        ~BotUpdateScope();
+
+        BotUpdateScope(BotUpdateScope const&) = delete;
+        BotUpdateScope& operator=(BotUpdateScope const&) = delete;
+    };
     void DisablePlayerBot(uint32 guid, bool logOutPlayer = true);
     Player* GetPlayerBot (uint32 guid) const;
 
@@ -76,8 +98,17 @@ protected:
     virtual uint32 GetOrCreateAccount(Player* master, std::string& error);
     void Cleanup();   
 private:
+    struct QueuedLogout
+    {
+        PlayerbotHolder* holder;
+        uint32 guid;
+        bool allowInstant;
+        bool forDelete;
+    };
+
     static std::mutex m_queuedLogoutsMutex;
-    static std::vector<std::pair<PlayerbotHolder*, uint32>> m_queuedLogouts;
+    static std::vector<QueuedLogout> m_queuedLogouts;
+    static thread_local uint32 m_botUpdateDepth;
 
     typedef std::list<std::string> (PlayerbotHolder::*HolderCommandHandler)(Player* master, const std::string param, AccountTypes security);
     typedef std::string (PlayerbotHolder::*BotCommandHandler)(Player* bot, Player* master, const std::string param);
