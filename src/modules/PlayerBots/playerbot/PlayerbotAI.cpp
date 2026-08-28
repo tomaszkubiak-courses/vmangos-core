@@ -43,6 +43,8 @@
 #include "Transports/Transport.h"
 #include "Guild/GuildMgr.h"
 #include "Chat/ChannelMgr.h"
+#include "Chat/AbstractPlayer.h"
+#include "World.h"
 #include "PlayerbotLLMInterface.h"
 
 #include "playerbot/BotStringAlgo.h"
@@ -3619,6 +3621,22 @@ bool PlayerbotAI::Whisper(std::string msg, std::string receiverName, bool likePl
     return true;
 }
 
+// Nothing a bot says reaches sWorld.LogChat on its own. That is called from the
+// chat opcode handlers, and a bot has no socket - the module calls Player::Say,
+// Whisper and the group variants directly - so Chat.log and the logs database,
+// which carry every line a real player types, never saw a word of it. Feed them
+// here, at the points where the message is actually sent rather than where the
+// type is decided, because the whisper path can still refuse to send.
+static void LogBotChat(Player* bot, char const* type, std::string const& text, Player* target = nullptr)
+{
+    WorldSession* session = bot ? bot->GetSession() : nullptr;
+    if (!session || !session->GetPlayer())
+        return;
+
+    sWorld.LogChat(session, type, text.c_str(),
+        target ? PlayerPointer(new PlayerWrapper<Player>(target)) : PlayerPointer(nullptr));
+}
+
 bool PlayerbotAI::TellPlayerNoFacing(Player* player, std::string text, PlayerbotSecurityLevel securityLevel, bool isPrivate, bool noRepeat, bool ignoreSilent)
 {
     if(!player)
@@ -3696,18 +3714,21 @@ bool PlayerbotAI::TellPlayerNoFacing(Player* player, std::string text, Playerbot
         {
             case CHAT_MSG_SAY:
             {
+                LogBotChat(bot, "Say", text);
                 bot->Say(text, (bot->GetTeam() == ALLIANCE ? LANG_COMMON : LANG_ORCISH));
                 return true;
             }
 
             case CHAT_MSG_RAID:
             {
+                LogBotChat(bot, "Raid", text);
                 this->SayToRaid(text.c_str());
 
                 return true;
             }
             case CHAT_MSG_PARTY:
             {
+                LogBotChat(bot, "Group", text);
                 SayToParty(text.c_str());
 
                 return true;
@@ -3735,6 +3756,7 @@ bool PlayerbotAI::TellPlayerNoFacing(Player* player, std::string text, Playerbot
                     return true;
                 }
 
+                LogBotChat(bot, "Whisp", text, player);
                 this->Whisper(text, player->GetName());
                 return true;
             }

@@ -512,8 +512,10 @@ static CmangosScriptDevAIMgrStub sScriptDevAIMgr;
 #define BG_AV_GO_GY_BANNER_SNOWFALL 180062
 #endif
 
-// === GetSpellCastResultString stub (cmangos free function) ===
-inline char const* GetSpellCastResultString(SpellCastResult /*res*/) { return ""; }
+// === GetSpellCastResultString (cmangos free function) ===
+// Defined in playerbot/SpellCastResultString.cpp - one case per SpellCastResult,
+// guarded the same way the enum is.
+char const* GetSpellCastResultString(SpellCastResult res);
 
 // === TARGET_FLAG_LOCKED / SPELL_STATE_TARGETING (cmangos) ===
 #ifndef SPELL_STATE_TARGETING
