@@ -5122,6 +5122,13 @@ void PlayerbotFactory::InitGuild()
     if (bot->GetGuildId())
         return;
 
+    // RandomBotGuildCount = 0 means the operator turned random bot guilds off. Nothing below
+    // can succeed in that case - CreateRandomGuilds returns immediately on the same check, so
+    // randomBotGuilds stays empty - and every randomised bot was logging "No random guilds
+    // available" at error level for a configuration that is working exactly as asked.
+    if (!sPlayerbotAIConfig.randomBotGuildCount)
+        return;
+
     if (sPlayerbotAIConfig.randomBotGuilds.size() < sPlayerbotAIConfig.randomBotGuildCount)
         RandomPlayerbotFactory::CreateRandomGuilds();
 
