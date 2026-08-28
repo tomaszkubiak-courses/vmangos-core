@@ -188,7 +188,23 @@ bool OutNumberedTrigger::IsActive()
 bool BuffTrigger::IsActive()
 {
     Unit* target = GetTarget();
-	return target && !ai->HasAura(spell, target, false, checkIsOwner) && target->IsAlive();
+    if (!target || !target->IsAlive())
+        return false;
+
+    // A buff the bot has not learned can never be applied, so firing on the missing aura only
+    // queues an action that reports IMPOSSIBLE and is queued again on the next tick. A hunter
+    // below level 10 did that with "aspect of the hawk" for its whole session.
+    //
+    // Only spells that are real DBC names are gated this way. Several triggers are named for a
+    // family rather than a spell - "seal", "blessing", "any mage armor" - and those resolve to
+    // no spell id at all, so asking whether the bot knows them would always say no and would
+    // silence the trigger for every paladin and mage. Cooldowns and resource costs are not
+    // checked here either; they clear by themselves. HasSpell reads a cached value and is
+    // tested first because SpellIds returns its vector by value.
+    if (!ai->HasSpell(spell) && !chat->SpellIds(spell).empty())
+        return false;
+
+	return !ai->HasAura(spell, target, false, checkIsOwner);
 }
 
 bool MyBuffTrigger::IsActive()
@@ -491,7 +507,10 @@ bool DeflectSpellTrigger::IsActive()
     if (!target->IsNonMeleeSpellCasted(true))
         return false;
 
-    if (!target->GetTargetGuid() == bot->GetObjectGuid())
+    // Was written "!target->GetTargetGuid() == bot->GetObjectGuid()", which negates the guid
+    // first and then compares a bool against it, so the test never fired and the bot would
+    // deflect a cast aimed at somebody else.
+    if (target->GetTargetGuid() != bot->GetObjectGuid())
         return false;
 
     uint32 spellid = context->GetValue<uint32>("spell id", spell)->Get();
