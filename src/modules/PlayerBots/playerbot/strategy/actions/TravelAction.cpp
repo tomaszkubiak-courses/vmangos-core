@@ -144,12 +144,7 @@ bool DarkPortalAzerothAction::isUseful()
 
 bool MoveFromDarkPortalAction::Execute(Event& event)
 {
-    RESET_AI_VALUE(GuidPosition,"rpg target");
-
-    if (bot->GetTeam() == ALLIANCE)
-        return MoveTo(530, -319.261f, 1027.213f, 54.172638f, false, true);
-    else
-        return MoveTo(530, -180.444f, 1027.947f, 54.181538f, false, true);
-
+    // The far side of the Dark Portal is Outland, which is map 530 and does not exist
+    // before TBC. Nothing on a 1.12 build can reach this.
     return false;
 }

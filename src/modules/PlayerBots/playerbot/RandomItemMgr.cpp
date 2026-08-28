@@ -146,7 +146,6 @@ void RandomItemMgr::Init()
     LoadRandomEnchantments();
     BuildRandomItemCache();
 #ifdef MANGOSBOT_TWO
-    BuildGlyphCache();
 #endif
     //BuildRarityCache();
 }
@@ -431,16 +430,6 @@ bool RandomItemMgr::ShouldEquipArmorForSpec(uint8 playerclass, uint8 spec, ItemP
             resultArmorSubClass = { ITEM_SUBCLASS_ARMOR_MAIL, ITEM_SUBCLASS_ARMOR_PLATE };
         break;
     }
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-    {
-        if (proto->InventoryType == INVTYPE_HOLDABLE)
-            return false;
-
-        resultArmorSubClass = { ITEM_SUBCLASS_ARMOR_SIGIL, ITEM_SUBCLASS_ARMOR_PLATE };
-        break;
-    }
-#endif
     case CLASS_PALADIN:
     {
         if (m_weightScales[spec].info.name != "holy" && proto->InventoryType == INVTYPE_HOLDABLE)
@@ -732,14 +721,6 @@ bool RandomItemMgr::ShouldEquipWeaponForSpec(uint8 playerclass, uint8 spec, Item
         }
         break;
     }
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-    {
-        mh_weapons = { ITEM_SUBCLASS_WEAPON_SWORD, ITEM_SUBCLASS_WEAPON_SWORD2, ITEM_SUBCLASS_WEAPON_AXE, ITEM_SUBCLASS_WEAPON_AXE2, ITEM_SUBCLASS_WEAPON_MACE, ITEM_SUBCLASS_WEAPON_MACE2 };
-        r_weapons = { ITEM_SUBCLASS_ARMOR_SIGIL };
-        break;
-    }
-#endif
     }
 
     if (slot_mh == EQUIPMENT_SLOT_MAINHAND)
@@ -826,17 +807,6 @@ bool RandomItemMgr::CanEquipWeapon(uint8 clazz, ItemPrototype const* proto)
                 proto->SubClass != ITEM_SUBCLASS_WEAPON_THROWN)
             return false;
         break;
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-        if (proto->SubClass != ITEM_SUBCLASS_WEAPON_MACE2 &&
-            proto->SubClass != ITEM_SUBCLASS_WEAPON_SWORD2 &&
-            proto->SubClass != ITEM_SUBCLASS_WEAPON_MACE &&
-            proto->SubClass != ITEM_SUBCLASS_WEAPON_SWORD &&
-            proto->SubClass != ITEM_SUBCLASS_WEAPON_AXE &&
-            proto->SubClass != ITEM_SUBCLASS_WEAPON_AXE2)
-            return false;
-        break;
-#endif
     }
 
     return true;
@@ -1495,19 +1465,11 @@ uint32 RandomItemMgr::CalculateStatWeight(uint8 playerclass, uint8 spec, ItemPro
     bool isHealingItem = false;
     bool isSpellDamageItem = false;
     bool hasInt = false;
-#ifdef MANGOSBOT_TWO
-    bool noCaster = (Classes)playerclass == CLASS_WARRIOR || (Classes)playerclass == CLASS_ROGUE || (Classes)playerclass == CLASS_DEATH_KNIGHT || (Classes)playerclass == CLASS_HUNTER || spec == 30 || spec == 32 || spec == 21 || spec == 6;
-    bool hasMana = !((Classes)playerclass == CLASS_WARRIOR || (Classes)playerclass == CLASS_ROGUE || (Classes)playerclass == CLASS_DEATH_KNIGHT);
-
-    if (!proto->IsWeapon() && (proto->SubClass == ITEM_SUBCLASS_ARMOR_LIBRAM || proto->SubClass == ITEM_SUBCLASS_ARMOR_IDOL || proto->SubClass == ITEM_SUBCLASS_ARMOR_TOTEM || proto->SubClass == ITEM_SUBCLASS_ARMOR_SIGIL))
-        return (uint32)(proto->Quality + proto->ItemLevel);
-#else
     bool noCaster = (Classes)playerclass == CLASS_WARRIOR || (Classes)playerclass == CLASS_ROGUE || (Classes)playerclass == CLASS_HUNTER || spec == 30 || spec == 32 || spec == 21 || spec == 6;
     bool hasMana = !((Classes)playerclass == CLASS_WARRIOR || (Classes)playerclass == CLASS_ROGUE);
 
     if ((Classes)playerclass == CLASS_HUNTER && proto->SubClass == ITEM_SUBCLASS_WEAPON_THROWN)
         return (uint32)proto->ItemLevel;
-#endif
 
     //check relicts
     if (proto->InventoryType == INVTYPE_RELIC)
@@ -2667,20 +2629,6 @@ std::string RandomItemMgr::GetPlayerSpecName(Player* player)
         else if (tab == 2)
             specName = "surv";
         break;
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-        if (tab == 0)
-            specName = "blooddps";
-        else if (tab == 1)
-        {
-            specName = "frosttank";
-            if (urand(0, 100) > 50)
-                specName = "frostdps";
-        }
-        else if (tab == 2)
-            specName = "unholydps";
-        break;
-#endif
     case CLASS_MAGE:
         if (tab == 0)
             specName = "arcane";
@@ -4002,20 +3950,6 @@ void RandomItemMgr::BuildRarityCache()
 }
 
 #ifdef MANGOSBOT_TWO
-void RandomItemMgr::BuildGlyphCache()
-{
-    sLog.outString("Building glyphCache", sItemStorage.GetMaxEntry());
-    for (uint32 itemId = 0; itemId < sItemStorage.GetMaxEntry(); ++itemId)
-    {
-        ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
-        if (!proto)
-            continue;
-
-        if (proto->Class != ITEM_CLASS_GLYPH)
-            continue;
-
-        glyphCache[proto->AllowableClass].push_back(proto->ItemId);
-    }
 }
 #endif
 

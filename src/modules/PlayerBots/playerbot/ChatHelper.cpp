@@ -191,12 +191,6 @@ ChatHelper::ChatHelper(PlayerbotAI* ai) : PlayerbotAIAware(ai)
     specs[CLASS_WARRIOR][1] = "fury";
     specs[CLASS_WARRIOR][2] = "protection";
 
-#ifdef MANGOSBOT_TWO
-    classes[CLASS_DEATH_KNIGHT] = "dk";
-    specs[CLASS_DEATH_KNIGHT][0] = "blood";
-    specs[CLASS_DEATH_KNIGHT][1] = "frost";
-    specs[CLASS_DEATH_KNIGHT][2] = "unholy";
-#endif
 
     races[RACE_DWARF] = "Dwarf";
     races[RACE_GNOME] = "Gnome";

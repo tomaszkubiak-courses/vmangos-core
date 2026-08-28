@@ -9,8 +9,7 @@ bool DemonArmorTrigger::IsActive()
 {
 	Unit* target = GetTarget();
 	return !ai->HasAura("demon skin", target) &&
-		   !ai->HasAura("demon armor", target) &&
-		   !ai->HasAura("fel armor", target);
+		   !ai->HasAura("demon armor", target);
 }
 
 bool SpellstoneTrigger::IsActive() 
@@ -26,7 +25,7 @@ bool InfernoTrigger::IsActive()
 bool CorruptionTrigger::IsActive()
 {
 	Unit* target = GetTarget();
-	return target && !ai->HasAura("corruption", target) && !ai->HasAura("seed of corruption", target) && !HasMaxDebuffs();
+	return target && !ai->HasAura("corruption", target) && !HasMaxDebuffs();
 }
 
 bool LifeTapTrigger::IsActive()
@@ -72,20 +71,10 @@ bool CorruptionOnAttackerTrigger::IsActive()
 {
     if (DebuffOnAttackerTrigger::IsActive())
     {
-        return !ai->HasAura("seed of corruption", GetTarget(), false, true);
+        return true;
 	}
 
 	return false;
-}
-
-bool SeedOfCorruptionOnAttackerTrigger::IsActive()
-{
-    if (DebuffOnAttackerTrigger::IsActive())
-    {
-        return AI_VALUE(uint8, "attackers count") >= 3;
-    }
-
-    return false;
 }
 
 bool NoCurseTrigger::IsActive()

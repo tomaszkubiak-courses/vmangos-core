@@ -187,7 +187,6 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
     masterIncomingPacketHandlers.AddHandler(CMSG_RECLAIM_CORPSE, "revive from corpse");
 
 #ifdef MANGOSBOT_TWO
-    masterIncomingPacketHandlers.AddHandler(CMSG_LFG_TELEPORT, "lfg teleport");
 #endif
 
     botOutgoingPacketHandlers.AddHandler(SMSG_PETITION_SHOW_SIGNATURES, "petition offer");
@@ -225,11 +224,8 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
     botOutgoingPacketHandlers.AddHandler(SMSG_QUESTGIVER_QUEST_DETAILS, "quest details");   
 
 #ifndef MANGOSBOT_ZERO
-    botOutgoingPacketHandlers.AddHandler(SMSG_ARENA_TEAM_INVITE, "arena team invite");
 #endif
 #ifdef MANGOSBOT_TWO
-    botOutgoingPacketHandlers.AddHandler(SMSG_LFG_ROLE_CHECK_UPDATE, "lfg role check");
-    botOutgoingPacketHandlers.AddHandler(SMSG_LFG_PROPOSAL_UPDATE, "lfg proposal");
 #endif
 
     botOutgoingPacketHandlers.AddHandler(SMSG_CAST_RESULT, "cast failed");
@@ -2676,9 +2672,6 @@ bool PlayerbotAI::IsRanged(Player* player, bool inGroup)
     case CLASS_PALADIN:
     case CLASS_WARRIOR:
     case CLASS_ROGUE:
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-#endif
         return false;
     case CLASS_DRUID:
         return !HasAnyAuraOf(player, "cat form", "bear form", "dire bear form", NULL);

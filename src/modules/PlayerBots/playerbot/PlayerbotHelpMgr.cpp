@@ -21,7 +21,6 @@
 #include "strategy/druid/DruidAiObjectContext.h"
 #include "strategy/hunter/HunterAiObjectContext.h"
 #include "strategy/rogue/RogueAiObjectContext.h"
-#include "strategy/deathknight/DKAiObjectContext.h"
 #endif
 
 PlayerbotHelpMgr::PlayerbotHelpMgr()
@@ -223,9 +222,6 @@ void PlayerbotHelpMgr::LoadAllStrategies()
     classContext["hunter"] = new HunterAiObjectContext(ai);
     classContext["rogue"] = new RogueAiObjectContext(ai);
     classContext["priest"] = new PriestAiObjectContext(ai);
-//#ifdef MANGOSBOT_TWO
-    classContext["deathknight"] = new DKAiObjectContext(ai);
-//#endif
     classContext["shaman"] = new ShamanAiObjectContext(ai);
     classContext["mage"] = new MageAiObjectContext(ai);
     classContext["warlock"] = new WarlockAiObjectContext(ai);

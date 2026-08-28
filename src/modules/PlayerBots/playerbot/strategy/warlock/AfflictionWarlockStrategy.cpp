@@ -391,10 +391,6 @@ void AfflictionWarlockStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
         NextAction::array(0, new NextAction("dark pact", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "unstable affliction",
-        NextAction::array(0, new NextAction("unstable affliction", ACTION_NORMAL + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "siphon life",
         NextAction::array(0, new NextAction("siphon life", ACTION_NORMAL), NULL)));
 }
@@ -489,10 +485,6 @@ void AfflictionWarlockRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& tr
 void AfflictionWarlockAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     WarlockAoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "unstable affliction on attacker",
-        NextAction::array(0, new NextAction("unstable affliction on attacker", ACTION_HIGH + 4), NULL)));
 
     triggers.push_back(new TriggerNode(
         "siphon life on attacker",
@@ -768,10 +760,6 @@ void AfflictionWarlockStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
         NextAction::array(0, new NextAction("dark pact", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "unstable affliction",
-        NextAction::array(0, new NextAction("unstable affliction", ACTION_NORMAL + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "siphon life",
         NextAction::array(0, new NextAction("siphon life", ACTION_NORMAL), NULL)));
 }
@@ -866,10 +854,6 @@ void AfflictionWarlockRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& tr
 void AfflictionWarlockAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     WarlockAoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "unstable affliction on attacker",
-        NextAction::array(0, new NextAction("unstable affliction on attacker", ACTION_HIGH + 4), NULL)));
 
     triggers.push_back(new TriggerNode(
         "siphon life on attacker",

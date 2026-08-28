@@ -440,10 +440,6 @@ void RestorationDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
                              new NextAction("healing touch on party", ACTION_CRITICAL_HEAL), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "lifebloom",
-        NextAction::array(0, new NextAction("lifebloom", ACTION_MEDIUM_HEAL + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "low health",
         NextAction::array(0, new NextAction("regrowth", ACTION_MEDIUM_HEAL), NULL)));
 
@@ -842,10 +838,6 @@ void RestorationDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
         "party member critical health",
         NextAction::array(0, new NextAction("regrowth on party", ACTION_CRITICAL_HEAL + 1),
                              new NextAction("healing touch on party", ACTION_CRITICAL_HEAL), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "clearcasting",
-        NextAction::array(0, new NextAction("lifebloom", ACTION_CRITICAL_HEAL - 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "low health",

@@ -97,13 +97,10 @@
 #include "TalentSpecValue.h"
 #include "MountValues.h"
 #include "DeadValues.h"
-#include "playerbot/strategy/druid/DruidValues.h"
 #include "TravelValues.h"
 #include "LootValues.h"
-#include "GlyphValues.h"
 #include "StuckValues.h"
 #include "FishValues.h"
-#include "RuneForgeValues.h"
 #include "WorldBuffTravelValues.h"
 
 namespace ai
@@ -124,7 +121,6 @@ namespace ai
             creators["closest game objects static los"] = [](PlayerbotAI* ai) { return new NearestGameObjects(ai, INTERACTION_DISTANCE, LOS_STATIC); };
             creators["nearest npcs"] = [](PlayerbotAI* ai) { return new NearestNpcsValue(ai); };
             creators["nearest npcs no los"] = [](PlayerbotAI* ai) { return new NearestNpcsValue(ai, sPlayerbotAIConfig.sightDistance, true); };
-            creators["nearest vehicles"] = [](PlayerbotAI* ai) { return new NearestVehiclesValue(ai); };
             creators["nearest friendly players"] = [](PlayerbotAI* ai) { return new NearestFriendlyPlayersValue(ai); };
             creators["closest friendly players"] = [](PlayerbotAI* ai) { return new NearestFriendlyPlayersValue(ai, INTERACTION_DISTANCE); };
             creators["possible targets"] = [](PlayerbotAI* ai) { return new PossibleTargetsValue(ai); };
@@ -215,7 +211,6 @@ namespace ai
             creators["trinkets on use"] = [](PlayerbotAI* ai) { return new EquipedUsableTrinketValue(ai); };
 
             creators["spell id"] = [](PlayerbotAI* ai) { return new SpellIdValue(ai); };
-            creators["vehicle spell id"] = [](PlayerbotAI* ai) { return new VehicleSpellIdValue(ai); };
             creators["item for spell"] = [](PlayerbotAI* ai) { return new ItemForSpellValue(ai); };
             creators["spell cast useful"] = [](PlayerbotAI* ai) { return new SpellCastUsefulValue(ai); };
             creators["spell ready"] = [](PlayerbotAI* ai) { return new SpellReadyValue(ai); };
@@ -443,12 +438,7 @@ namespace ai
             creators["trigger active"] = [](PlayerbotAI* ai) { return new TriggerActiveValue(ai); };
             creators["has strategy"] = [](PlayerbotAI* ai) { return new HasStrategyValue(ai); };
 
-            creators["party tank without lifebloom"] = [](PlayerbotAI* ai) { return new PartyTankWithoutLifebloomValue(ai); };
             creators["move style"] = [](PlayerbotAI* ai) { return new MoveStyleValue(ai); };
-            creators["available glyphs"] = [](PlayerbotAI* ai) { return new AvailableGlyphsValue(ai); };
-            creators["wanted glyphs"] = [](PlayerbotAI* ai) { return new WantedGlyphsValue(ai); };
-            creators["equiped glyphs"] = [](PlayerbotAI* ai) { return new EquipedGlyphsValue(ai); };
-            creators["glyph is upgrade"] = [](PlayerbotAI* ai) { return new GlyphIsUpgradeValue(ai); };
 
             //Travel
             creators["focus travel target"] = [](PlayerbotAI* ai) { return new FocusTravelTargetValue(ai); };
@@ -478,9 +468,6 @@ namespace ai
             creators["time since last change"] = [](PlayerbotAI* ai) { return new TimeSinceLastChangeValue(ai); };
             creators["distance moved since"] = [](PlayerbotAI* ai) { return new DistanceMovedSinceValue(ai); };
 
-            creators["runeforge spells"] = [](PlayerbotAI* ai) { return new RuneForgeSpellsValue(ai); };
-            creators["best runeforge spell"] = [](PlayerbotAI* ai) { return new BestRuneForgeSpellValue(ai); };
-            creators["should runeforge"] = [](PlayerbotAI* ai) { return new ShouldRuneForgeValue(ai); };
         };
     };
 }

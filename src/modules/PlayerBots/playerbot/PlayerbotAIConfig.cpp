@@ -1297,54 +1297,6 @@ void PlayerbotAIConfig::LoadTalentSpecs()
                         talentPath.talentSpec.push_back(linkSpec);
                     }
 
-                    {
-                        //Glyphs
-
-                        using GlyphPriority = std::pair<std::string, uint32>;
-                        using GlyphPriorityList = std::vector<GlyphPriority>;
-                        using GlyphPriorityLevelMap = std::unordered_map<uint32, GlyphPriorityList>;
-                        using GlyphPrioritySpecMap = std::unordered_map<uint32, GlyphPriorityLevelMap>;
-
-                        std::ostringstream os; os << "AiPlayerbot.PremadeSpecGlyp." << cls << "." << spec << "." << level;
-
-                        std::string glyphList = config.GetStringDefault(os.str().c_str(), "");
-                        glyphList = glyphList.substr(0, glyphList.find("#", 0));
-                        botstr::trim_right(glyphList);
-
-                        if (!glyphList.empty())
-                        {
-                            Tokens premadeSpecGlyphs = Qualified::getMultiQualifiers(glyphList, ",");
-
-                            for (auto& glyph : premadeSpecGlyphs)
-                            {
-                                Tokens tokens = Qualified::getMultiQualifiers(glyph, "|");
-                                std::string glyphName = "Glyph of " + tokens[0];
-                                uint32 talentId = tokens.size() > 1 ? stoi(tokens[1]) : 0;
-
-                                bool glyphFound = false;
-                                for (auto& itemId : sRandomItemMgr.GetGlyphs(1 << (cls - 1)))
-                                {
-                                    ItemPrototype const* proto = sObjectMgr.GetItemPrototype(itemId);
-
-                                    if (!proto)
-                                        continue;
-
-                                    if (proto->Name1 == glyphName)
-                                    {
-                                        glyphPriorityMap[cls][spec][level].push_back(std::make_pair(itemId, talentId));
-                                        glyphFound = true;
-                                        break;
-                                    }
-                                }
-
-                                if (!glyphFound)
-                                {
-                                    sLog.outError("%s is not found for class %d (spec %d level %d)", glyphName.c_str(), cls, spec, level);
-                                }
-
-                            }
-                        }
-                    }
                 }
 
                 //Only add paths that have atleast 1 spec.

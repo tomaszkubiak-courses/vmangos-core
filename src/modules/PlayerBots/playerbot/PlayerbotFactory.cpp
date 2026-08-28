@@ -2642,12 +2642,6 @@ bool PlayerbotFactory::CheckItemStats(uint8 sp, uint8 ap, uint8 tank)
         if (!ap || sp > ap || sp > tank)
             return false;
         break;
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-        if ((!ap && !tank) || sp > ap || sp > tank)
-            return false;
-        break;
-#endif
     }
 
     return sp || ap || tank;
@@ -2923,15 +2917,6 @@ bool PlayerbotFactory::CanEquipWeapon(ItemPrototype const* proto)
             return false;
       }
       break;
-#ifdef MANGOSBOT_TWO
-   case CLASS_DEATH_KNIGHT:
-       if (proto->SubClass != ITEM_SUBCLASS_WEAPON_MACE2 &&
-           proto->SubClass != ITEM_SUBCLASS_WEAPON_POLEARM &&
-           proto->SubClass != ITEM_SUBCLASS_WEAPON_SWORD2 &&
-           proto->SubClass != ITEM_SUBCLASS_WEAPON_AXE2)
-           return false;
-       break;
-#endif
    }
 
    return true;
@@ -3508,9 +3493,6 @@ void PlayerbotFactory::InitEquipment(bool incremental, bool syncWithMaster, bool
 #ifdef MANGOSBOT_ONE
                     if (proto->IsWeapon() && slot == EQUIPMENT_SLOT_OFFHAND && (bot->GetClass() == CLASS_ROGUE || specId == 2 || specId == 21))
 #endif
-#ifdef MANGOSBOT_TWO
-                    if (proto->IsWeapon() && slot == EQUIPMENT_SLOT_OFFHAND && (bot->GetClass() == CLASS_ROGUE || specId == 2 || specId == 21 || bot->GetClass() == CLASS_DEATH_KNIGHT))
-#endif
                         {
                             bool betterValue = false;
                             bool betterDamage = false;
@@ -3938,9 +3920,6 @@ void PlayerbotFactory::InitTradeSkills()
         {
         case CLASS_WARRIOR:
         case CLASS_PALADIN:
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT:
-#endif
             firstSkills.push_back(SKILL_BLACKSMITHING);
             secondSkills.push_back(SKILL_ENGINEERING);
             break;
@@ -4003,9 +3982,6 @@ void PlayerbotFactory::InitTradeSkills()
     {
     case CLASS_WARRIOR:
     case CLASS_PALADIN:
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-#endif
         bot->LearnSpell(9788, false);  // armorsmith
         bot->LearnSpell(9788, false);  // armorsmith
         bot->LearnSpell(9787, false);  // weaponsmith
@@ -4259,17 +4235,6 @@ void PlayerbotFactory::InitSkills()
         SetRandomSkill(SKILL_AXES);
 #endif
         break;
-#ifdef MANGOSBOT_TWO
-    case CLASS_DEATH_KNIGHT:
-        SetRandomSkill(SKILL_SWORDS);
-        SetRandomSkill(SKILL_AXES);
-        SetRandomSkill(SKILL_MACES);
-        SetRandomSkill(SKILL_2H_SWORDS);
-        SetRandomSkill(SKILL_2H_MACES);
-        SetRandomSkill(SKILL_2H_AXES);
-        SetRandomSkill(SKILL_POLEARMS);
-        break;
-#endif
     }
 }
 

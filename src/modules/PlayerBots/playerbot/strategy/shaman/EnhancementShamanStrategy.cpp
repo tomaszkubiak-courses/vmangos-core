@@ -11,25 +11,21 @@ public:
     EnhancementShamanStrategyActionNodeFactory()
     {
         creators["stormstrike"] = &stormstrike;
-        creators["lava lash"] = &lava_lash;
         creators["searing totem"] = &searing_totem;
         creators["mana spring totem"] = &mana_spring_totem;
-        creators["magma totem"] = &magma_totem;
         creators["strength of earth totem"] = &strength_of_earth_totem;
         creators["windfury totem"] = &windfury_totem;
         creators["windfury weapon"] = &windfury_weapon;
     }
 
 private:
-    ACTION_NODE_A(stormstrike, "stormstrike", "lava lash");
+    ACTION_NODE_A(stormstrike, "stormstrike", "melee");
 
-    ACTION_NODE_A(lava_lash, "lava lash", "melee");
 
     ACTION_NODE_A(searing_totem, "searing totem", "flametongue totem");
 
     ACTION_NODE_A(mana_spring_totem, "mana spring totem", "healing stream totem");
 
-    ACTION_NODE_C(magma_totem, "magma totem", "fire nova");
 
     ACTION_NODE_A(strength_of_earth_totem, "strength of earth totem", "stoneskin totem");
 
@@ -153,10 +149,6 @@ void EnhancementShamanRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& tr
 void EnhancementShamanAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     ShamanAoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("fire nova", ACTION_HIGH), NULL)));
 
     triggers.push_back(new TriggerNode(
         "melee light aoe",
@@ -591,10 +583,6 @@ void EnhancementShamanAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
     ShamanAoeStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("fire nova", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "melee light aoe",
         NextAction::array(0, new NextAction("oil of immolation", ACTION_HIGH), NULL)));
 }
@@ -1025,10 +1013,6 @@ void EnhancementShamanRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& tr
 void EnhancementShamanAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     ShamanAoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("fire nova", ACTION_HIGH), NULL)));
 
     triggers.push_back(new TriggerNode(
         "melee light aoe",

@@ -1049,9 +1049,6 @@ void CombatRogueBoostStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& tr
         "blade flurry",
         NextAction::array(0, new NextAction("blade flurry", ACTION_HIGH + 4), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "killing spree",
-        NextAction::array(0, new NextAction("killing spree", ACTION_HIGH + 4), NULL)));
 }
 
 void CombatRogueBoostPveStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)

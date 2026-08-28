@@ -890,10 +890,6 @@ void PriestCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     CcStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "chastise",
-        NextAction::array(0, new NextAction("chastise", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "shackle undead",
         NextAction::array(0, new NextAction("shackle undead", ACTION_INTERRUPT), NULL)));
 
@@ -949,13 +945,6 @@ void PriestBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         "target of attacker",
         NextAction::array(0, new NextAction("elune's grace", ACTION_HIGH + 2), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "medium mana",
-        NextAction::array(0, new NextAction("symbol of hope", ACTION_HIGH + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "low mana",
-        NextAction::array(0, new NextAction("shadowfiend", ACTION_HIGH), NULL)));
 }
 
 void PriestBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1526,9 +1515,6 @@ void PriestBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         "target of attacker",
         NextAction::array(0, new NextAction("elune's grace", ACTION_HIGH + 1), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "low mana",
-        NextAction::array(0, new NextAction("shadowfiend", ACTION_HIGH), NULL)));
 }
 
 void PriestBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

@@ -11,14 +11,12 @@ public:
     WarlockStrategyActionNodeFactory()
     {
         creators["banish"] = &banish;
-        creators["fel armor"] = &fel_armor;
         creators["demon armor"] = &demon_armor;
     }
 
 private:
     ACTION_NODE_A(banish, "banish", "fear");
 
-    ACTION_NODE_A(fel_armor, "fel armor", "demon armor");
 
     ACTION_NODE_A(demon_armor, "demon armor", "demon skin");
 };
@@ -239,7 +237,7 @@ void WarlockBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "demon armor",
-        NextAction::array(0, new NextAction("fel armor", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("demon armor", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "soulstone",
@@ -613,10 +611,6 @@ void WarlockRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     ClassRaidStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "medium threat",
-        NextAction::array(0, new NextAction("soulshatter", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "has aggro",
         NextAction::array(0, new NextAction("shoot", ACTION_HIGH + 9), NULL)));
 }
@@ -639,10 +633,6 @@ void WarlockRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& triggers)
 void WarlockAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     AoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "seed of corruption on attacker",
-        NextAction::array(0, new NextAction("seed of corruption on attacker", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "corruption on attacker",
@@ -703,7 +693,7 @@ void WarlockBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "demon armor",
-        NextAction::array(0, new NextAction("fel armor", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("demon armor", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "soulstone",
@@ -1079,10 +1069,6 @@ void WarlockRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     ClassRaidStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "medium threat",
-        NextAction::array(0, new NextAction("soulshatter", ACTION_INTERRUPT), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "has aggro",
         NextAction::array(0, new NextAction("shoot", ACTION_HIGH + 9), NULL)));
 }
@@ -1105,10 +1091,6 @@ void WarlockRaidStrategy::InitDeadTriggers(std::list<TriggerNode*>& triggers)
 void WarlockAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     AoeStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "seed of corruption on attacker",
-        NextAction::array(0, new NextAction("seed of corruption on attacker", ACTION_HIGH + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "corruption on attacker",
@@ -1169,7 +1151,7 @@ void WarlockBuffStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "demon armor",
-        NextAction::array(0, new NextAction("fel armor", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("demon armor", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "soulstone",
@@ -1422,10 +1404,6 @@ void WarlockCursesRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
 void WarlockManualPetStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
     triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "often",
         NextAction::array(0, new NextAction("initialize pet", ACTION_NORMAL + 1), NULL)));
 }
@@ -1434,12 +1412,6 @@ void WarlockManualCurseStrategy::InitCombatTriggers(std::list<TriggerNode*>& tri
 {
     if (ai->HasStrategy("aoe", BotState::BOT_STATE_COMBAT))
     {
-        triggers.push_back(new TriggerNode(
-            triggerName + " on attacker",
-            NextAction::array(0, new NextAction(actionName + " on attacker", ACTION_HIGH + 1), NULL)));
     }
 
-    triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_HIGH), NULL)));
 }

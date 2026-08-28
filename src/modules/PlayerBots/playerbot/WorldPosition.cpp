@@ -522,9 +522,6 @@ std::string WorldPosition::getAreaName(const bool fullName, const bool zoneName)
 
 int32 WorldPosition::getAreaLevel() const
 {
-    if (this->mapId == 609)
-        return 1;
-
     if(GetArea())
         return sTravelMgr.GetAreaLevel(GetArea()->Id);
 
@@ -884,7 +881,7 @@ bool WorldPosition::loadMapAndVMap(uint32 mapId, uint32 instanceId, int x, int y
     std::string logName = "load_map_grid.csv";
 
     bool hasMmap = false;
-    if (mapId == 0 || mapId == 1 || mapId == 530 || mapId == 571)
+    if (mapId == 0 || mapId == 1)
         hasMmap = isMmapLoaded(mapId, 0, x, y);
     else
         hasMmap = isMmapLoaded(mapId, instanceId, x, y);
@@ -904,7 +901,7 @@ bool WorldPosition::loadMapAndVMap(uint32 mapId, uint32 instanceId, int x, int y
         // the world rather than the caller.
         isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(mapId, x, y);
 #else
-        if (mapId == 0 || mapId == 1 || mapId == 530 || mapId == 571)
+        if (mapId == 0 || mapId == 1)
         {
             isLoaded = MMAP::MMapFactory::createOrGetMMapManager()->loadMap(mapId, 0, x, y, 0);
         }

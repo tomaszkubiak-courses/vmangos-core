@@ -965,10 +965,6 @@ void RogueStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
                              new NextAction("feint", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "cloak of shadows",
-        NextAction::array(0, new NextAction("cloak of shadows", ACTION_INTERRUPT + 2), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "sprint",
         NextAction::array(0, new NextAction("sprint", ACTION_HIGH + 1), NULL)));
 }
@@ -1385,9 +1381,6 @@ void RoguePoisonsRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& tr
 
 void RogueManualPoisonStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
 {
-    triggers.push_back(new TriggerNode(
-        triggerName,
-        NextAction::array(0, new NextAction(actionName, ACTION_NORMAL), NULL)));
 }
 
 class RogueStealthedStrategyMultiplier : public Multiplier

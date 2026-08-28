@@ -4,42 +4,6 @@
 
 namespace ai
 {
-    // TurtleWoW Holy Paladin: Daybreak target finder.
-    // Daybreak (talent 460, capstone) procs on critical heals, applying
-    // buff "Daybreak" (spell 51322) to the healed ally for ~12 sec. The
-    // buff increases healing taken from FoL/HL/HS + max HP.
-    //
-    // This value class iterates the bot's party and returns the most
-    // damaged party member who has the Daybreak buff active. Used as
-    // the target lookup for a healing trigger that prioritizes already-
-    // Daybreak'd allies for efficient follow-up healing.
-    class PartyMemberWithDaybreakValue : public PartyMemberValue
-    {
-    public:
-        PartyMemberWithDaybreakValue(PlayerbotAI* ai)
-            : PartyMemberValue(ai, "party member with daybreak") {}
-
-    protected:
-        Unit* Calculate() override;
-    };
-
-    // Trigger fires when a party member has Daybreak AND is below 95% HP
-    // (so a heal would have somewhere to land). The associated action
-    // pivots the bot toward healing the Daybreak'd ally for boosted effect.
-    class PartyMemberHasDaybreakTrigger : public Trigger
-    {
-    public:
-        PartyMemberHasDaybreakTrigger(PlayerbotAI* ai)
-            : Trigger(ai, "party member has daybreak", 1) {}
-
-        virtual std::string GetTargetName() override { return "party member with daybreak"; }
-
-        virtual bool IsActive() override
-        {
-            return GetTarget() != nullptr;
-        }
-    };
-
     class NoPaladinAuraTrigger : public BuffTrigger
     {
     public:
@@ -52,7 +16,6 @@ namespace ai
     BUFF_TRIGGER(FireResistanceAuraTrigger, "fire resistance aura");
     BUFF_TRIGGER(DevotionAuraTrigger, "devotion aura");
     BUFF_TRIGGER(RetributionAuraTrigger, "retribution aura");
-    BUFF_TRIGGER(CrusaderAuraTrigger, "crusader aura");
     BUFF_TRIGGER(SanctityAuraTrigger, "sanctity aura");
     BUFF_TRIGGER(ConcentrationAuraTrigger, "concentration aura");
 
@@ -85,7 +48,6 @@ namespace ai
         bool IsActive() override;
     };
 
-    CD_TRIGGER(CrusaderStrikeTrigger, "crusader strike");
 
     // repentance triggers
     INTERRUPT_HEALER_TRIGGER(RepentanceOnHealerTrigger, "repentance on enemy healer");
@@ -517,6 +479,4 @@ namespace ai
         BlessingOfSacrificeTrigger(PlayerbotAI* ai) : PartyMemberLowHealthTrigger(ai, "blessing of sacrifice", sPlayerbotAIConfig.criticalHealth, 0, true) {}
     };
 
-    DEBUFF_TRIGGER(AvengerShieldTrigger, "avenger's shield");
-    BOOST_TRIGGER(DivineIlluminationBoostTrigger, "divine illumination");
 }

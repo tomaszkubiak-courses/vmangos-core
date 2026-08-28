@@ -10,13 +10,11 @@ public:
     HolyPriestStrategyActionNodeFactory()
     {
         creators["lightwell"] = &lightwell;
-        creators["circle of healing"] = &circle_of_healing;
     }
 
 private:
-    ACTION_NODE_A(lightwell, "lightwell", "circle of healing");
+    ACTION_NODE_A(lightwell, "lightwell", "prayer of healing");
 
-    ACTION_NODE_A(circle_of_healing, "circle of healing", "prayer of healing");
 };
 
 HolyPriestStrategy::HolyPriestStrategy(PlayerbotAI* ai) : PriestStrategy(ai)
@@ -160,7 +158,7 @@ void HolyPriestAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "medium aoe heal",
-        NextAction::array(0, new NextAction("circle of healing", ACTION_MEDIUM_HEAL), NULL)));
+        NextAction::array(0, new NextAction("prayer of healing", ACTION_MEDIUM_HEAL), NULL)));
 }
 
 void HolyPriestAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -413,9 +411,6 @@ void HolyPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         "party member almost full health",
         NextAction::array(0, new NextAction("renew on party", ACTION_LIGHT_HEAL), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "binding heal",
-        NextAction::array(0, new NextAction("binding heal", ACTION_LIGHT_HEAL), NULL)));
 }
 
 void HolyPriestStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -511,11 +506,7 @@ void HolyPriestAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "medium aoe heal",
-        NextAction::array(0, new NextAction("prayer of mending", ACTION_MEDIUM_HEAL + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "medium aoe heal",
-        NextAction::array(0, new NextAction("circle of healing", ACTION_MEDIUM_HEAL), NULL)));
+        NextAction::array(0, new NextAction("prayer of healing", ACTION_MEDIUM_HEAL), NULL)));
 }
 
 void HolyPriestAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -768,9 +759,6 @@ void HolyPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         "party member almost full health",
         NextAction::array(0, new NextAction("renew on party", ACTION_LIGHT_HEAL), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "binding heal",
-        NextAction::array(0, new NextAction("binding heal", ACTION_LIGHT_HEAL), NULL)));
 }
 
 void HolyPriestStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -866,11 +854,7 @@ void HolyPriestAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "medium aoe heal",
-        NextAction::array(0, new NextAction("prayer of mending", ACTION_MEDIUM_HEAL + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "medium aoe heal",
-        NextAction::array(0, new NextAction("circle of healing", ACTION_MEDIUM_HEAL), NULL)));
+        NextAction::array(0, new NextAction("prayer of healing", ACTION_MEDIUM_HEAL), NULL)));
 }
 
 void HolyPriestAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

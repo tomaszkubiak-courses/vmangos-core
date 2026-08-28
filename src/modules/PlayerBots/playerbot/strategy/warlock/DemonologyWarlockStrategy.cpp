@@ -698,9 +698,6 @@ void DemonologyWarlockPetPveStrategy::InitNonCombatTriggers(std::list<TriggerNod
     DemonologyWarlockPetStrategy::InitNonCombatTriggers(triggers);
     WarlockPetPveStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "no pet",
-        NextAction::array(0, new NextAction("summon felguard", ACTION_NORMAL + 2), NULL)));
 }
 
 void DemonologyWarlockPetPvpStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -714,9 +711,6 @@ void DemonologyWarlockPetPvpStrategy::InitNonCombatTriggers(std::list<TriggerNod
     DemonologyWarlockPetStrategy::InitNonCombatTriggers(triggers);
     WarlockPetPvpStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "no pet",
-        NextAction::array(0, new NextAction("summon felguard", ACTION_NORMAL + 2), NULL)));
 }
 
 void DemonologyWarlockPetRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1069,9 +1063,6 @@ void DemonologyWarlockPetPveStrategy::InitNonCombatTriggers(std::list<TriggerNod
     DemonologyWarlockPetStrategy::InitNonCombatTriggers(triggers);
     WarlockPetPveStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "no pet",
-        NextAction::array(0, new NextAction("summon felguard", ACTION_NORMAL + 2), NULL)));
 }
 
 void DemonologyWarlockPetPvpStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1085,9 +1076,6 @@ void DemonologyWarlockPetPvpStrategy::InitNonCombatTriggers(std::list<TriggerNod
     DemonologyWarlockPetStrategy::InitNonCombatTriggers(triggers);
     WarlockPetPvpStrategy::InitNonCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "no pet",
-        NextAction::array(0, new NextAction("summon felguard", ACTION_NORMAL + 2), NULL)));
 }
 
 void DemonologyWarlockPetRaidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)

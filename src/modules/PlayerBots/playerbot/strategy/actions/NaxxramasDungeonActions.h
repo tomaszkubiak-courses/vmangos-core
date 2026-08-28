@@ -28,4 +28,14 @@ namespace ai
     public:
         FourHorsemanDisableFightStrategyAction(PlayerbotAI* ai) : ChangeAllStrategyAction(ai, "disable four horseman fight strategy", "-four horseman") {}
     };
+
+    // Creature 16697 is the Void Zone the Four Horsemen drop under a player - see
+    // boss_four_horsemen.cpp. This lived with the Karazhan strategies until those were
+    // removed, because Netherspite drops void zones of its own in Karazhan; the entry
+    // the bot avoids has only ever been the Naxxramas one.
+    class VoidZoneMoveAwayAction : public MoveAwayFromCreature
+    {
+    public:
+        VoidZoneMoveAwayAction(PlayerbotAI* ai) : MoveAwayFromCreature(ai, "move away from void zone", 16697, 6.0f) {}
+    };
 }

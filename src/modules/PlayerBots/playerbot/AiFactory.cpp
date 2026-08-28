@@ -12,7 +12,6 @@
 #include "strategy/druid/DruidAiObjectContext.h"
 #include "strategy/hunter/HunterAiObjectContext.h"
 #include "strategy/rogue/RogueAiObjectContext.h"
-#include "strategy/deathknight/DKAiObjectContext.h"
 #include "Objects/Player.h"
 #include "playerbot/PlayerbotAIConfig.h"
 #include "playerbot/RandomPlayerbotMgr.h"
@@ -76,13 +75,6 @@ AiObjectContext* AiFactory::createAiObjectContext(Player* player, PlayerbotAI* a
             break;
         }
 
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT:
-        {
-            return new DKAiObjectContext(ai);
-            break;
-        }
-#endif
     }
     return new AiObjectContext(ai);
 }
@@ -249,24 +241,6 @@ BotRoles AiFactory::GetPlayerRoles(uint8 cls, uint8 tab)
             break;
         }
 
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT: {
-            if (tab == 0)
-            {
-                role = BOT_ROLE_TANK;
-            }
-            else if (tab == 1)
-            {
-                role = (BotRoles)(BOT_ROLE_TANK | BOT_ROLE_DPS);
-            }
-            else if (tab == 2)
-            {
-                role = BOT_ROLE_DPS;
-            }
-
-            break;
-        }
-#endif
         default: {
             role = BOT_ROLE_DPS;
             break;
@@ -539,26 +513,6 @@ void AiFactory::AddDefaultCombatStrategies(Player* player, PlayerbotAI* const fa
             break;
         }
 
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT:
-        {
-            if (tab == 0)
-            {
-                combatEngine->addStrategies("blood", "tank assist", "pull", "pull back", NULL);
-            }
-            else if (tab == 1)
-            {
-                combatEngine->addStrategies("frost", "frost aoe", "dps assist", NULL);
-            }
-            else
-            {
-                combatEngine->addStrategies("unholy", "unholy aoe", "dps assist", NULL);
-            }
-
-            combatEngine->addStrategies("dksquest", "dps assist", "flee", "close", "cc", NULL);
-            break;
-        }
-#endif
     }
 
     if (facade->IsRealPlayer() || sRandomPlayerbotMgr.IsFreeBot(player))
@@ -913,23 +867,6 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
             break;
         }
 
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT:
-        {
-            if (tab == 0)
-            {
-                nonCombatEngine->addStrategy("tank assist");
-            }
-            else
-            {
-                nonCombatEngine->addStrategy("dps assist");
-            }
-
-            nonCombatEngine->addStrategy("dksquest");
-
-            break;
-        }
-#endif
 
         default:
         {
@@ -980,7 +917,6 @@ void AiFactory::AddDefaultNonCombatStrategies(Player* player, PlayerbotAI* const
 
         nonCombatEngine->addStrategy("roll");
 #ifdef MANGOSBOT_TWO
-        nonCombatEngine->addStrategy("glyph");
 #endif
 
         // let 25% of free bots start duels.

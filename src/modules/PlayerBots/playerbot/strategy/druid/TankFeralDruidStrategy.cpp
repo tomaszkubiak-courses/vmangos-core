@@ -10,20 +10,14 @@ class TankFeralDruidStrategyActionNodeFactory : public NamedObjectFactory<Action
 public:
     TankFeralDruidStrategyActionNodeFactory()
     {
-        creators["survival instincts"] = &survival_instincts;
         creators["omen of clarity"] = &omen_of_clarity;
-        creators["feral charge - bear"] = &feral_charge_bear;
-        creators["mangle (bear)"] = &mangle_bear;
     }
 
 private:
-    ACTION_NODE_A(survival_instincts, "survival instincts", "barskin");
 
     ACTION_NODE_P(omen_of_clarity, "omen of clarity", "caster form");
 
-    ACTION_NODE_A(feral_charge_bear, "feral charge - bear", "reach melee");
 
-    ACTION_NODE_A(mangle_bear, "mangle (bear)", "maul");
 };
 
 TankFeralDruidStrategy::TankFeralDruidStrategy(PlayerbotAI* ai) : DruidStrategy(ai)
@@ -56,7 +50,7 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "enemy out of melee",
-        NextAction::array(0, new NextAction("feral charge - bear", ACTION_MOVE + 1), NULL)));
+        NextAction::array(0, new NextAction("reach melee", ACTION_MOVE + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "lose aggro",
@@ -68,7 +62,7 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "medium rage available",
-        NextAction::array(0, new NextAction("mangle (bear)", ACTION_NORMAL + 1), NULL)));
+        NextAction::array(0, new NextAction("maul", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "enemy too close for melee",
@@ -494,7 +488,7 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "critical health",
-        NextAction::array(0, new NextAction("survival instincts", ACTION_EMERGENCY), NULL)));
+        NextAction::array(0, new NextAction("barkskin", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
         "low health",
@@ -502,7 +496,7 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "enemy out of melee",
-        NextAction::array(0, new NextAction("feral charge - bear", ACTION_MOVE + 1), NULL)));
+        NextAction::array(0, new NextAction("reach melee", ACTION_MOVE + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "lose aggro",
@@ -513,12 +507,8 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
         NextAction::array(0, new NextAction("faerie fire (feral)", ACTION_HIGH + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "lacerate",
-        NextAction::array(0, new NextAction("lacerate", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "medium rage available",
-        NextAction::array(0, new NextAction("mangle (bear)", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("maul", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "enemy too close for melee",
@@ -940,7 +930,7 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "critical health",
-        NextAction::array(0, new NextAction("survival instincts", ACTION_EMERGENCY), NULL)));
+        NextAction::array(0, new NextAction("barkskin", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
         "low health",
@@ -948,7 +938,7 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
 
     triggers.push_back(new TriggerNode(
         "enemy out of melee",
-        NextAction::array(0, new NextAction("feral charge - bear", ACTION_MOVE + 1), NULL)));
+        NextAction::array(0, new NextAction("reach melee", ACTION_MOVE + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "lose aggro",
@@ -959,12 +949,8 @@ void TankFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigger
         NextAction::array(0, new NextAction("faerie fire (feral)", ACTION_HIGH + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "lacerate",
-        NextAction::array(0, new NextAction("lacerate", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "medium rage available",
-        NextAction::array(0, new NextAction("mangle (bear)", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("maul", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "enemy too close for melee",

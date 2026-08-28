@@ -88,11 +88,6 @@ struct ParsedUrl {
     bool https;
 };
 
-//GlyphPrioritySpecMap[specId][level] = {{glyphItemId, prereqTalentSpell}};
-using GlyphPriority = std::pair<uint32, uint32>;
-using GlyphPriorityList = std::vector<GlyphPriority>;
-using GlyphPriorityLevelMap = std::unordered_map<uint32, GlyphPriorityList>;
-using GlyphPrioritySpecMap = std::unordered_map<uint32, GlyphPriorityLevelMap>;
 
 class PlayerbotAIConfig
 {
@@ -214,7 +209,6 @@ public:
     std::map<ClassRacePair, uint32> fixedClassRaceCounts;
     uint32 levelProbability[PLAYER_STRONG_MAX_LEVEL + 1];   // see levelBucket in PlayerbotLoginMgr.h
     ClassSpecs classSpecs[MAX_CLASSES];
-    GlyphPrioritySpecMap glyphPriorityMap[MAX_CLASSES];
     bool gearProgressionSystemEnabled;
     uint32 gearProgressionSystemItemLevels[MAX_GEAR_PROGRESSION_LEVEL][2];
     int32 gearProgressionSystemItems[MAX_GEAR_PROGRESSION_LEVEL][MAX_CLASSES][4][SLOT_EMPTY];

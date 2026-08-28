@@ -3244,10 +3244,6 @@ void RandomPlayerbotMgr::Randomize(Player* bot)
     bool initialRandom = false;
     if (bot->GetLevel() <= sPlayerbotAIConfig.randombotStartingLevel)
         initialRandom = true;
-#ifdef MANGOSBOT_TWO
-    else if (bot->GetLevel() < 60 && bot->GetClass() == CLASS_DEATH_KNIGHT)
-        initialRandom = true;
-#endif
 
     // give bot random level if is above or below level sync
     if (!initialRandom && players.size() && sPlayerbotAIConfig.syncLevelWithPlayers)
@@ -3323,10 +3319,6 @@ void RandomPlayerbotMgr::RandomizeFirst(Player* bot)
     auto pmo = sPerformanceMonitor.start(PERF_MON_RNDBOT, "RandomizeFirst");
     uint32 level = urand(std::max(uint32(sWorld.getConfig(CONFIG_UINT32_START_PLAYER_LEVEL)), sPlayerbotAIConfig.randomBotMinLevel), maxLevel);
 
-#ifdef MANGOSBOT_TWO
-    if (bot->GetClass() == CLASS_DEATH_KNIGHT)
-        level = urand(std::max(bot->GetLevel(), sWorld.getConfig(CONFIG_UINT32_START_HEROIC_PLAYER_LEVEL)), std::max(sWorld.getConfig(CONFIG_UINT32_START_HEROIC_PLAYER_LEVEL), maxLevel));
-#endif
 
     if (urand(0, 100) < 100 * sPlayerbotAIConfig.randomBotMaxLevelChance && level < maxLevel)
         level = maxLevel;
@@ -3336,15 +3328,6 @@ void RandomPlayerbotMgr::RandomizeFirst(Player* bot)
         level = 60;
 #endif
 
-#ifdef MANGOSBOT_TWO
-    // do not allow level down death knights
-    if (bot->GetClass() == CLASS_DEATH_KNIGHT && level < sWorld.getConfig(CONFIG_UINT32_START_HEROIC_PLAYER_LEVEL))
-        return;
-
-    // only randomise death knights to min lvl 60
-    if (bot->GetClass() == CLASS_DEATH_KNIGHT && level < 60)
-        level = 60;
-#endif
 
     if (level == sWorld.getConfig(CONFIG_UINT32_START_PLAYER_LEVEL))
         return;
@@ -4031,14 +4014,6 @@ void RandomPlayerbotMgr::PrintStats(uint32 requesterGuid)
             else
                 dps++;
             break;
-#ifdef MANGOSBOT_TWO
-        case CLASS_DEATH_KNIGHT:
-            if (spec == 0)
-                tank++;
-            else
-                dps++;
-            break;
-#endif
         default:
             dps++;
             break;

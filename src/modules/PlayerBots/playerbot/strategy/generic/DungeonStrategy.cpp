@@ -20,8 +20,8 @@ void DungeonStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("enable blackwing lair strategy", 100.0f), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "enter karazhan",
-        NextAction::array(0, new NextAction("enable karazhan strategy", 100.0f), NULL)));
+        "enter naxxramas",
+        NextAction::array(0, new NextAction("enable naxxramas strategy", 100.0f), NULL)));
 }
 
 void DungeonStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -51,10 +51,10 @@ void DungeonStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
         NextAction::array(0, new NextAction("disable blackwing lair strategy", 100.0f), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "enter karazhan",
-        NextAction::array(0, new NextAction("enable karazhan strategy", 100.0f), NULL)));
+        "enter naxxramas",
+        NextAction::array(0, new NextAction("enable naxxramas strategy", 100.0f), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "leave karazhan",
-        NextAction::array(0, new NextAction("disable karazhan strategy", 100.0f), NULL)));
+        "leave naxxramas",
+        NextAction::array(0, new NextAction("disable naxxramas strategy", 100.0f), NULL)));
 }

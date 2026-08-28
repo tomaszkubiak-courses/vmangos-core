@@ -620,13 +620,6 @@ void DestructionWarlockCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
 {
     WarlockCcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "shadowfury interrupt",
-        NextAction::array(0, new NextAction("shadowfury", ACTION_INTERRUPT + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "shadowfury on snare target",
-        NextAction::array(0, new NextAction("shadowfury on snare target", ACTION_INTERRUPT), NULL)));
 }
 
 void DestructionWarlockCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -993,13 +986,6 @@ void DestructionWarlockCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
 {
     WarlockCcStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "shadowfury interrupt",
-        NextAction::array(0, new NextAction("shadowfury", ACTION_INTERRUPT + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "shadowfury on snare target",
-        NextAction::array(0, new NextAction("shadowfury on snare target", ACTION_INTERRUPT), NULL)));
 }
 
 void DestructionWarlockCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

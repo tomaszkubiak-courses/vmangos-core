@@ -15,7 +15,6 @@ bool CastPaladinAuraAction::Execute(Event& event)
     altAuras.push_back("shadow resistance aura");
     altAuras.push_back("fire resistance aura");
     altAuras.push_back("frost resistance aura");
-    altAuras.push_back("crusader aura");
 
     for (auto aura : altAuras)
     {
@@ -268,11 +267,7 @@ std::string CastBlessingOnPartyAction::GetBlessingForTarget(Unit* target)
             if (greater && blessing == "blessing of salvation" && target->IsPlayer())
             {
                 const uint8 playerClass = ((Player*)target)->GetClass();
-#ifdef MANGOSBOT_TWO
-                if (playerClass == CLASS_PALADIN || playerClass == CLASS_WARRIOR || playerClass == CLASS_DRUID || playerClass == CLASS_DEATH_KNIGHT)
-#else
                 if (playerClass == CLASS_PALADIN || playerClass == CLASS_WARRIOR || playerClass == CLASS_DRUID)
-#endif
                 {
                     break;
                 }

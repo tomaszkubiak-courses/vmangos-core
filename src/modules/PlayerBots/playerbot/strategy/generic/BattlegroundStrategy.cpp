@@ -188,57 +188,6 @@ void IsleStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
         "bg active",
         NextAction::array(0, new NextAction("bg check flag", 70.0f), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "timer",
-        NextAction::array(0, new NextAction("enter vehicle", 85.0f), NULL)));
-
-    /*triggers.push_back(new TriggerNode(
-        "random",
-        NextAction::array(0, new NextAction("leave vehicle", 80.0f), NULL)));*/
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("hurl boulder", 70.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("fire cannon", 70.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("napalm", 70.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "enemy is close",
-        NextAction::array(0, new NextAction("steam blast", 80.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("ram", 70.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "enemy is close",
-        NextAction::array(0, new NextAction("ram", 79.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "enemy out of melee",
-        NextAction::array(0, new NextAction("steam rush", 81.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("incendiary rocket", 70.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("rocket blast", 70.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("blade salvo", 71.0f), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "in vehicle",
-        NextAction::array(0, new NextAction("glaive throw", 70.0f), NULL)));
 }
 
 void IsleStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)

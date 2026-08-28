@@ -10,24 +10,18 @@ class DpsFeralDruidStrategyActionNodeFactory : public NamedObjectFactory<ActionN
 public:
     DpsFeralDruidStrategyActionNodeFactory()
     {
-        creators["survival instincts"] = &survival_instincts;
         creators["omen of clarity"] = &omen_of_clarity;
-        creators["feral charge - cat"] = &feral_charge_cat;
         creators["shred"] = &shred;
-        creators["mangle (cat)"] = &mangle_cat;
         creators["powershift"] = &powershift;
     }
 
 private:
-    ACTION_NODE_A(survival_instincts, "survival instincts", "barskin");
 
     ACTION_NODE_P(omen_of_clarity, "omen of clarity", "caster form");
 
-    ACTION_NODE_A(feral_charge_cat, "feral charge - cat", "reach melee");
 
-    ACTION_NODE_A(shred, "shred", "mangle (cat)");
+    ACTION_NODE_A(shred, "shred", "claw");
 
-    ACTION_NODE_A(mangle_cat, "mangle (cat)", "claw");
 
     ACTION_NODE_A(pounce, "pounce", "ravage");
 
@@ -49,16 +43,12 @@ public:
         creators["pounce"] = &pounce;
         creators["ravage"] = &ravage;
         creators["shred"] = &shred;
-        creators["mangle (cat)"] = &mangle_cat;
-        creators["feral charge - cat"] = &feral_charge_cat;
     }
 
 private:
-    ACTION_NODE_A(feral_charge_cat, "feral charge - cat", "reach melee");
 
-    ACTION_NODE_A(shred, "shred", "mangle (cat)");
+    ACTION_NODE_A(shred, "shred", "claw");
 
-    ACTION_NODE_A(mangle_cat, "mangle (cat)", "claw");
 
     ACTION_NODE_A(pounce, "pounce", "ravage");
 
@@ -108,7 +98,7 @@ void DpsFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "not behind target",
-        NextAction::array(0, new NextAction("mangle (cat)", ACTION_NORMAL), NULL)));
+        NextAction::array(0, new NextAction("claw", ACTION_NORMAL), NULL)));
 }
 
 void DpsFeralDruidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -246,9 +236,6 @@ void DpsFeralDruidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
 {
     DruidAoeStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("swipe (cat)", ACTION_HIGH), NULL)));
 }
 
 void DpsFeralDruidAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -619,7 +606,7 @@ void DpsFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "not behind target",
-        NextAction::array(0, new NextAction("mangle (cat)", ACTION_NORMAL), NULL)));
+        NextAction::array(0, new NextAction("claw", ACTION_NORMAL), NULL)));
 }
 
 void DpsFeralDruidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -741,9 +728,6 @@ void DpsFeralDruidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
 {
     DruidAoeStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("swipe (cat)", ACTION_HIGH), NULL)));
 }
 
 void DpsFeralDruidAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1094,7 +1078,7 @@ void DpsFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "enemy out of melee",
-        NextAction::array(0, new NextAction("feral charge - cat", ACTION_MOVE), NULL)));
+        NextAction::array(0, new NextAction("reach melee", ACTION_MOVE), NULL)));
 
     triggers.push_back(new TriggerNode(
         "faerie fire (feral)",
@@ -1118,7 +1102,7 @@ void DpsFeralDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers
 
     triggers.push_back(new TriggerNode(
         "not behind target",
-        NextAction::array(0, new NextAction("mangle (cat)", ACTION_NORMAL), NULL)));
+        NextAction::array(0, new NextAction("claw", ACTION_NORMAL), NULL)));
 }
 
 void DpsFeralDruidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1240,9 +1224,6 @@ void DpsFeralDruidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
 {
     DruidAoeStrategy::InitCombatTriggers(triggers);
 
-    triggers.push_back(new TriggerNode(
-        "melee medium aoe",
-        NextAction::array(0, new NextAction("swipe (cat)", ACTION_HIGH), NULL)));
 }
 
 void DpsFeralDruidAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

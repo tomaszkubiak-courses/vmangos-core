@@ -210,11 +210,8 @@ namespace ai
                 creators["4 combo"] = [](PlayerbotAI* ai) { return new ComboPointsAvailableTrigger(ai, 4); };
                 creators["sinister strike"] = [](PlayerbotAI* ai) { return new SpellCanBeCastedTrigger(ai, "sinister strike"); };
                 creators["hemorrhage"] = [](PlayerbotAI* ai) { return new SpellCanBeCastedTrigger(ai, "hemorrhage"); };
-                creators["killing spree"] = [](PlayerbotAI* ai) { return new RogueBoostBuffTrigger(ai, "killing spree"); };
                 creators["eviscerate"] = [](PlayerbotAI* ai) { return new EviscerateTrigger(ai); };
                 creators["blade flurry"] = [](PlayerbotAI* ai) { return new RogueBoostBuffTrigger(ai, "blade flurry"); };
-                //creators["tricks of the trade on tank"] = [](PlayerbotAI* ai) { return new TricksOfTheTradeOnTankTrigger(ai); };
-                creators["cloak of shadows"] = [](PlayerbotAI* ai) { return new CloakOfShadowsTrigger(ai); };
                 creators["fan of knives"] = [](PlayerbotAI* ai) { return new SpellCanBeCastedTrigger(ai, "fan of knives"); };
                 creators["riposte"] = [](PlayerbotAI* ai) { return new RiposteCastTrigger(ai); };
                 creators["apply deadly poison main hand"] = [](PlayerbotAI* ai) { return new ApplyDeadlyPoisonTrigger(ai, true); };
@@ -238,7 +235,6 @@ namespace ai
             AiObjectContextInternal()
             {
                 creators["riposte"] = [](PlayerbotAI* ai) { return new CastRiposteAction(ai); };
-                creators["mutilate"] = [](PlayerbotAI* ai) { return new CastMutilateAction(ai); };
                 creators["sinister strike"] = [](PlayerbotAI* ai) { return new CastSinisterStrikeAction(ai); };
                 creators["hemorrhage"] = [](PlayerbotAI* ai) { return new CastHemorrhageAction(ai); };
                 creators["ghostly strike"] = [](PlayerbotAI* ai) { return new CastGhostlyStrikeAction(ai); };
@@ -265,14 +261,10 @@ namespace ai
                 creators["unstealth"] = [](PlayerbotAI* ai) { return new RogueUnstealthAction(ai); };
                 creators["sap"] = [](PlayerbotAI* ai) { return new CastSapAction(ai); };
                 creators["check stealth"] = [](PlayerbotAI* ai) { return new CheckStealthAction(ai); };
-                creators["killing spree"] = [](PlayerbotAI* ai) { return new CastKillingSpreeAction(ai); };
-                creators["tricks of the trade"] = [](PlayerbotAI* ai) { return new CastTricksOfTheTradeOnPartyAction(ai); };
-                creators["cloak of shadows"] = [](PlayerbotAI* ai) { return new CastCloakOfShadowsAction(ai); };
                 //creators["fan of knives"] = [](PlayerbotAI* ai) { return new CastFanOfKnivesAction(ai); };
                 creators["cold blood"] = [](PlayerbotAI* ai) { return new CastColdBloodAction(ai); };
                 creators["preparation"] = [](PlayerbotAI* ai) { return new CastPreparationAction(ai); };
                 creators["premeditation"] = [](PlayerbotAI* ai) { return new CastPremeditationAction(ai); };
-                creators["shadowstep"] = [](PlayerbotAI* ai) { return new CastShadowstepAction(ai); };
                 creators["update pve strats"] = [](PlayerbotAI* ai) { return new UpdateRoguePveStrategiesAction(ai); };
                 creators["update pvp strats"] = [](PlayerbotAI* ai) { return new UpdateRoguePvpStrategiesAction(ai); };
                 creators["update raid strats"] = [](PlayerbotAI* ai) { return new UpdateRogueRaidStrategiesAction(ai); };

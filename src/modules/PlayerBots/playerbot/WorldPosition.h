@@ -126,10 +126,10 @@ namespace ai
         static void printWKT(const std::vector<WorldPosition>& points, std::ostringstream& out, const uint32 dim = 0, const bool loop = false);
         void printWKT(std::ostringstream& out) const { printWKT({ *this }, out); }
 
-        bool isOverworld() const { return this->mapId == 0 || this->mapId == 1 || this->mapId == 530 || this->mapId == 571 || this->mapId == 609; }
-        bool isBg() const { return this->mapId == 30 || this->mapId == 489 || this->mapId == 529 || this->mapId == 566 || this->mapId == 607 || this->mapId == 628; }
-        bool isArena() const { return this->mapId == 559 || this->mapId == 572 || this->mapId == 562 || this->mapId == 617 || this->mapId == 618; }
-        bool isInstance() const { return !isOverworld() || this->mapId == 609;}
+        bool isOverworld() const { return this->mapId == 0 || this->mapId == 1; }
+        bool isBg() const { return this->mapId == 30 || this->mapId == 489 || this->mapId == 529; }
+        bool isArena() const { return false; }
+        bool isInstance() const { return !isOverworld(); }
         bool isInWater() const { return getTerrain() ? getTerrain()->IsInWater(this->x, this->y, this->z) : false; };
         bool isUnderWater() const { return getTerrain() ? getTerrain()->IsUnderWater(this->x, this->y, this->z) : false; };
         bool setAtWaterSurface();

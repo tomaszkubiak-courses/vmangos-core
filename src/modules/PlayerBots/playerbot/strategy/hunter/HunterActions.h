@@ -28,13 +28,7 @@ public:
     BEGIN_RANGED_SPELL_ACTION(CastArcaneShotAction, "arcane shot")
     END_SPELL_ACTION()
 
-    BEGIN_RANGED_SPELL_ACTION(CastExplosiveShotAction, "explosive shot")
-    END_SPELL_ACTION()
-
     BEGIN_RANGED_SPELL_ACTION(CastAimedShotAction, "aimed shot")
-    END_SPELL_ACTION()
-
-    BEGIN_RANGED_SPELL_ACTION(CastChimeraShotAction, "chimera shot")
     END_SPELL_ACTION()
 
     BEGIN_RANGED_DEBUFF_ACTION(CastConcussiveShotAction, "concussive shot")
@@ -110,22 +104,10 @@ public:
         }
     };
 
-    class CastAspectOfTheViperAction : public CastBuffSpellAction
-    {
-    public:
-        CastAspectOfTheViperAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "aspect of the viper") {}
-    };
-
     class CastAspectOfTheBeastAction : public CastBuffSpellAction
     {
     public:
         CastAspectOfTheBeastAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "aspect of the beast") {}
-    };
-
-    class CastAspectOfTheDragonhawkAction : public CastBuffSpellAction
-    {
-    public:
-        CastAspectOfTheDragonhawkAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "aspect of the dragonhawk") {}
     };
 
     class CastCallPetAction : public CastBuffSpellAction
@@ -167,12 +149,6 @@ public:
         CastRapidFireAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "rapid fire") {}
     };
 
-    class CastKillCommandAction : public CastBuffSpellAction
-    {
-    public:
-        CastKillCommandAction(PlayerbotAI* ai) : CastBuffSpellAction(ai, "kill command") {}
-    };
-
     class CastBlackArrow : public CastRangedDebuffSpellAction
     {
     public:
@@ -180,8 +156,6 @@ public:
     };
 
     SNARE_ACTION(CastBlackArrowSnareAction, "black arrow");
-    SPELL_ACTION(CastSilencingShotAction, "silencing shot");
-    ENEMY_HEALER_ACTION(CastSilencingShotOnHealerAction, "silencing shot");
     BUFF_ACTION(CastReadinessAction, "readiness");
     ;
     class CastWingClipAction : public CastMeleeSpellAction
@@ -282,16 +256,6 @@ public:
     public:
         CastFlareAction(PlayerbotAI* ai) : CastSpellAction(ai, "flare") {}
         virtual std::string GetTargetName() override { return "nearest stealthed unit"; }
-    };
-
-    class CastSteadyShotAction : public CastSpellAction
-    {
-    public:
-        CastSteadyShotAction(PlayerbotAI* ai) : CastSpellAction(ai, "steady shot") {}
-        virtual bool Execute(Event& event);
-
-    private:
-        uint32 weaponDelay;
     };
 
     class TrapOnTargetAction : public CastSpellAction

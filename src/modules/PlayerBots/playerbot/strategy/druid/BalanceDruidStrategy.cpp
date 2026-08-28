@@ -10,7 +10,6 @@ class BalanceDruidStrategyActionNodeFactory : public NamedObjectFactory<ActionNo
 public:
     BalanceDruidStrategyActionNodeFactory()
     {
-        creators["starfall"] = &starfall;
         creators["starfire"] = &starfire;
         creators["innervate"] = &innervate;
     }
@@ -25,7 +24,6 @@ private:
             /*C*/ NULL);
     }
 
-    ACTION_NODE_A(starfall, "starfall", "hurricane");
 
     ACTION_NODE_A(starfire, "starfire", "wrath");
 };
@@ -63,22 +61,9 @@ void BalanceDruidStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         "faerie fire",
         NextAction::array(0, new NextAction("faerie fire", ACTION_NORMAL + 3), NULL)));
 
-    // TurtleWoW Balance redesign: Eclipse rotation swap.
-    // The capstone Eclipse talent (51444) procs Arcane Eclipse buff on Wrath
-    // crit (boosts Arcane = Starfire), and Nature Eclipse buff on Starfire
-    // crit (boosts Nature = Wrath). Each ~10-sec window with a 30-sec
-    // internal CD. We pivot to the boosted school during the buff.
-    //
-    // HIGH+3 priority: above the standard PVE rotation (NORMAL+0..+2) so the
-    // bot prioritizes Eclipse-boosted casts when the buff fires, but below
-    // health/utility triggers (HIGH+5+) so it doesn't override emergencies.
-    triggers.push_back(new TriggerNode(
-        "arcane eclipse",
-        NextAction::array(0, new NextAction("starfire", ACTION_HIGH + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "nature eclipse",
-        NextAction::array(0, new NextAction("wrath", ACTION_HIGH + 3), NULL)));
+    // Turtle's Eclipse rework had a rotation swap here, keyed on the "Arcane Eclipse"
+    // and "Nature Eclipse" buffs (spells 51442/51443 behind talent 320). Neither spell
+    // exists in 1.12, so the triggers could never fire.
 }
 
 void BalanceDruidStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -207,7 +192,7 @@ void BalanceDruidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigge
 
     triggers.push_back(new TriggerNode(
         "ranged high aoe",
-        NextAction::array(0, new NextAction("starfall", ACTION_HIGH), NULL)));
+        NextAction::array(0, new NextAction("hurricane", ACTION_HIGH), NULL)));
 }
 
 void BalanceDruidAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -604,7 +589,7 @@ void BalanceDruidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigge
 
     triggers.push_back(new TriggerNode(
         "ranged high aoe",
-        NextAction::array(0, new NextAction("starfall", ACTION_HIGH), NULL)));
+        NextAction::array(0, new NextAction("hurricane", ACTION_HIGH), NULL)));
 }
 
 void BalanceDruidAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1009,7 +994,7 @@ void BalanceDruidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigge
 
     triggers.push_back(new TriggerNode(
         "ranged high aoe",
-        NextAction::array(0, new NextAction("starfall", ACTION_HIGH), NULL)));
+        NextAction::array(0, new NextAction("hurricane", ACTION_HIGH), NULL)));
 }
 
 void BalanceDruidAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

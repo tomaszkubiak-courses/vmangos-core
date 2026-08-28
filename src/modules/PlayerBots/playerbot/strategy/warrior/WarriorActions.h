@@ -14,7 +14,6 @@ namespace ai
     MELEE_ACTION(CastChallengingShoutAction, "challenging shout");
     MELEE_DEBUFF_ACTION_R(CastIntimidatingShoutAction, "intimidating shout", 8.0f);
     // shouts 2.4.3
-    BUFF_ACTION(CastCommandingShoutAction, "commanding shout");
 
     // arms
     MELEE_ACTION(CastHeroicStrikeAction, "heroic strike");
@@ -28,15 +27,11 @@ namespace ai
     MELEE_ACTION(CastMockingBlowAction, "mocking blow");
     BUFF_ACTION(CastRetaliationAction, "retaliation");
     // arms 3.3.5
-    SPELL_ACTION(CastHeroicThrowAction, "heroic throw");
-    SNARE_ACTION(CastHeroicThrowSnareAction, "heroic throw");
-    RANGED_DEBUFF_ACTION(CastShatteringThrowAction, "shattering throw");
     
     // arms talents
     MELEE_ACTION(CastMortalStrikeAction, "mortal strike");
     BUFF_ACTION(CastSweepingStrikesAction, "sweeping strikes");
     // arms talents 3.3.5
-    BUFF_ACTION(CastBladestormAction, "bladestorm");
 
     // fury
     MELEE_ACTION(CastCleaveAction, "cleave");
@@ -51,17 +46,13 @@ namespace ai
     ENEMY_HEALER_ACTION(CastPummelOnEnemyHealerAction, "pummel");
     BUFF_ACTION(CastRecklessnessAction, "recklessness");
     // fury 2.4.3
-    MELEE_ACTION(CastVictoryRushAction, "victory rush");
     // fury 3.3.5
-    BUFF_ACTION(CastEnragedRegenerationAction, "enraged regeneration");
-    BUFF_ACTION(CastHeroicFuryAction, "heroic fury");
 
     // fury talents
     BUFF_ACTION(CastDeathWishAction, "death wish");
     MELEE_ACTION(CastBloodthirstAction, "bloodthirst");
     MELEE_DEBUFF_ACTION_R(CastPiercingHowlAction, "piercing howl", 8.0f);
     // fury talents 2.4.3
-    BUFF_ACTION(CastRampageAction, "rampage");
 
     // protection
     MELEE_ACTION_U(CastTauntAction, "taunt", GetTarget() && GetTarget()->GetVictim() && GetTarget()->GetVictim() != bot);
@@ -76,17 +67,13 @@ namespace ai
     BUFF_ACTION(CastShieldWallAction, "shield wall");
     // protection 2.4.3
     PROTECT_ACTION(CastInterveneAction, "intervene");
-    BUFF_ACTION(CastSpellReflectionAction, "spell reflection");
 
     // protection talents
     BUFF_ACTION(CastLastStandAction, "last stand");
     MELEE_ACTION(CastShieldSlamAction, "shield slam");
     MELEE_ACTION(CastConcussionBlowAction, "concussion blow");
     // protection talents 2.4.3
-    MELEE_ACTION(CastDevastateAction, "devastate");
     // protection talents 3.3.5
-    MELEE_DEBUFF_ACTION_R(CastShockwaveAction, "shockwave", 8.0f);
-    SNARE_ACTION(CastShockwaveSnareAction, "shockwave");
 
     class CastBattleShoutAction : public CastBuffSpellAction
     {

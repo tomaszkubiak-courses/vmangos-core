@@ -6,47 +6,11 @@
 
 using namespace ai;
 
-// TurtleWoW Holy Paladin: Daybreak target finder predicate.
-// Match a party member who has the Daybreak buff (spell 51322 specifically;
-// other "Daybreak" entries 50931 / 51323 are different mechanics — talent
-// passive and old vanilla effect respectively) AND HP < 95% (so the heal
-// has somewhere to land).
-class PlayerWithDaybreakPredicate : public FindPlayerPredicate, public PlayerbotAIAware
-{
-public:
-    PlayerWithDaybreakPredicate(PlayerbotAI* ai)
-        : PlayerbotAIAware(ai), FindPlayerPredicate() {}
-
-    virtual bool Check(Unit* unit) override
-    {
-        if (!unit || !sServerFacade.IsAlive(unit))
-            return false;
-        // 51322 is the Daybreak buff applied on crit-heals (boost healing
-        // taken + max HP). Distinct from 50931 (old) and 51323 (talent).
-        if (!ai->HasAura(51322, unit))
-            return false;
-        // Only return targets that actually need healing — top off allies
-        // already at full HP would waste the buff window.
-        uint32 hp = unit->GetHealth();
-        uint32 maxHp = unit->GetMaxHealth();
-        if (maxHp == 0)
-            return false;
-        return (hp * 100 / maxHp) < 95;
-    }
-};
-
-Unit* PartyMemberWithDaybreakValue::Calculate()
-{
-    PlayerWithDaybreakPredicate predicate(ai);
-    return FindPartyMember(predicate);
-}
-
 bool SealTrigger::IsActive()
 {
 	Unit* target = GetTarget();
 	return !ai->HasAura("seal of justice", target) &&
         !ai->HasAura("seal of command", target) &&
-        !ai->HasAura("seal of vengeance", target) &&
 		!ai->HasAura("seal of righteousness", target) &&
 		!ai->HasAura("seal of light", target) &&
         !ai->HasAura("seal of wisdom", target) &&
@@ -245,7 +209,6 @@ bool NoPaladinAuraTrigger::IsActive()
     altAuras.push_back("shadow resistance aura");
     altAuras.push_back("fire resistance aura");
     altAuras.push_back("frost resistance aura");
-    altAuras.push_back("crusader aura");
 
     for (auto aura : altAuras)
     {

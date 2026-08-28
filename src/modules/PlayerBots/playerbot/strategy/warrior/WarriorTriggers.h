@@ -7,19 +7,15 @@ namespace ai
     BUFF_TRIGGER(DefensiveStanceTrigger, "defensive stance");
     BUFF_TRIGGER(BerserkerStanceTrigger, "berserker stance");
     BUFF_TRIGGER(ShieldBlockTrigger, "shield block");
-    BUFF_TRIGGER_A(CommandingShoutTrigger, "commanding shout");
     DEBUFF_TRIGGER(RendDebuffTrigger, "rend");
     DEBUFF_TRIGGER(DisarmDebuffTrigger, "disarm");
     DEBUFF_TRIGGER_A(SunderArmorDebuffTrigger, "sunder armor");
     DEBUFF_TRIGGER(DemoralizingShoutDebuffTrigger, "demoralizing shout");
     DEBUFF_TRIGGER(MortalStrikeDebuffTrigger, "mortal strike");
     DEBUFF_ENEMY_TRIGGER(RendDebuffOnAttackerTrigger, "rend");
-    CAN_CAST_TRIGGER(DevastateAvailableTrigger, "devastate");
     CAN_CAST_TRIGGER(RevengeAvailableTrigger, "revenge");
     CAN_CAST_TRIGGER(OverpowerAvailableTrigger, "overpower");
-    BUFF_TRIGGER(RampageAvailableTrigger, "rampage");
     BUFF_TRIGGER_A(BloodrageBuffTrigger, "bloodrage");
-    CAN_CAST_TRIGGER(VictoryRushTrigger, "victory rush");
     HAS_AURA_TRIGGER(SwordAndBoardTrigger, "sword and board");
     SNARE_TRIGGER(ConcussionBlowTrigger, "concussion blow");
     SNARE_TRIGGER(HamstringTrigger, "hamstring");
@@ -29,8 +25,6 @@ namespace ai
     SNARE_TRIGGER(TauntSnareTrigger, "taunt");
     SNARE_TRIGGER(InterceptSnareTrigger, "intercept");
     CD_TRIGGER(InterceptCanCastTrigger, "intercept");
-    SNARE_TRIGGER(ShockwaveSnareTrigger, "shockwave");
-    DEBUFF_TRIGGER(ShockwaveTrigger, "shockwave");
     BOOST_TRIGGER(DeathWishTrigger, "death wish");
     BOOST_TRIGGER(RecklessnessTrigger, "recklessness");
     INTERRUPT_HEALER_TRIGGER(ShieldBashInterruptEnemyHealerSpellTrigger, "shield bash");
@@ -39,7 +33,6 @@ namespace ai
     INTERRUPT_TRIGGER(PummelInterruptSpellTrigger, "pummel");
     INTERRUPT_HEALER_TRIGGER(InterceptInterruptEnemyHealerSpellTrigger, "intercept");
     INTERRUPT_TRIGGER(InterceptInterruptSpellTrigger, "intercept");
-    DEFLECT_TRIGGER(SpellReflectionTrigger, "spell reflection");
     HAS_AURA_TRIGGER(SuddenDeathTrigger, "sudden death");
     HAS_AURA_TRIGGER(SlamInstantTrigger, "slam!");
     HAS_AURA_TRIGGER(TasteForBloodTrigger, "taste for blood");
@@ -147,34 +140,4 @@ namespace ai
         SlamTrigger(PlayerbotAI* ai) : SpellCanBeCastedTrigger(ai, "slam") {}
     };
 
-    // TurtleWoW Protection Warrior: Defensive Tactics 3/3 = 180% threat
-    // retention in non-Defensive stances when wearing a shield.
-    //
-    // At max rank, Berserker Stance retains MORE than 100% of Defiance's
-    // +30% threat boost AND adds +10% damage. The bot wants Berserker
-    // Stance whenever survival isn't at risk.
-    //
-    // This trigger fires when:
-    //   - Bot is missing Berserker Stance (BerserkerStanceTrigger semantics)
-    //   - Bot is in combat
-    //   - Bot HP > 70% (safety threshold)
-    //
-    // Only used in ProtectionWarriorStrategy — implied "DT talent + shield".
-    // If bot doesn't actually have DT or shield, the threat-retention won't
-    // hold and the existing "lose aggro" trigger will self-correct via
-    // Heroic Throw Taunt.
-    class DefensiveTacticsBerserkerStanceTrigger : public BerserkerStanceTrigger
-    {
-    public:
-        DefensiveTacticsBerserkerStanceTrigger(PlayerbotAI* ai) : BerserkerStanceTrigger(ai) {}
-
-        virtual bool IsActive() override
-        {
-            if (!BerserkerStanceTrigger::IsActive())
-                return false;
-            if (!sServerFacade.IsInCombat(bot))
-                return false;
-            return AI_VALUE2(uint8, "health", "self target") > 70;
-        }
-    };
 }

@@ -10,15 +10,11 @@ class ProtectionPaladinStrategyActionNodeFactory : public NamedObjectFactory<Act
 public:
     ProtectionPaladinStrategyActionNodeFactory()
     {
-        creators["seal of vengeance"] = &seal_of_vengeance;
-        creators["hand of reckoning"] = &hand_of_reckoning;
         creators["judgement"] = &judgement;
     }
 
 private:
-    ACTION_NODE_A(seal_of_vengeance, "seal of vengeance", "seal of righteousness");
 
-    ACTION_NODE_A(hand_of_reckoning, "hand of reckoning", "righteous defense");
 
     ACTION_NODE_A(judgement, "judgement", "exorcism");
 };
@@ -48,14 +44,6 @@ void ProtectionPaladinStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
         NextAction::array(0, new NextAction("remove greater blessing of salvation", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "lose aggro",
-        NextAction::array(0, new NextAction("hand of reckoning", ACTION_MOVE), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "holy shield",
-        NextAction::array(0, new NextAction("holy shield", ACTION_HIGH + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "medium mana",
         NextAction::array(0, new NextAction("seal of wisdom", ACTION_HIGH + 1), NULL)));
 
@@ -65,7 +53,7 @@ void ProtectionPaladinStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
 
     triggers.push_back(new TriggerNode(
         "seal",
-        NextAction::array(0, new NextAction("seal of vengeance", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("seal of command", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "judgement",
@@ -562,14 +550,6 @@ void ProtectionPaladinStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
         NextAction::array(0, new NextAction("remove greater blessing of salvation", ACTION_EMERGENCY), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "lose aggro",
-        NextAction::array(0, new NextAction("hand of reckoning", ACTION_MOVE), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "holy shield",
-        NextAction::array(0, new NextAction("holy shield", ACTION_HIGH + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "low mana",
         NextAction::array(0, new NextAction("seal of wisdom", ACTION_HIGH + 1), NULL)));
 
@@ -579,7 +559,7 @@ void ProtectionPaladinStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
 
     triggers.push_back(new TriggerNode(
         "seal",
-        NextAction::array(0, new NextAction("seal of vengeance", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("seal of command", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "judgement",
@@ -705,9 +685,6 @@ void ProtectionPaladinAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
         "consecration",
         NextAction::array(0, new NextAction("consecration", ACTION_HIGH), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "avenger's shield",
-        NextAction::array(0, new NextAction("avenger's shield", ACTION_HIGH), NULL)));
 }
 
 void ProtectionPaladinAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1068,14 +1045,6 @@ void ProtectionPaladinStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
     PaladinStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "lose aggro",
-        NextAction::array(0, new NextAction("hand of reckoning", ACTION_MOVE), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "holy shield",
-        NextAction::array(0, new NextAction("holy shield", ACTION_HIGH + 3), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "medium mana",
         NextAction::array(0, new NextAction("judgement of wisdom", ACTION_HIGH + 2), NULL)));
 
@@ -1089,7 +1058,7 @@ void ProtectionPaladinStrategy::InitCombatTriggers(std::list<TriggerNode*>& trig
 
     triggers.push_back(new TriggerNode(
         "seal",
-        NextAction::array(0, new NextAction("seal of vengeance", ACTION_NORMAL + 2), NULL)));
+        NextAction::array(0, new NextAction("seal of command", ACTION_NORMAL + 2), NULL)));
 
     triggers.push_back(new TriggerNode(
         "judgement of light",
@@ -1209,20 +1178,12 @@ void ProtectionPaladinAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& t
 
     triggers.push_back(new TriggerNode(
         "melee light aoe",
-        NextAction::array(0, new NextAction("hammer of the righteous", ACTION_HIGH + 3),
-                             new NextAction("avenger's shield", ACTION_HIGH + 2), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "melee light aoe",
         NextAction::array(0, new NextAction("consecration", ACTION_HIGH + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "consecration",
         NextAction::array(0, new NextAction("consecration", ACTION_HIGH), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "avenger's shield",
-        NextAction::array(0, new NextAction("avenger's shield", ACTION_HIGH), NULL)));
 }
 
 void ProtectionPaladinAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

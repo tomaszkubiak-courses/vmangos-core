@@ -9,11 +9,9 @@ class ShadowPriestStrategyActionNodeFactory : public NamedObjectFactory<ActionNo
 public:
     ShadowPriestStrategyActionNodeFactory()
     {
-        creators["dispersion"] = &dispersion;
     }
 
 private:
-    ACTION_NODE_A(dispersion, "dispersion", "mana potion");
 };
 
 ShadowPriestStrategy::ShadowPriestStrategy(PlayerbotAI* ai) : PriestStrategy(ai)
@@ -56,29 +54,9 @@ void ShadowPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
         "no mana",
         NextAction::array(0, new NextAction("shoot", ACTION_NORMAL), NULL)));
 
-    // TurtleWoW build additions:
-    //
-    // Vampiric Touch (Shadow 5/2, 2/2): debuff that boosts Vampiric Embrace
-    // healing and adds party mana feedback (% of Shadow damage as mana).
-    // The "mana battery" half of the Shadow Priest's role — without this,
-    // VE alone heals but doesn't restore mana.
-    triggers.push_back(new TriggerNode(
-        "vampiric touch",
-        NextAction::array(0, new NextAction("vampiric touch", ACTION_NORMAL + 3), NULL)));
-
-    // Silence (Shadow 5/1, 1/1): caster-mob interrupt. 5-sec silence,
-    // 45-sec CD. Pairs with priority-target tracking so we silence
-    // healers / heavy-spell mobs over melee.
-    triggers.push_back(new TriggerNode(
-        "silence",
-        NextAction::array(0, new NextAction("silence", ACTION_INTERRUPT), NULL)));
-
-    // Shadowfiend mana refill on long fights. Baseline class ability in
-    // Turtle 1.18 (verify in-game). 5-min CD; pet attacks target and
-    // returns mana to caster on each hit. ~50% of mana pool refill.
-    triggers.push_back(new TriggerNode(
-        "shadowfiend",
-        NextAction::array(0, new NextAction("shadowfiend", ACTION_HIGH + 5), NULL)));
+    // Vampiric Touch, Silence and Shadowfiend were added here from the Turtle build.
+    // All three arrive with TBC, so on 1.12 each resolved to spell id 0 and the
+    // triggers never fired. The expansion blocks further down keep them.
 
     // Inner Focus → Mind Blast: pre-buff for guaranteed Mind Blast crit
     // when mana is low. The crit triggers Spirit Tap (+100% Spirit + 50%
@@ -346,15 +324,9 @@ void ShadowPriestBoostRaidStrategy::InitNonCombatTriggers(std::list<TriggerNode*
 
 void ShadowPriestCcStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
 {
+    // Silence is a TBC talent. The shadow priest's crowd control on 1.12 is what
+    // PriestCcStrategy already gives it - Shackle Undead and Psychic Scream.
     PriestCcStrategy::InitCombatTriggers(triggers);
-
-    triggers.push_back(new TriggerNode(
-        "silence",
-        NextAction::array(0, new NextAction("silence", ACTION_INTERRUPT + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "silence on enemy healer",
-        NextAction::array(0, new NextAction("silence on enemy healer", ACTION_INTERRUPT), NULL)));
 }
 
 void ShadowPriestCcStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -457,10 +429,6 @@ void ShadowPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     PriestStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "target critical health",
-        NextAction::array(0, new NextAction("shadow word: death", ACTION_HIGH + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "mind blast",
         NextAction::array(0, new NextAction("mind blast", ACTION_HIGH), NULL)));
 
@@ -479,10 +447,6 @@ void ShadowPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "hex of weakness",
         NextAction::array(0, new NextAction("hex of weakness", ACTION_NORMAL + 2), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "vampiric touch",
-        NextAction::array(0, new NextAction("vampiric touch", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "no mana",
@@ -584,9 +548,6 @@ void ShadowPriestAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigge
         "shadow word: pain on attacker",
         NextAction::array(0, new NextAction("shadow word: pain on attacker", ACTION_HIGH + 1), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "vampiric touch on attacker",
-        NextAction::array(0, new NextAction("vampiric touch on attacker", ACTION_HIGH), NULL)));
 }
 
 void ShadowPriestAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -843,10 +804,6 @@ void ShadowPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     PriestStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "target critical health",
-        NextAction::array(0, new NextAction("shadow word: death", ACTION_HIGH + 1), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "mind blast",
         NextAction::array(0, new NextAction("mind blast", ACTION_HIGH), NULL)));
 
@@ -865,10 +822,6 @@ void ShadowPriestStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "hex of weakness",
         NextAction::array(0, new NextAction("hex of weakness", ACTION_NORMAL + 2), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "vampiric touch",
-        NextAction::array(0, new NextAction("vampiric touch", ACTION_NORMAL + 1), NULL)));
 
     triggers.push_back(new TriggerNode(
         "no mana",
@@ -970,9 +923,6 @@ void ShadowPriestAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigge
         "shadow word: pain on attacker",
         NextAction::array(0, new NextAction("shadow word: pain on attacker", ACTION_HIGH + 1), NULL)));
 
-    triggers.push_back(new TriggerNode(
-        "vampiric touch on attacker",
-        NextAction::array(0, new NextAction("vampiric touch on attacker", ACTION_HIGH), NULL)));
 }
 
 void ShadowPriestAoeStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
@@ -1031,7 +981,7 @@ void ShadowPriestBuffStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
     /*
     triggers.push_back(new TriggerNode(
         "low mana",
-        NextAction::array(0, new NextAction("dispersion", ACTION_EMERGENCY + 5), NULL)));
+        NextAction::array(0, new NextAction("mana potion", ACTION_EMERGENCY + 5), NULL)));
     */
 }
 

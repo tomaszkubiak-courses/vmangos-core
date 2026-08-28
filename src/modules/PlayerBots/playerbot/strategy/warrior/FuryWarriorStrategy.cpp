@@ -626,10 +626,6 @@ void FuryWarriorBoostStrategy::InitCombatTriggers(std::list<TriggerNode*>& trigg
     WarriorBoostStrategy::InitCombatTriggers(triggers);
 
     triggers.push_back(new TriggerNode(
-        "rampage",
-        NextAction::array(0, new NextAction("rampage", ACTION_HIGH), NULL)));
-
-    triggers.push_back(new TriggerNode(
         "recklessness",
         NextAction::array(0, new NextAction("recklessness", ACTION_HIGH), NULL)));
 }
