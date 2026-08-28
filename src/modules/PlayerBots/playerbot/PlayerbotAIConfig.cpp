@@ -585,7 +585,7 @@ bool PlayerbotAIConfig::Initialize()
     inviteChat = config.GetBoolDefault("AiPlayerbot.InviteChat", true);
     botsSilent = config.GetBoolDefault("AiPlayerbot.BotsSilent", false);
     enableActionLog = config.GetBoolDefault("AiPlayerbot.EnableActionLog", false);
-    botLogFile = config.GetStringDefault("AiPlayerbot.BotLogFile", "bots.log");
+    botLogFile = config.GetStringDefault("AiPlayerbot.BotLogFile", "");
     {
         std::string logsDir = sConfig.GetStringDefault("LogsDir", "");
         bool botLogDebug = config.GetBoolDefault("AiPlayerbot.BotLogDebug", false);
