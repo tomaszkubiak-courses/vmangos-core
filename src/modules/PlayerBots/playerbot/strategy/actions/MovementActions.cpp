@@ -2633,9 +2633,18 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
     WorldPosition endPosition(obj->GetMapId(), endPoint.x, endPoint.y, endPoint.z);
     endPosition.setZ(endPosition.getHeight());
 
+    MotionMaster& mm = *bot->GetMotionMaster();
+
+    // Everything from here to the MoveChase fallback only exists to route around hazards, and
+    // GeneratePathAvoidingHazards gives up immediately when there are none. Without this guard
+    // a bot with no hazard nearby still paid for a full canPathTo() navmesh run inside
+    // IsValidPosition and a second one in getPathTo(), every chase tick, and then fell through
+    // to MoveChase regardless.
+    const bool hasHazards = !AI_VALUE(std::list<HazardPosition>, "hazards").empty();
+
     // Check if the end position is inside a hazard
     HazardPosition hazardPosition;
-    if (IsHazardNearPosition(endPosition, &hazardPosition))
+    if (hasHazards && IsHazardNearPosition(endPosition, &hazardPosition))
     {
         // Try to generate a nearby position outside the hazard
         const Vector3 hazardPoint = hazardPosition.first.getVector3();
@@ -2663,10 +2672,8 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
         }
     }
 
-    MotionMaster& mm = *bot->GetMotionMaster();
-
     // Prevent moving if requested to move into a hazard
-    if (IsValidPosition(endPosition, botPosition))
+    if (hasHazards && IsValidPosition(endPosition, botPosition))
     {
         std::vector<WorldPosition> path = botPosition.getPathTo(endPosition,bot);
         if (GeneratePathAvoidingHazards(path))
@@ -2685,9 +2692,9 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
             WaitForReach(distance);
             return true;
         }
-        sLog.outDetail("[BOT CHASE] %s -> %s: dist=%.1f no hazard-avoidance path (no hazards or unroutable), using MoveChase", bot->GetName(), obj->GetName(), distanceToTarget);
+        sLog.outDetail("[BOT CHASE] %s -> %s: dist=%.1f hazards present but unroutable, using MoveChase", bot->GetName(), obj->GetName(), distanceToTarget);
     }
-    else
+    else if (hasHazards)
     {
         sLog.outDetail("[BOT CHASE] %s -> %s: dist=%.1f endPos invalid, falling back", bot->GetName(), obj->GetName(), distanceToTarget);
     }
