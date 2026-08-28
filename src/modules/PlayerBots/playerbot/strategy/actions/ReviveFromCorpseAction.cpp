@@ -75,6 +75,49 @@ bool ReviveFromCorpseAction::Execute(Event& event)
     return true;
 }
 
+// How long a ghost may keep moving without getting any closer to its corpse before the corpse
+// run is written off. A genuine corpse run closes distance continuously, so this only needs to
+// be long enough to cover pathing around an obstacle.
+static const uint32 CORPSE_RUN_STALL_SECONDS = 60;
+
+// How much closer the bot has to get for it to count as progress, in yards. Large enough that
+// jitter around a stuck position does not keep resetting the clock.
+static const float CORPSE_RUN_PROGRESS_YARDS = 1.0f;
+
+bool FindCorpseAction::IsClosingOnCorpse(Corpse* corpse, float corpseDist)
+{
+    time_t const now = time(nullptr);
+    ObjectGuid const corpseGuid = corpse->GetObjectGuid();
+
+    // A different corpse means a different run; start the measurement over.
+    if (m_progressCorpse != corpseGuid)
+    {
+        m_progressCorpse = corpseGuid;
+        m_bestCorpseDist = corpseDist;
+        m_lastProgress = now;
+        return true;
+    }
+
+    if (corpseDist < m_bestCorpseDist - CORPSE_RUN_PROGRESS_YARDS)
+    {
+        m_bestCorpseDist = corpseDist;
+        m_lastProgress = now;
+        return true;
+    }
+
+    // Getting further away is not progress, but it does mean the bot was moved rather than
+    // stuck - a repop or a random teleport. Re-baseline from where it is now instead of
+    // measuring against a distance it can no longer beat.
+    if (corpseDist > m_bestCorpseDist + CORPSE_RUN_PROGRESS_YARDS)
+    {
+        m_bestCorpseDist = corpseDist;
+        m_lastProgress = now;
+        return true;
+    }
+
+    return uint32(now - m_lastProgress) < CORPSE_RUN_STALL_SECONDS;
+}
+
 bool FindCorpseAction::Execute(Event& event)
 {
     if (bot->InBattleGround())
@@ -242,6 +285,8 @@ bool FindCorpseAction::Execute(Event& event)
     }
     else
     {
+        bool const closingOnCorpse = IsClosingOnCorpse(corpse, corpseDist);
+
 #ifndef MANGOSBOT_ZERO
         if (bot->IsMovingIgnoreFlying())
             moved = true;
@@ -249,6 +294,23 @@ bool FindCorpseAction::Execute(Event& event)
         if ((!bot->IsStopped()))
             moved = true;
 #endif
+        // Being in motion was taken as being on the way. A bot circling, or walking into
+        // something it cannot path past, satisfies that test on every tick and so kept the
+        // corpse run alive indefinitely - MoveTo was never even called, which is why the
+        // collapsed-path counter in MoveTo2 could not catch this case. Only the ten minute
+        // move-long-stuck repop ever ended it.
+        if (moved && !closingOnCorpse)
+        {
+            sLog.outDetail("[BOT CORPSE] %s: find corpse - moving but no closer than %.1f for %us, abandoning the corpse run",
+                bot->GetName(), m_bestCorpseDist, CORPSE_RUN_STALL_SECONDS);
+
+            moved = false;
+            if (!ai->HasActivePlayerMaster())
+                moved = ai->DoSpecificAction("spirit healer", Event(), true);
+
+            return moved;
+        }
+
         if (moved)
         {
             sLog.outDetail("[BOT CORPSE] %s: find corpse - already moving towards corpse", bot->GetName());
