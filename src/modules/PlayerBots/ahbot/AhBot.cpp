@@ -102,6 +102,15 @@ void activateAhbotThread()
 
 void AhBot::Update()
 {
+    // Nothing below is worth doing when the auction bot is off, and the cost of
+    // finding that out later was not free: with no ahbot.conf present the config
+    // never loads, so updateInterval stays at zero and every world tick passed
+    // the check below, logged a line, and detached a thread whose only job was
+    // to notice that AhBot is disabled and return. A run of a little over an
+    // hour spent 164000 log lines and as many threads on that.
+    if (!sAhBotConfig.enabled)
+        return;
+
     if (sWorld.IsShutdowning())
         return;
 

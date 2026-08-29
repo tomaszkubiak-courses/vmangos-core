@@ -6,7 +6,18 @@ std::vector<std::string> split(const std::string &s, char delim);
 INSTANTIATE_SINGLETON_1(AhBotConfig);
 
 AhBotConfig::AhBotConfig()
+    : enabled(false), guid(0), updateInterval(900), historyDays(30), maxSellInterval(3600 * 8),
+      itemBuyMinInterval(600), itemBuyMaxInterval(7200),
+      itemSellMinInterval(600), itemSellMaxInterval(7200),
+      alwaysAvailableMoney(200000), priceMultiplier(1.0f), priceQualityMultiplier(1.0f),
+      defaultMinPrice(20), stackReducePrice(1000000),
+      maxItemLevel(199), maxRequiredLevel(80),
+      underPriceProbability(0.05f), sendmail(true)
 {
+    // Initialize() returns early when there is no ahbot.conf to read, so these
+    // are the values the rest of the module sees on a server that never
+    // configured the auction bot. They used to be whatever zero-initialised
+    // static storage left behind, which made the update interval zero.
 }
 
 template <class T>
@@ -38,6 +49,11 @@ bool AhBotConfig::Initialize()
 
     guid = (uint64)config.GetIntDefault("AhBot.GUID", 0);
     updateInterval = config.GetIntDefault("AhBot.UpdateIntervalInSeconds", 900);
+    if (!updateInterval)
+    {
+        sLog.outError("[AhBot] AhBot.UpdateIntervalInSeconds is 0, which would run an auction check every world tick. Using 900.");
+        updateInterval = 900;
+    }
     historyDays = config.GetIntDefault("AhBot.History.Days", 30);
     itemBuyMinInterval = config.GetIntDefault("AhBot.ItemBuyMinInterval", 600);
     itemBuyMaxInterval = config.GetIntDefault("AhBot.ItemBuyMaxInterval", 7200);
