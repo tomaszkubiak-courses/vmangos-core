@@ -1987,6 +1987,25 @@ void GameObject::Use(Unit* user)
             return;
         }
 #endif
+        case GAMEOBJECT_TYPE_TEXT:                          //9 books, plaques, signs
+        {
+            if (user->GetTypeId() != TYPEID_PLAYER)
+                return;
+
+            // The client opens its page-text window when it gets this, then
+            // asks for the content with CMSG_PAGE_TEXT_QUERY - which
+            // HandlePageTextQueryOpcode already answers, and already accepts
+            // a GAMEOBJECT_TYPE_TEXT guid for. Only the reply to the use was
+            // missing, so every book a player clicked logged an error.
+            WorldPacket data(SMSG_GAMEOBJECT_PAGETEXT, 8);
+            data << GetObjectGuid();
+            ((Player*)user)->GetSession()->SendPacket(&data);
+            return;
+        }
+        case GAMEOBJECT_TYPE_MAILBOX:                       //19
+            // Nothing to do on use: the client follows up with
+            // CMSG_GET_MAIL_LIST, which is where mail is actually served.
+            return;
         default:
             sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "GameObject::Use unhandled GameObject type %u (entry %u).", GetGoType(), GetEntry());
             break;
