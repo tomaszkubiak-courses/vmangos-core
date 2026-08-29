@@ -255,6 +255,25 @@ PlayerbotAI::~PlayerbotAI()
         delete aiObjectContext;
 }
 
+// Revalidate the cached master pointer against ObjectAccessor BEFORE any
+// code path can deref it. If the master Player was destroyed since
+// SetMaster() was called (typical when master logs out / disconnects),
+// FindPlayer returns nullptr or a different live pointer. We null `master`
+// defensively. The masterGuid shadow (set in SetMaster, see PlayerbotAI.h)
+// is the safe lookup key - we never deref the cached `master` pointer here.
+void PlayerbotAI::RevalidateMasterPointer()
+{
+    if (!master)
+        return;
+
+    Player* live = masterGuid ? sObjectAccessor.FindPlayer(masterGuid) : nullptr;
+    if (live != master)
+    {
+        master = nullptr;
+        masterGuid = ObjectGuid();
+    }
+}
+
 void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 {
     AiObjectContext* context = aiObjectContext;
@@ -263,23 +282,7 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 
     SC_PHASE("UpdateAI.entry", bot ? bot->GetName() : "(null)");
 
-    // revalidate the
-    // cached master pointer against ObjectAccessor BEFORE any code
-    // path can deref it. If the master Player was destroyed since
-    // SetMaster() was called (typical when master logs out /
-    // disconnects), FindPlayer returns nullptr or a different live
-    // pointer. We null `master` defensively. The masterGuid shadow
-    // (set in SetMaster, see PlayerbotAI.h) is the safe lookup key —
-    // we never deref the cached `master` pointer in this check.
-    if (master)
-    {
-        Player* live = masterGuid ? sObjectAccessor.FindPlayer(masterGuid) : nullptr;
-        if (live != master)
-        {
-            master = nullptr;
-            masterGuid = ObjectGuid();
-        }
-    }
+    RevalidateMasterPointer();
 
     if(aiInternalUpdateDelay > elapsed)
     {
@@ -1894,7 +1897,11 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
                     if (bot->InBattleGround() && !(isMentioned || (msgtype != CHAT_MSG_CHANNEL && !isFromFreeBot)))
                         return;
 
-                    if (HasRealPlayerMaster() && guid1 != GetMaster()->GetObjectGuid())
+                    // A channel broadcast reaches this bot from whichever map
+                    // thread the speaker is on, not from this bot's own tick, so
+                    // `master` has not been revalidated since it was cached.
+                    RevalidateMasterPointer();
+                    if (HasRealPlayerMaster() && guid1 != masterGuid)
                         return;
 
                     if (lang == LANG_ADDON)
