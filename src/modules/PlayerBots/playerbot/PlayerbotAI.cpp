@@ -294,8 +294,17 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
         isWaiting = false;
     }
 
-    // cancel logout in combat
-    if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+    // Cancel a pending logout that combat has invalidated.
+    //
+    // This used to also fire on UNIT_STATE_STUNNED, which is a different
+    // thing entirely: HandleLogoutRequestOpcode sets the UNIT_FLAG_STUNNED
+    // *field flag* to root the player during the 20-second timer, and never
+    // touches the unit *state*. UNIT_STATE_STUNNED means a real stun from a
+    // spell, so any stunned bot - logging out or not - ran the cancel every
+    // AI tick, sending a LogoutCancelAck nobody asked for and broadcasting
+    // "Logout cancelled!" each time. That was 1467 of 25580 Chat.log lines
+    // in one 85-minute run. IsLogingOut() is the whole condition.
+    if (bot->GetSession()->IsLogingOut())
     {
         if (sServerFacade.IsInCombat(bot) || (master && sServerFacade.IsInCombat(master) && sServerFacade.GetDistance2d(bot, master) < 30.0f))
         {
@@ -1260,7 +1269,9 @@ void PlayerbotAI::UpdateAIInternal(uint32 elapsed, bool minimal)
         }
     }
     // logout if logout timer is ready or if instant logout is possible
-    if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+    // (UNIT_STATE_STUNNED used to be part of this test - see the note in
+    // UpdateAIInternal; it is a spell stun, not the logout root)
+    if (bot->GetSession()->IsLogingOut())
     {
         WorldSession* botWorldSessionPtr = bot->GetSession();
         bool logout = botWorldSessionPtr->ShouldLogOut(time(nullptr));
@@ -1421,8 +1432,8 @@ void PlayerbotAI::Reset(bool full)
         WorldSession* botWorldSessionPtr = bot->GetSession();
         bool logout = botWorldSessionPtr->ShouldLogOut(time(nullptr));
 
-        // cancel logout
-        if (!logout && (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut()))
+        // cancel logout (see the UNIT_STATE_STUNNED note further up)
+        if (!logout && bot->GetSession()->IsLogingOut())
         {
             WorldPacket p;
             bot->GetSession()->BotHandleLogoutCancelOpcode(p);
@@ -1598,7 +1609,7 @@ void PlayerbotAI::HandleCommand(uint32 type, const std::string& text, Player& fr
     }
     else if (filtered == "logout")
     {
-        if (!(bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut()))
+        if (!bot->GetSession()->IsLogingOut())
         {
             if (type == CHAT_MSG_WHISPER)
                 TellPlayer(&fromPlayer, BOT_TEXT("logout_start"));
@@ -1609,7 +1620,7 @@ void PlayerbotAI::HandleCommand(uint32 type, const std::string& text, Player& fr
     }
     else if (filtered == "logout cancel")
     {
-        if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+        if (bot->GetSession()->IsLogingOut())
         {
             if (type == CHAT_MSG_WHISPER)
                 TellPlayer(&fromPlayer, BOT_TEXT("logout_cancel"));
