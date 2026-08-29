@@ -13347,6 +13347,16 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, WorldObject* questE
             DestroyItemCount(pQuest->ReqItemId[i], pQuest->ReqItemCount[i], true);
     }
 
+    // Take back the item the quest handed out when it was accepted. Abandoning
+    // a quest already does this through RemoveQuestAtSlot; turning one in did
+    // not, so a source item that is not also a required item stayed in the bag
+    // for good - the Lieutenant's Insignia from "Hidden Enemies" being the one
+    // that got reported. ObjectMgr::LoadQuests clears the flag for the chains
+    // whose next quest still needs the item. The msg argument is false because
+    // there is nothing to reject here: the quest is already being rewarded.
+    if (pQuest->ShouldDestroySrcItemOnReward())
+        TakeOrReplaceQuestStartItems(questId, false, false);
+
     RemoveTimedQuest(questId);
 
     if (BattleGround* bg = GetBattleGround())

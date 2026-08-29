@@ -6241,6 +6241,64 @@ void ObjectMgr::LoadQuests()
         }
     }
 
+    // Decide, per quest, whether rewarding it should take back the item it
+    // handed out at accept time (SrcItemId). Player::RewardQuest destroys the
+    // quest's ReqItems and nothing else, so a source item that is not also a
+    // required item used to stay in the bag forever - 203 quests in a 1.12
+    // world DB do that, "Hidden Enemies" (5727) and its Lieutenant's Insignia
+    // among them.
+    //
+    // The exception is a chain that hands the item over one quest and consumes
+    // it in the next without granting it again: "Final Preparations" (8994)
+    // gives Lord Valthalak's Amulet and "Mea Culpa, Lord Valthalak" (8995)
+    // requires it. Destroying it on reward would make those chains
+    // uncompletable, so scan the follow-up quests once here and mark those
+    // source items to be kept.
+    for (auto const& itr : m_QuestTemplatesMap)
+    {
+        Quest* qinfo = itr.second.get();
+        uint32 const srcItemId = qinfo->GetSrcItemId();
+        if (!srcItemId)
+            continue;
+
+        auto const followerNeedsItem = [srcItemId](Quest const* pNext)
+        {
+            // A follow-up that hands the item out itself is fine - it will get
+            // its own copy when the player accepts it.
+            if (pNext->GetSrcItemId() == srcItemId)
+                return false;
+
+            for (uint32 i = 0; i < QUEST_ITEM_OBJECTIVES_COUNT; ++i)
+                if (pNext->ReqItemId[i] == srcItemId)
+                    return true;
+
+            for (uint32 i = 0; i < QUEST_SOURCE_ITEM_IDS_COUNT; ++i)
+                if (pNext->ReqSourceId[i] == srcItemId)
+                    return true;
+
+            return false;
+        };
+
+        // Chains are expressed from both ends in the DB, so look at the links
+        // this quest names and at every quest that names this one as previous.
+        for (auto const& other : m_QuestTemplatesMap)
+        {
+            Quest const* pOther = other.second.get();
+            if (pOther == qinfo)
+                continue;
+
+            bool const follows = (uint32)abs(pOther->GetPrevQuestId()) == qinfo->GetQuestId() ||
+                                 qinfo->GetNextQuestInChain() == pOther->GetQuestId() ||
+                                 (uint32)abs(qinfo->GetNextQuestId()) == pOther->GetQuestId();
+
+            if (follows && followerNeedsItem(pOther))
+            {
+                qinfo->m_destroySrcItemOnReward = false;
+                break;
+            }
+        }
+    }
+
     sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "");
     sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, ">> Loaded %lu quests definitions", (unsigned long)m_QuestTemplatesMap.size());
 }
