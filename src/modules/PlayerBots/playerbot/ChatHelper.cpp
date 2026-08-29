@@ -432,7 +432,12 @@ std::string ChatHelper::formatQuest(Quest const* quest)
     int loc_idx = sPlayerbotTextMgr.GetLocalePriority();
     std::string title = quest->GetTitle();
     title = BotLocalizedQuestTitle(quest->GetQuestId(), loc_idx, title);
-    out << "|cFFFFFF00|Hquest:" << quest->GetQuestId() << ':' << quest->GetQuestLevel() << "|h[" << title << "]|h|r";
+    // Plain coloured label, not a |H...|h hyperlink. The 1.12.1 client's
+    // ItemRef.lua only knows the link types the vanilla UI can itself produce -
+    // clicking anything else pops "Unknown link type" - and quest links are a
+    // 2.0 addition. The core's own isValidChatMessage, written for this client,
+    // accepts only "item" and "enchant" for the same reason.
+    out << "|cFFFFFF00[" << title << "]|r";
     return out.str();
 }
 
@@ -450,7 +455,9 @@ std::string ChatHelper::formatGameobject(const GameObject* go)
                 name = gl->Name[loc_idx];
         }
     }
-    out << "|cFFFFFF00|Hfound:" << go->GetObjectGuid().GetRawValue() << ":" << go->GetEntry() << ":" <<  "|h[" << name << "]|h|r";
+    // "found" was never a WoW link type in any client, so this always threw
+    // "Unknown link type" when a player clicked it. Plain label instead.
+    out << "|cFFFFFF00[" << name << "]|r";
     return out.str();
 }
 
@@ -469,7 +476,7 @@ std::string ChatHelper::formatWorldobject(const WorldObject* wo)
                 name = gl->Name[loc_idx];
         }
     }
-    out << "|cFFFFFF00|Hfound:" << wo->GetObjectGuid().GetRawValue() << ":" << wo->GetEntry() << ":" << "|h[" << name << "]|h|r";
+    out << "|cFFFFFF00[" << name << "]|r";
     return out.str();
 }
 
@@ -484,7 +491,8 @@ std::string ChatHelper::formatWorldEntry(int32 entry)
         gInfo = sObjectMgr.GetGameObjectTemplate(entry * -1);
 
     std::ostringstream out;
-    out << "|cFFFFFF00|Hentry:" << abs(entry) << ":" << "|h[";
+    // "entry" is not a client link type either - plain label.
+    out << "|cFFFFFF00[";
 
     int loc_idx = sPlayerbotTextMgr.GetLocalePriority();
     std::string name;
@@ -512,14 +520,15 @@ std::string ChatHelper::formatWorldEntry(int32 entry)
     
     out << name;
     
-    out << "]|h|r";
+    out << "]|r";
     return out.str();
 }
 
 std::string ChatHelper::formatSpell(SpellEntry const *sInfo)
 {
     std::ostringstream out;
-    out << "|cffffffff|Hspell:" << sInfo->Id << "|h[" << sInfo->SpellName[LOCALE_enUS] << "]|h|r";
+    // Spell hyperlinks arrived with 2.0; in 1.12.1 they are an unknown link type.
+    out << "|cffffffff[" << sInfo->SpellName[LOCALE_enUS] << "]|r";
     return out.str();
 }
 
@@ -1160,9 +1169,10 @@ std::string ChatHelper::formatGuidPosition(const GuidPosition& guidP, const Guid
     else if (guidP.GetGameObjectInfo())
         out << formatWorldEntry(guidP.GetEntry()*-1);
     else
-        out << "|cFFFFFF00|Hfound:" << guidP.GetRawValue() << ":" << guidP.GetEntry() << ":" << "|h[unkown " << guidP.GetTypeName() << " " << guidP.GetRawValue() << "]|h|r";
+        out << "|cFFFFFF00[unkown " << guidP.GetTypeName() << " " << guidP.GetRawValue() << "]|r";
 
-    out.seekp(-5, out.cur);
+    // The labels above now end in "]|r" rather than "]|h|r", so rewind three.
+    out.seekp(-3, out.cur);
 
     if (WorldPosition(guidP))
         out << " " << formatWorldPosition(guidP, ref);
