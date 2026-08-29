@@ -76,9 +76,13 @@ std::vector<uint32> EnchantSpellsValue::Calculate()
 
 uint32 HasReagentsForValue::Calculate()
 {
-    if (ai->HasCheat(BotCheatMask::item))
-        return true;
-
+    // The item cheat used to answer yes here without looking at the bags. Nothing
+    // downstream waives the requirement, though: every caller ends in an ordinary
+    // cast, and Spell::CheckCast counts the reagents for real and returns
+    // SPELL_FAILED_ITEM_NOT_READY when they are missing. So the cheat only
+    // switched off this gate and left the bot picking a recipe it cannot make,
+    // failing, saying so out loud, and picking it again a second later - four
+    // fifths of everything the bots said in a four hour run. Count the reagents.
     uint32 spellId = stoi(getQualifier());
 
     const SpellEntry* pSpellInfo = sServerFacade.LookupSpellInfo(spellId);
