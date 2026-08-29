@@ -7026,9 +7026,25 @@ void Player::DuelComplete(DuelCompleteType type)
     m_duel->opponent->SetGuidValue(PLAYER_DUEL_ARBITER, ObjectGuid());
     m_duel->opponent->SetUInt32Value(PLAYER_DUEL_TEAM, 0);
 
-    if (m_duel->opponent->m_duel)
-        m_duel->opponent->m_duel->finished = true;
+    // Both sides keep their DuelInfo until their own next Player::Update deletes
+    // it, but a player can be freed before that happens: logging out runs
+    // CleanupsBeforeDelete, which lands here, and the Player is destroyed right
+    // after. Anything still reading the raw opponent pointer in that window is
+    // reading freed memory - a bot died on a virtual call dispatched through the
+    // dead object's vtable. The duel is over, so drop the pointers here instead
+    // of leaving them aimed at whatever the allocator does with the memory next.
+    Player* pOpponent = m_duel->opponent;
+
+    if (pOpponent->m_duel)
+    {
+        pOpponent->m_duel->finished = true;
+        pOpponent->m_duel->opponent = nullptr;
+        pOpponent->m_duel->initiator = nullptr;
+    }
+
     m_duel->finished = true;
+    m_duel->opponent = nullptr;
+    m_duel->initiator = nullptr;
 }
 
 //---------------------------------------------------------//
