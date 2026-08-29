@@ -10,6 +10,7 @@
 #include "Database/DatabaseEnv.h"
 #include "PlayerbotAI.h"
 #include "BotDiagnostics.h"  // for SC_LOG
+#include "BotActionLog.h"
 #include "Objects/Player.h"
 #include "playerbot/AiFactory.h"
 #include "MemoryMonitor.h"
@@ -341,6 +342,9 @@ RandomPlayerbotMgr::RandomPlayerbotMgr()
 
 RandomPlayerbotMgr::~RandomPlayerbotMgr()
 {
+    // Backstop: flush and close any per-bot action log still open, so a
+    // shutdown does not depend on every bot having taken a logout path.
+    ai::botdiag::BotActionLog::CloseAll();
 }
 
 int RandomPlayerbotMgr::GetMaxAllowedBotCount()

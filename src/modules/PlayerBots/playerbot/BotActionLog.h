@@ -30,6 +30,16 @@ public:
     // that was never opened.
     static void Close(PlayerbotAI* ai);
 
+    // Same, keyed by the bot's low GUID. Needed because the Player and the
+    // PlayerbotAI are already gone on some teardown paths, and the
+    // PlayerbotAI* overload cannot then reach the handle at all - which is
+    // how 488 of 2375 files were left open in one run.
+    static void Close(uint32 guid);
+
+    // Close every open handle. Called when the bot manager shuts down, so a
+    // clean stop does not depend on every bot taking the logout path.
+    static void CloseAll();
+
     // Get the open handle for this bot, or null if not open. Cheap.
     static std::FILE* GetHandle(PlayerbotAI* ai);
 
@@ -59,10 +69,36 @@ public:
     static void LogAuraApply(PlayerbotAI* ai, uint32 spellId, int32 durationMs, ObjectGuid casterGuid, bool force = false);
     static void LogAuraRemove(PlayerbotAI* ai, uint32 spellId, ObjectGuid casterGuid, bool force = false);
 
+    // Number of per-bot files kept open at once. The Windows CRT caps a
+    // process at 512 open FILE streams by default, and the whole server
+    // shares that budget with the world logs, the DBC/map/vmap/mmap loaders
+    // and the MySQL client. One handle per bot exceeded it 39 minutes into a
+    // 200-bot run, after which every unrelated fopen in the process failed -
+    // visible as 152 bogus "VMapManager2: could not load" errors for files
+    // that were on disk and intact. Handles past the cap are closed
+    // least-recently-used first and reopened on next write.
+    static constexpr size_t kMaxOpenFiles = 128;
+
 private:
-    // Map keyed by bot character GUID (low). Player* would be unsafe
-    // across logout; the GUID stays valid in the map until we Close it.
-    static std::unordered_map<uint32, std::FILE*> sFiles;
+    // One open file per bot, keyed by character GUID (low). Player* would be
+    // unsafe across logout; the GUID stays valid in the map until we close it.
+    struct OpenFile
+    {
+        std::FILE* fp = nullptr;
+        uint64 lastUse = 0;     // sUseCounter stamp, for LRU eviction
+    };
+    static std::unordered_map<uint32, OpenFile> sFiles;
+
+    // Path per bot, kept for the whole run even while the handle is evicted,
+    // so reopening appends to the file the bot already has. Rebuilding it
+    // would embed a fresh timestamp and scatter one bot across many files.
+    static std::unordered_map<uint32, std::string> sPaths;
+
+    // Monotonic stamp source for the LRU order above.
+    static uint64 sUseCounter;
+
+    // Close the least-recently-used handle. Caller holds sFilesMutex.
+    static void EvictOldestLocked();
 
     // Helper: build the per-bot log path. `<botname>_<sessionId>_<date>.log`.
     static std::string BuildPath(Player* bot);

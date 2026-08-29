@@ -396,7 +396,9 @@ void PlayerbotHolder::UpdateSessions(uint32 elapsed)
             }
         }
 
-        if (GetBotAI(bot) && GetBotAI(bot)->GetShouldLogOut() && !bot->HasUnitState(UNIT_STATE_STUNNED) && !bot->GetSession()->IsLogingOut())
+        // No UNIT_STATE_STUNNED term here: that is a real spell stun, and
+        // testing it left a stunned bot unable to ever start its logout.
+        if (GetBotAI(bot) && GetBotAI(bot)->GetShouldLogOut() && !bot->GetSession()->IsLogingOut())
         {
             LogoutPlayerBot(bot->GetObjectGuid().GetRawValue());
         }
@@ -429,7 +431,7 @@ void PlayerbotHolder::LogoutAllBots()
         ++total;
         const bool hasAI    = GetBotAI(bot) != nullptr;
         const bool realPlay = hasAI && GetBotAI(bot)->IsRealPlayer();
-        if (!hasAI)        { ++skippedNoAI; return; }
+        if (!hasAI)        { ai::botdiag::BotActionLog::Close(bot->GetGUIDLow()); ++skippedNoAI; return; }
         if (realPlay)      { ++skippedRealPlayer; return; }
         SC_LOG("LogoutAllBots: logging out bot=%s guid=%u (remote=%s)",
                bot->GetName(), bot->GetGUIDLow(),
@@ -454,7 +456,11 @@ void PlayerbotMgr::CancelLogout()
         PlayerbotAI* ai = GetBotAI(bot);
         if (ai && !ai->IsRealPlayer())
         {
-            if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+            // Only a session that is actually logging out. UNIT_STATE_STUNNED
+            // is a real spell stun, not the UNIT_FLAG_STUNNED root that the
+            // logout timer applies - testing it made every stunned bot cancel
+            // a logout it never started, and announce it.
+            if (bot->GetSession()->IsLogingOut())
             {
                 WorldPacket p;
                 bot->GetSession()->BotHandleLogoutCancelOpcode(p);
@@ -468,7 +474,7 @@ void PlayerbotMgr::CancelLogout()
         PlayerbotAI* ai = GetBotAI(bot);
         if (ai && !ai->IsRealPlayer() && ai->GetMaster() == master)
         {
-            if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+            if (bot->GetSession()->IsLogingOut())
             {
                 WorldPacket p;
                 bot->GetSession()->BotHandleLogoutCancelOpcode(p);
@@ -550,12 +556,22 @@ void PlayerbotHolder::LogoutPlayerBot(uint32 guid, bool allowInstant, bool forDe
     }
 
     Player* bot = GetPlayerBot(guid);
+    if (!bot)
+    {
+        // The Player is already gone, so the PlayerbotAI* overload of Close()
+        // can no longer reach this bot's log handle. Close it by guid.
+        ai::botdiag::BotActionLog::Close(guid);
+    }
     if (bot)
     {
         SC_LOG("LogoutPlayerBot bot=%s found in playerBots map", bot->GetName());
         PlayerbotAI* ai = GetBotAI(bot);
         if (!ai)
         {
+            // No AI means nothing below can run, including the Close() further
+            // down. Release the per-bot action log here or its handle stays
+            // open for the rest of the process.
+            ai::botdiag::BotActionLog::Close(guid);
             SC_LOG("LogoutPlayerBot bot=%s has no AI — early return", bot->GetName());
             return;
         }
@@ -596,7 +612,7 @@ void PlayerbotHolder::LogoutPlayerBot(uint32 guid, bool allowInstant, bool forDe
         // if no instant logout, request normal logout
         if (!allowInstant)
         {
-            if (bot && (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut()))
+            if (bot && bot->GetSession()->IsLogingOut())
             {
                 return;
             }
@@ -671,6 +687,10 @@ void PlayerbotHolder::DisablePlayerBot(uint32 guid, bool logOutPlayer)
         {
             RemoveBotAI(bot);
         }
+
+        // DisablePlayerBot is a teardown path of its own - it never reaches
+        // LogoutPlayerBot, so the action log has to be released here too.
+        ai::botdiag::BotActionLog::Close(guid);
     }
 }
 
