@@ -47,6 +47,10 @@ namespace ai
 
         static bool InCombat(Unit* target, Player* player, bool checkPullTargets = true);
 
+        // Re-resolves a raw unit pointer through the object accessor, so an entry
+        // left behind by a freed unit is dropped instead of dereferenced.
+        Unit* ResolveLiveUnit(Unit* unit);
+
         WorldPosition calculatePos;
     };
 

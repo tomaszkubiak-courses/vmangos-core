@@ -4,8 +4,106 @@
 #include "PossibleTargetsValue.h"
 #include "EnemyPlayerValue.h"
 
+#ifdef _WIN32
+#include <excpt.h>
+#include "CrashDump.h"
+#include "Errors.h"
+#endif
+
 using namespace ai;
 using namespace MaNGOS;
+
+#ifdef _WIN32
+namespace
+{
+    // 0xC0000005, spelled out so this file does not have to pull in windows.h.
+    unsigned long const kAccessViolation = 0xC0000005;
+
+    // A stale unit is stale for every bot that can see it, on every tick, so an
+    // uncapped handler would fill the disk before anyone read the first line.
+    unsigned int const kMaxReports = 3;
+    unsigned int g_reportCount = 0;
+
+    int ReportStaleAttackerFault(unsigned long code, void* exceptionPointers, Player* player)
+    {
+        if (code != kAccessViolation)
+            return EXCEPTION_CONTINUE_SEARCH; // not ours - let it reach the process filter
+
+        ++g_reportCount;
+
+        if (g_reportCount > kMaxReports)
+        {
+            sLog.outError("AttackersValue: attacker list holds a stale unit again (occurrence %u), bot %s",
+                g_reportCount, player ? player->GetName() : "<null>");
+            return EXCEPTION_EXECUTE_HANDLER;
+        }
+
+        if (player)
+        {
+            sLog.outError("AttackersValue: access violation reading an attacker of %s "
+                          "(guid %u, map %u, zone %u, at %.2f %.2f %.2f)",
+                player->GetName(), player->GetGUIDLow(),
+                player->GetMapId(), player->GetZoneId(),
+                player->GetPositionX(), player->GetPositionY(), player->GetPositionZ());
+        }
+        else
+            sLog.outError("AttackersValue: access violation reading an attacker of a null player");
+
+        // Runs before the stack unwinds, so this is the faulting trace and not
+        // the handler's own.
+        MaNGOS::Errors::PrintStacktrace(0, 64);
+
+        if (char const* dumpPath = MaNGOS::CrashDump::Write(exceptionPointers))
+            sLog.outError("AttackersValue: crash dump written to %s", dumpPath);
+
+        return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    // Needs a frame of its own: MSVC rejects __try in a function that has objects
+    // to unwind, and the read itself is the only thing here that can fault.
+    bool ReadGuidGuarded(Unit* unit, Player* owner, ObjectGuid& guid)
+    {
+        __try
+        {
+            guid = unit->GetObjectGuid();
+            return true;
+        }
+        __except (ReportStaleAttackerFault(GetExceptionCode(), GetExceptionInformation(), owner))
+        {
+            return false;
+        }
+    }
+}
+#endif
+
+// Turns a raw unit pointer taken from core bookkeeping into one the object
+// accessor still knows about, or into nothing.
+//
+// Every other unit this value collects arrives as a guid and is resolved through
+// the accessor, so it cannot outlive the object it names. The attacker sets and
+// the duel opponent are raw pointers instead, and a unit freed while it was still
+// listed leaves one behind. The crash then lands wherever that pointer is next
+// dereferenced - a bot died reading a freed threat list inside ThreatManager,
+// with nothing in the trace to say who left the pointer there. Reading the guid
+// back and asking the map for it turns a stale entry into a skipped target: a
+// freed object is no longer in the store, so the lookup fails whether its memory
+// now reads as garbage or still holds the old guid.
+Unit* AttackersValue::ResolveLiveUnit(Unit* unit)
+{
+    if (!unit)
+        return nullptr;
+
+    ObjectGuid guid;
+
+#ifdef _WIN32
+    if (!ReadGuidGuarded(unit, bot, guid))
+        return nullptr;
+#else
+    guid = unit->GetObjectGuid();
+#endif
+
+    return ai->GetUnit(guid);
+}
 
 std::list<ObjectGuid> AttackersValue::Calculate()
 {
@@ -251,14 +349,15 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
         // Get the current attackers of the player
         for (Unit* attacker : player->GetAttackers())
         {
-            units.insert(attacker);
+            if (Unit* live = ResolveLiveUnit(attacker))
+                units.insert(live);
         }
 
         // Add the duel opponent (Only consider the owner bot)
         if (bot == player && bot->m_duel && bot->m_duel->opponent)
         {
             // Penqle's DuelInfo::opponent is an ObjectGuid; resolve to Unit*.
-            if (Unit* opp = bot->m_duel->opponent)
+            if (Unit* opp = ResolveLiveUnit(bot->m_duel->opponent))
                 units.insert(opp);
         }
 
@@ -268,7 +367,8 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
         {
             for (Unit* attacker : pet->GetAttackers())
             {
-                units.insert(attacker);
+                if (Unit* live = ResolveLiveUnit(attacker))
+                    units.insert(live);
             }
         }
 
@@ -309,6 +409,12 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
 
 bool AttackersValue::InCombat(Unit* target, Player* player, bool checkPullTargets)
 {
+    // Answer for a target already out of the world before anything reads its
+    // threat list. Nothing off the world holds threat, so the answer does not
+    // change, and a unit that has left the world is the one about to be freed.
+    if (!target || !player || !target->IsInWorld())
+        return false;
+
     // Check if the the target is attacking the player
     bool inCombat = (target->GetThreatManager().getThreat(player) > 0.0f) ||
                     (target->GetVictim() && (target->GetVictim() == player));
