@@ -2627,8 +2627,16 @@ bool Map::FindScriptFinalTargets(WorldObject*& source, WorldObject*& target, Scr
         SpellEntry const* pSpellInfo = (script.command == SCRIPT_COMMAND_CAST_SPELL) ? sSpellMgr.GetSpellEntry(script.castSpell.spellId) : nullptr;
         if (!(target = GetTargetByType(source, target, this, script.target_type, script.target_param1, script.target_param2, pSpellInfo)))
         {
+            // A miss on one of the threat-list target types is a runtime
+            // condition, not bad data: SelectAttackingTarget filters the list
+            // by the spell's range, line of sight and immunities, so a mob
+            // whose only attacker is kiting it out of range legitimately has
+            // nothing to pick. Every other target type names something that
+            // is supposed to exist, and a miss there is worth an error.
+            bool const runtimeMiss = script.target_type >= TARGET_T_HOSTILE &&
+                                     script.target_type <= TARGET_T_HOSTILE_FARTHEST;
             if (!(script.raw.data[4] & SF_GENERAL_SKIP_MISSING_TARGETS))
-                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "FindScriptTargets: Failed to find target for script with id %u (target_param1: %u), (target_param2: %u), (target_type: %u).", script.id, script.target_param1, script.target_param2, script.target_type);
+                sLog.Out(LOG_BASIC, runtimeMiss ? LOG_LVL_DEBUG : LOG_LVL_ERROR, "FindScriptTargets: Failed to find target for script with id %u (target_param1: %u), (target_param2: %u), (target_type: %u).", script.id, script.target_param1, script.target_param2, script.target_type);
             return false;
         }
     }
