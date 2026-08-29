@@ -102,6 +102,24 @@ Unit* AttackersValue::ResolveLiveUnit(Unit* unit)
     guid = unit->GetObjectGuid();
 #endif
 
+    // A guid that does not even name a unit cannot have come off a live one, so
+    // this entry is reading freed memory that has already been handed out again.
+    // Worth a line, because unlike the fault above it costs nothing to survive
+    // and would otherwise be skipped in silence - and it says which bot's list
+    // the entry was in, which is the part the crash never said.
+    if (!guid.IsUnit())
+    {
+        static unsigned int reported = 0;
+        if (reported < 10)
+        {
+            ++reported;
+            sLog.outError("AttackersValue: attacker list of %s holds an entry that is not a unit any more (raw guid " UI64FMTD ")",
+                bot ? bot->GetName() : "<null>", guid.GetRawValue());
+        }
+
+        return nullptr;
+    }
+
     return ai->GetUnit(guid);
 }
 

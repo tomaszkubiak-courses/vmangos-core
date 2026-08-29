@@ -197,6 +197,21 @@ Unit::~Unit()
     delete m_charmInfo;
     delete movespline;
 
+    // A unit freed while it is still linked into combat leaves raw pointers to
+    // itself behind: m_attacking means this unit is still listed in its victim's
+    // attacker set, and a non-empty m_attackers means every unit in it still
+    // points its own m_attacking here. Nothing reads those through a guid, so
+    // the mistake is invisible until something dereferences one of them, which
+    // happens somewhere else entirely - a playerbot died reading a freed threat
+    // list this way, with a trace that named only ThreatManager. Name the unit
+    // here, where the pointer is actually left behind. Every deletion path is
+    // supposed to have gone through CombatStop() by now, so this is silent on a
+    // healthy server; m_attacking is not dereferenced because it may already be
+    // the freed one.
+    if (m_attacking || !m_attackers.empty())
+        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Unit::~Unit (%s) freed while still linked into combat: attacking=%s, attackers=%u",
+            GetGuidStr().c_str(), m_attacking ? "yes" : "no", (uint32)m_attackers.size());
+
     // those should be already removed at "RemoveFromWorld()" call
     MANGOS_ASSERT(m_spellGameObjects.empty());
     MANGOS_ASSERT(m_spellDynObjects.empty());
