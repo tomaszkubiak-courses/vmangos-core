@@ -1123,8 +1123,11 @@ AiPlayerbot.JumpRandomChance = 0.20
 AiPlayerbot.JumpInPlaceChance = 0.50
 # Chance to jump backward instead of forward
 AiPlayerbot.JumpBackwardChance = 0.10
-# Jumping height limit
-AiPlayerbot.JumpHeightLimit = 60
+# How far a jump's arc may end up from where it started, up or down. Not the height of the
+# jump itself - JumpVSpeed sets that, and caps the rise at 1.64 yards. This only binds on
+# descent: 14.57 is where the core starts applying fall damage (Player::HandleFall), so a
+# bot will hop down a ledge but will not throw itself off a cliff and call it a jump.
+AiPlayerbot.JumpHeightLimit = 14.57
 # Add rpg jump strategy if bot is with real player
 AiPlayerbot.JumpWithPlayer = 0
 # Add rpg jump strategy in BG
