@@ -15735,6 +15735,13 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
 
         std::vector<Item*> problematicItems;
 
+        // An item that no longer fits the slot it was saved in is worth a GM's attention
+        // when a client put it there, but nothing a bot wears came from a client: its gear
+        // is generated in the core, and a mismatch means the generator picked something the
+        // character cannot wear, not that anyone cheated. Reporting those buries the real
+        // ones. The item is still mailed back either way, and the load itself still logs.
+        uint32 const itemLoadCheatAction = GetSession()->IsBotSession() ? 0 : (CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+
         // prevent items from being added to the queue when stored
         m_itemUpdateQueueBlocked = true;
         do
@@ -15832,7 +15839,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
                         item = StoreItem(dest, item, true);
                     else
                     {
-                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: cannot store", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: cannot store", itemLoadCheatAction);
                         success = false;
                     }
                 }
@@ -15843,7 +15850,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
                         QuickEquipItem(dest, item);
                     else
                     {
-                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: cannot QuickEquip", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: cannot QuickEquip", itemLoadCheatAction);
                         success = false;
                     }
                 }
@@ -15855,7 +15862,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
                         item = BankItem(dest, item, true);
                     else
                     {
-                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: cannot Bank", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: cannot Bank", itemLoadCheatAction);
                         success = false;
                     }
                 }
@@ -15881,13 +15888,13 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
                         item = StoreItem(dest, item, true);
                     else
                     {
-                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: can't store inside bag", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                        GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: can't store inside bag", itemLoadCheatAction);
                         success = false;
                     }
                 }
                 else
                 {
-                    GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: invalid bag pos", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                    GetSession()->ProcessAnticheatAction("PassiveAnticheat", "Item Load failed: invalid bag pos", itemLoadCheatAction);
                     success = false;
                 }
             }
@@ -15910,7 +15917,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
                 problematicItems.push_back(item);
                 std::stringstream oss;
                 oss << "Broken item " << item->GetEntry() << " GUID:" << item->GetGUIDLow() << " count:" << item->GetCount() << " bag:" << bag_guid << " slot:" << uint32(slot);
-                GetSession()->ProcessAnticheatAction("PassiveAnticheat", oss.str().c_str(), CHEAT_ACTION_LOG);
+                GetSession()->ProcessAnticheatAction("PassiveAnticheat", oss.str().c_str(), itemLoadCheatAction & CHEAT_ACTION_LOG);
             }
         }
         while (result->NextRow());

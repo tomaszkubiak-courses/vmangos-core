@@ -96,12 +96,7 @@ void WorldSession::RequestBgJoinQueue(ObjectGuid battlemaster, uint32 instanceId
     // battlemaster it clicked on and no portal it is standing in. The origin checks
     // below exist to validate what a client claims, and running them on a bot only
     // rejects every queue attempt and reports it to the GMs as a cheat.
-    bool requestFromBot = GetBot() != nullptr;
-#ifdef BUILD_PLAYERBOTS
-    // The playerbots module does not use PlayerBotEntry: it builds its own socketless
-    // session and marks it instead, so GetBot() is null for every character it drives.
-    requestFromBot = requestFromBot || IsPlayerbotSession();
-#endif
+    bool const requestFromBot = IsBotSession();
 
 #if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_6_1
     if (battlemaster == GetPlayer()->GetObjectGuid())
