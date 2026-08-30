@@ -432,12 +432,7 @@ std::string ChatHelper::formatQuest(Quest const* quest)
     int loc_idx = sPlayerbotTextMgr.GetLocalePriority();
     std::string title = quest->GetTitle();
     title = BotLocalizedQuestTitle(quest->GetQuestId(), loc_idx, title);
-    // Plain coloured label, not a |H...|h hyperlink. The 1.12.1 client's
-    // ItemRef.lua only knows the link types the vanilla UI can itself produce -
-    // clicking anything else pops "Unknown link type" - and quest links are a
-    // 2.0 addition. The core's own isValidChatMessage, written for this client,
-    // accepts only "item" and "enchant" for the same reason.
-    out << "|cFFFFFF00[" << title << "]|r";
+    out << "|cFFFFFF00|Hquest:" << quest->GetQuestId() << ':' << quest->GetQuestLevel() << "|h[" << title << "]|h|r";
     return out.str();
 }
 
@@ -455,9 +450,7 @@ std::string ChatHelper::formatGameobject(const GameObject* go)
                 name = gl->Name[loc_idx];
         }
     }
-    // "found" was never a WoW link type in any client, so this always threw
-    // "Unknown link type" when a player clicked it. Plain label instead.
-    out << "|cFFFFFF00[" << name << "]|r";
+    out << "|cFFFFFF00|Hfound:" << go->GetObjectGuid().GetRawValue() << ":" << go->GetEntry() << ":" <<  "|h[" << name << "]|h|r";
     return out.str();
 }
 
@@ -476,7 +469,7 @@ std::string ChatHelper::formatWorldobject(const WorldObject* wo)
                 name = gl->Name[loc_idx];
         }
     }
-    out << "|cFFFFFF00[" << name << "]|r";
+    out << "|cFFFFFF00|Hfound:" << wo->GetObjectGuid().GetRawValue() << ":" << wo->GetEntry() << ":" << "|h[" << name << "]|h|r";
     return out.str();
 }
 
@@ -491,8 +484,7 @@ std::string ChatHelper::formatWorldEntry(int32 entry)
         gInfo = sObjectMgr.GetGameObjectTemplate(entry * -1);
 
     std::ostringstream out;
-    // "entry" is not a client link type either - plain label.
-    out << "|cFFFFFF00[";
+    out << "|cFFFFFF00|Hentry:" << abs(entry) << ":" << "|h[";
 
     int loc_idx = sPlayerbotTextMgr.GetLocalePriority();
     std::string name;
@@ -520,15 +512,14 @@ std::string ChatHelper::formatWorldEntry(int32 entry)
     
     out << name;
     
-    out << "]|r";
+    out << "]|h|r";
     return out.str();
 }
 
 std::string ChatHelper::formatSpell(SpellEntry const *sInfo)
 {
     std::ostringstream out;
-    // Spell hyperlinks arrived with 2.0; in 1.12.1 they are an unknown link type.
-    out << "|cffffffff[" << sInfo->SpellName[LOCALE_enUS] << "]|r";
+    out << "|cffffffff|Hspell:" << sInfo->Id << "|h[" << sInfo->SpellName[LOCALE_enUS] << "]|h|r";
     return out.str();
 }
 
@@ -1169,10 +1160,9 @@ std::string ChatHelper::formatGuidPosition(const GuidPosition& guidP, const Guid
     else if (guidP.GetGameObjectInfo())
         out << formatWorldEntry(guidP.GetEntry()*-1);
     else
-        out << "|cFFFFFF00[unkown " << guidP.GetTypeName() << " " << guidP.GetRawValue() << "]|r";
+        out << "|cFFFFFF00|Hfound:" << guidP.GetRawValue() << ":" << guidP.GetEntry() << ":" << "|h[unkown " << guidP.GetTypeName() << " " << guidP.GetRawValue() << "]|h|r";
 
-    // The labels above now end in "]|r" rather than "]|h|r", so rewind three.
-    out.seekp(-3, out.cur);
+    out.seekp(-5, out.cur);
 
     if (WorldPosition(guidP))
         out << " " << formatWorldPosition(guidP, ref);
@@ -1188,6 +1178,59 @@ std::string ChatHelper::formatGuidPosition(const GuidPosition& guidP, const Guid
 std::string ChatHelper::formatBoolean(bool flag)
 {
     return flag ? "|cff00ff00ON|r" : "|cffffff00OFF|r";
+}
+
+std::string ChatHelper::stripUnsupportedLinks(const std::string& text)
+{
+    // The 1.12.1 client's ItemRef.lua only knows the link types the vanilla UI can
+    // itself produce - clicking anything else pops "Unknown link type". The core's
+    // own isValidChatMessage, written for this client, accepts "item" and
+    // "enchant", so those two pass through untouched. Everything else - quest and
+    // spell links, which arrived with 2.0, and the "found" and "entry" types the
+    // module invented - keeps its colour and its bracketed label but loses the
+    // hyperlink, so clicking it does nothing rather than throwing.
+    //
+    // This runs where a message is handed to the client. The module builds its own
+    // commands out of the same formatters and reads the guids back out of them
+    // with parseGameobjects and parseWorldEntries, so those strings must keep the
+    // link syntax.
+    std::string out;
+    out.reserve(text.size());
+
+    size_t pos = 0;
+    while (pos < text.size())
+    {
+        size_t start = text.find("|H", pos);
+        if (start == std::string::npos)
+            break;
+
+        // End of the |H<type>:<data>| header, where the label begins.
+        size_t header = text.find("|h", start + 2);
+        if (header == std::string::npos)
+            break;
+
+        size_t typeEnd = text.find(':', start + 2);
+        std::string type = (typeEnd == std::string::npos || typeEnd > header) ? text.substr(start + 2, header - start - 2) : text.substr(start + 2, typeEnd - start - 2);
+
+        if (type == "item" || type == "enchant")
+        {
+            // Leave the link alone and carry on past its header.
+            out.append(text, pos, header + 2 - pos);
+            pos = header + 2;
+            continue;
+        }
+
+        size_t label = text.find("|h", header + 2);
+        if (label == std::string::npos)
+            break;
+
+        out.append(text, pos, start - pos);
+        out.append(text, header + 2, label - header - 2);
+        pos = label + 2;
+    }
+
+    out.append(text, pos, std::string::npos);
+    return out;
 }
 
 void ChatHelper::eraseAllSubStr(std::string& mainStr, const std::string& toErase)

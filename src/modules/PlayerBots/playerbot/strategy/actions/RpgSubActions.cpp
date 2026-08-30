@@ -843,7 +843,7 @@ bool RpgEnchantAction::Execute(Event& event)
                     if (bot->GetGroup() && bot->GetGroup()->IsMember(guidP))
                         ai->TellPlayerNoFacing(GetMaster(), "Let me enchant this " + chat->formatItem(item) + " with " + chat->formatSpell(spellId) + " for you " + player->GetName() + ".", PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
                     else
-                        bot->Say("Let me enchant this " + chat->formatItem(item) + " with " + chat->formatSpell(spellId) + " for you " + player->GetName() + ".", (bot->GetTeam() == ALLIANCE ? LANG_COMMON : LANG_ORCISH));
+                        bot->Say(ChatHelper::stripUnsupportedLinks("Let me enchant this " + chat->formatItem(item) + " with " + chat->formatSpell(spellId) + " for you " + player->GetName() + "."), (bot->GetTeam() == ALLIANCE ? LANG_COMMON : LANG_ORCISH));
 
                     WorldPacket p;
                     uint32 status = TRADE_STATUS_TRADE_ACCEPT;

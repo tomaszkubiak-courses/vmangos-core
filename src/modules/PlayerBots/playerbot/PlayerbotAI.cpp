@@ -3200,6 +3200,10 @@ ChatChannelSource PlayerbotAI::GetChatChannelSource(Player* bot, uint32 type, st
 
 bool PlayerbotAI::SayToGuild(std::string msg, bool likePlayer)
 {
+    // A bot's own text can carry links this client cannot open; see
+    // ChatHelper::stripUnsupportedLinks.
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3246,6 +3250,8 @@ bool PlayerbotAI::SayToGuild(std::string msg, bool likePlayer)
 
 bool PlayerbotAI::SayToWorld(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3270,6 +3276,8 @@ bool PlayerbotAI::SayToWorld(std::string msg)
 
 bool PlayerbotAI::SayToGeneral(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3303,6 +3311,8 @@ bool PlayerbotAI::SayToGeneral(std::string msg)
 
 bool PlayerbotAI::SayToTrade(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3344,6 +3354,8 @@ bool PlayerbotAI::SayToTrade(std::string msg)
 
 bool PlayerbotAI::SayToLFG(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3376,6 +3388,8 @@ bool PlayerbotAI::SayToLFG(std::string msg)
 
 bool PlayerbotAI::SayToLocalDefense(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3409,6 +3423,8 @@ bool PlayerbotAI::SayToLocalDefense(std::string msg)
 
 bool PlayerbotAI::SayToWorldDefense(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
 #ifdef MANGOSBOT_ZERO
     //check if 11 honor rank
     if (bot->GetHonorMgr().GetRank().rank < 11)
@@ -3441,6 +3457,8 @@ bool PlayerbotAI::SayToWorldDefense(std::string msg)
 
 bool PlayerbotAI::SayToGuildRecruitment(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     //check for bot's level? level 60?
     if (msg.empty())
     {
@@ -3484,6 +3502,8 @@ bool PlayerbotAI::SayToGuildRecruitment(std::string msg)
 
 bool PlayerbotAI::SayToParty(std::string msg, bool likePlayer)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (!bot->GetGroup())
     {
         return false;
@@ -3523,6 +3543,8 @@ bool PlayerbotAI::SayToParty(std::string msg, bool likePlayer)
 
 bool PlayerbotAI::SayToRaid(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (!bot->GetGroup() || !bot->GetGroup()->isRaidGroup())
     {
         return false;
@@ -3608,6 +3630,8 @@ bool PlayerbotAI::Say(std::string msg, bool likePlayer)
 
 bool PlayerbotAI::Whisper(std::string msg, std::string receiverName, bool likePlayer)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     ObjectGuid receiver = sObjectMgr.GetPlayerGuidByName(receiverName);
     Player* rPlayer = sObjectMgr.GetPlayer(receiver);
 
@@ -3657,6 +3681,8 @@ bool PlayerbotAI::TellPlayerNoFacing(Player* player, std::string text, Playerbot
 {
     if(!player)
         return false;
+
+    text = ChatHelper::stripUnsupportedLinks(text);
 
     if (!ignoreSilent && HasStrategy("silent", BotState::BOT_STATE_NON_COMBAT))
         return false;

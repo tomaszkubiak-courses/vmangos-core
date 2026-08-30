@@ -57,6 +57,11 @@ namespace ai
         static bool parseItemClass(const std::string& text, uint32* itemClass, uint32* itemSubClass);
         static uint32 parseSlot(const std::string& text);
 
+        // Rewrites the |H...|h hyperlinks a 1.12.1 client cannot open into plain
+        // labels. Call it where a bot's message is handed to the client, never on
+        // the strings the module parses back with parseGameobjects and friends.
+        static std::string stripUnsupportedLinks(const std::string& text);
+
         static std::string formatSpell(SpellEntry const *sInfo);
         // Penqle uses sSpellMgr.GetSpellEntry() instead of cmangos's sSpellTemplate.LookupEntry<SpellEntry>().
         static std::string formatSpell(uint32 spellId) {SpellEntry const* spellInfo = sSpellMgr.GetSpellEntry(spellId); if (!spellInfo) return ""; return formatSpell(spellInfo);};
