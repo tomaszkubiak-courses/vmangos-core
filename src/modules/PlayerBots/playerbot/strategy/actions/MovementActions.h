@@ -140,6 +140,7 @@ namespace ai
         bool IsValidPosition(const WorldPosition& position, const WorldPosition& visibleFromPosition);
         bool IsHazardNearPosition(const WorldPosition& position, HazardPosition* outHazard = nullptr);
         bool GeneratePathAvoidingHazards(std::vector<WorldPosition>& movePath);
+        bool RepairPathSegments(std::vector<WorldPosition>& movePath);
     };
 
     class FleeAction : public MovementAction
