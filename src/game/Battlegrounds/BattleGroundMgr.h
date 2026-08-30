@@ -110,6 +110,7 @@ class BattleGroundQueue
         QueuedPlayersMap m_queuedPlayers;
 
     private:
+        void DropStaleQueueEntry(ObjectGuid guid);
         void RemoveOfflinePlayer();
         bool HasPlayersInQueue(BattleGroundBracketId bracketId);
         void CheckFreeSlots(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId);
