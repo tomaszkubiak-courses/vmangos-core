@@ -250,6 +250,9 @@ Player::Player(WorldSession* session) : Unit(),
     m_fallStartZ = 0.0f;
 
     m_currentCinematicEntry = 0;
+    m_cinematicLastCheck = 0;
+    m_cinematicElapsedTime = 0;
+    m_cinematicHasWaypoints = false;
 
     m_cannotBeDetectedTimer = 0;
 
@@ -1574,6 +1577,25 @@ void Player::SetWorldMask(uint32 newMask)
 void Player::UpdateCinematic(uint32 diff)
 {
     m_cinematicElapsedTime += diff;
+
+    // A cinematic only ends when the client says it has, and a client that
+    // never sends CMSG_COMPLETE_CINEMATIC leaves the player watching one for
+    // the rest of the session. That is not just a stuck camera: IsTargetable()
+    // refuses every hostile target while a cinematic is running, so the player
+    // stays immune to being attacked, and CheckAreaExploreAndOutdoor() returns
+    // early, so they never discover another area. Give up on our own once the
+    // cinematic has outlasted any real one by a wide margin.
+    if (m_cinematicElapsedTime >= CINEMATIC_MAX_DURATION)
+    {
+        CinematicEnd();
+        return;
+    }
+
+    // Nothing to move the camera along, so there is no reason to look one up
+    // again every second. CinematicStart() has already reported this.
+    if (!m_cinematicHasWaypoints)
+        return;
+
     // We check a new position every second.
     if ((m_cinematicLastCheck + 1000) > m_cinematicElapsedTime)
         return;
@@ -1610,6 +1632,14 @@ void Player::CinematicStart(uint32 id)
     m_cinematicElapsedTime = 0;
     m_currentCinematicEntry = id;
 
+    // `cinematic_waypoints` is what moves the camera along on our side, and it
+    // does not have to cover every cinematic - the client plays the sequence
+    // either way. Report a cinematic we cannot follow once, here, rather than
+    // on every one of the once-a-second checks that follow.
+    m_cinematicHasWaypoints = sObjectMgr.HasCinematicWaypoints(id);
+    if (!m_cinematicHasWaypoints)
+        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Can not find the starting point of cinematic %u", id);
+
     // Teleport to the first position of the cinematic
     UpdateCinematic(1);
 }
@@ -1621,6 +1651,7 @@ void Player::CinematicEnd()
     m_currentCinematicEntry = 0;
     m_cinematicLastCheck = 0;
     m_cinematicElapsedTime = 0;
+    m_cinematicHasWaypoints = false;
 
     // When you make a new character, current area gets
     // explored after you finish watching the cinematic.

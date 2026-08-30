@@ -485,9 +485,19 @@ Position const* ObjectMgr::GetCinematicInitialPosition(uint32 cinematicId)
                 return &(it->position);
         }
     }
-    // Not found
-    sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Can not find the starting point of cinematic %u", cinematicId);
+    // Not found. The caller reports this, once when the cinematic starts -
+    // this runs once per second for as long as the cinematic lasts, so a
+    // message here is a message per second per player.
     return nullptr;
+}
+
+bool ObjectMgr::HasCinematicWaypoints(uint32 cinematicId) const
+{
+    for (const auto& waypoint : m_CinematicWaypoints)
+        if (cinematicId == waypoint.cinematic_id)
+            return true;
+
+    return false;
 }
 
 // Phasing system

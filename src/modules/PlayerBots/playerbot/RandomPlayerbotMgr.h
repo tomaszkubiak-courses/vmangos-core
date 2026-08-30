@@ -270,6 +270,8 @@ public:
 
         void MirrorAh();
     private:
+        std::vector<WorldLocation>& GrindLocationsForLevel(uint32 level);
+
         PlayerBotMap players;
         int processTicks;
         std::unordered_map<std::string, WorldLocation> namedLocations;

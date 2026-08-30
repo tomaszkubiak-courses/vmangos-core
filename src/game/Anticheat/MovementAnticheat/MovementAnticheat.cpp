@@ -176,6 +176,14 @@ void MovementAnticheat::AddCheats(uint32 cheats, uint32 count)
     if (!cheats)
         return;
 
+    // There is no remote client behind a bot to validate. Bots are moved by the
+    // core's own movement code from a session with no socket, so anything this
+    // finds is the server disagreeing with itself, and the penalty for it is
+    // real: PendingAckDelay kicked bots out of the pool, because a bot never
+    // answers a movement change it was never sent.
+    if (m_session->IsBotSession())
+        return;
+
     if (sWorld.getConfig(CONFIG_UINT32_AC_MOVEMENT_PACKET_LOG_SIZE) ||
        (sWorld.getConfig(CONFIG_BOOL_AC_MOVEMENT_NOTIFY_CHEATERS) && m_session->GetPlayer()))
     {

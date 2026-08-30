@@ -2927,9 +2927,14 @@ std::vector<std::pair<uint32, uint32>> RandomPlayerbotMgr::RpgLocationsNear(Worl
 
 void RandomPlayerbotMgr::PrepareTeleportCache()
 {
-    uint32 maxLevel = sPlayerbotAIConfig.randomBotMaxLevel;
-    if (maxLevel > sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL))
-        maxLevel = sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL);
+    // Cache every level a bot can actually be, not just the levels the random
+    // bot generator hands out. RandomBotMaxLevel caps what new random bots are
+    // created at; it does not cap what already exists. Characters made before
+    // the cap was lowered, bots levelled by a player, and bots that simply
+    // levelled past it are all above it, and a level with no cached locations
+    // meant RandomTeleport() bailed out with "no locations available" every
+    // time - those bots never relocated again for the life of the server.
+    uint32 maxLevel = sWorld.getConfig(CONFIG_UINT32_MAX_PLAYER_LEVEL);
 
     auto results = CharacterDatabase.PQuery("SELECT `map_id`, `x`, `y`, `z`, `level` FROM `ai_playerbot_tele_cache`");
     if (results)
@@ -3161,13 +3166,55 @@ void RandomPlayerbotMgr::PrintTeleportCache()
     }
 }
 
+// The grind-spot cache is built per level, and a level that ended up with no
+// spots is fatal to the bot standing on it: RandomTeleport() gives up, so the
+// bot is never moved anywhere again. That happens whenever the cache was built
+// for a narrower level range than the bots occupy - an existing
+// `ai_playerbot_tele_cache` filled under a lower RandomBotMaxLevel keeps its old
+// range, because the table is only rebuilt when it is empty. Hand back the
+// closest level that does have spots instead; a level 60 bot sent to a level 55
+// grind spot is in roughly the right part of the world, which beats standing
+// still forever.
+std::vector<WorldLocation>& RandomPlayerbotMgr::GrindLocationsForLevel(uint32 level)
+{
+    static std::vector<WorldLocation> s_noLocations;
+
+    auto exact = locsPerLevelCache.find(level);
+    if (exact != locsPerLevelCache.end() && !exact->second.empty())
+        return exact->second;
+
+    std::vector<WorldLocation>* nearest = nullptr;
+    uint32 nearestDistance = 0;
+    uint32 nearestLevel = 0;
+
+    for (auto& entry : locsPerLevelCache)
+    {
+        if (entry.second.empty())
+            continue;
+
+        uint32 const distance = entry.first > level ? entry.first - level : level - entry.first;
+        if (!nearest || distance < nearestDistance)
+        {
+            nearest = &entry.second;
+            nearestDistance = distance;
+            nearestLevel = entry.first;
+        }
+    }
+
+    if (!nearest)
+        return s_noLocations;
+
+    sLog.outDetail("No teleport locations cached for level %u, using level %u instead", level, nearestLevel);
+    return *nearest;
+}
+
 void RandomPlayerbotMgr::RandomTeleportForLevel(Player* bot, bool activeOnly)
 {
     if (bot->InBattleGround())
         return;
 
     sLog.outDetail("Preparing location to random teleporting bot %s for level %u", bot->GetName(), bot->GetLevel());
-    RandomTeleport(bot, locsPerLevelCache[bot->GetLevel()], false, activeOnly);
+    RandomTeleport(bot, GrindLocationsForLevel(bot->GetLevel()), false, activeOnly);
     Refresh(bot);
 
     WorldPosition botPos(bot);
@@ -4257,7 +4304,7 @@ void RandomPlayerbotMgr::RandomTeleportForRpg(Player* bot, bool activeOnly)
     if (locs->empty())
         locs = &rpgLocsCacheLevel[0][level];
     if (locs->empty())
-        locs = &locsPerLevelCache[level];
+        locs = &GrindLocationsForLevel(level);
 
     sLog.outDetail("Random teleporting bot %s for RPG (%zu locations available)", bot->GetName(), locs->size());
     RandomTeleport(bot, *locs, true, activeOnly);
