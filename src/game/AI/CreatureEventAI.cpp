@@ -667,6 +667,14 @@ void CreatureEventAI::MoveInLineOfSight(Unit* pWho)
 
 void CreatureEventAI::UpdateEventsOn_MoveInLineOfSight(Unit* pWho)
 {
+    // The relocation notifier hands us every unit that moved nearby, corpses and the
+    // ghosts of dead players included. A creature has nothing to react to there, and
+    // firing the event anyway also burns its repeat timer, so a live enemy arriving
+    // right behind the ghost finds the event on cooldown. BasicAI::MoveInLineOfSight
+    // draws the same line for its own proximity aggro.
+    if (!pWho->IsAlive())
+        return;
+
     for (auto& itr : m_CreatureEventAIList)
     {
         if (itr.Event.event_type == EVENT_T_OOC_LOS)
