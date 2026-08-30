@@ -812,6 +812,41 @@ void RandomPlayerbotMgr::ScaleBotActivity()
 
     setActivityPercentage(activityPercentage);
 
+    // TEMPORARY DIAGNOSTIC (bot travel/quest triage). Over a three hour run with a
+    // thousand bots, bot_events.csv held not one QuestTravelToGiver / ToTaker /
+    // ToObjective row, every one of the 828 deaths recorded the travel destination as
+    // "no destination", and 750 of 1223 accepted quests were pruned again by
+    // CleanQuestLogAction for lack of progress. All three are the same symptom: the
+    // travel branch never runs. Whether that is the activity governor holding bots in
+    // minimal mode or something broken further in is not visible from any existing log -
+    // activity_pid.csv carries the number but sweeps every bot's gear score twice a
+    // second to do it, which is not affordable here. One line a minute instead.
+    {
+        static uint32 lastActivityReport = 0;
+        uint32 const nowMS = WorldTimer::getMSTime();
+        if (!lastActivityReport || WorldTimer::getMSTimeDiff(lastActivityReport, nowMS) >= MINUTE * IN_MILLISECONDS)
+        {
+            lastActivityReport = nowMS;
+
+            uint32 total = 0, active = 0, canTravel = 0;
+            ForEachPlayerbot([&](Player* bot)
+            {
+                PlayerbotAI* botAi = GetBotAI(bot);
+                if (!botAi)
+                    return;
+
+                ++total;
+                if (botAi->AllowActivity(ALL_ACTIVITY))
+                    ++active;
+                if (botAi->AllowActivity(TRAVEL_ACTIVITY))
+                    ++canTravel;
+            });
+
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BOTACTIVITY] diff %ums, activity %.1f%%, %u of %u bots active, %u allowed to travel",
+                     sWorld.GetCurrentDiff(), activityPercentage, active, total, canTravel);
+        }
+    }
+
     if (sPlayerbotAIConfig.hasLog("activity_pid.csv"))
     {
         double virtualMemUsedByMe = 0;

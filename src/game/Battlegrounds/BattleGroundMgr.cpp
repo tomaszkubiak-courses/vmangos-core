@@ -928,11 +928,63 @@ void BattleGroundQueue::CheckForStrandedGroups()
     sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "BattleGroundQueue: %zu queued groups for only %zu queued players - at least one group is stranded and will never be removed.", groupCount, m_queuedPlayers.size());
 }
 
+// TEMPORARY DIAGNOSTIC (bot battleground triage). Over a three hour run with a
+// thousand bots and 6556 queue attempts, not one battleground ran: no row in
+// logs_battleground, no character left on a battleground map. Nothing on the way
+// from the queue to a started match is logged above LOG_LVL_DEBUG, so there is no
+// way to tell whether the bots ever reach the queue, whether they pile up on one
+// side, or whether matches form and nobody enters them. One line per queue per
+// minute, and only while somebody is waiting. Remove once the cause is known.
+void BattleGroundQueue::ReportQueueCensus(BattleGroundTypeId bgTypeId)
+{
+    uint32 const now = WorldTimer::getMSTime();
+    if (m_lastCensusTime && WorldTimer::getMSTimeDiff(m_lastCensusTime, now) < MINUTE * IN_MILLISECONDS)
+        return;
+
+    std::ostringstream census;
+    bool anyone = false;
+
+    for (uint32 bracket = BG_BRACKET_ID_FIRST; bracket < MAX_BATTLEGROUND_BRACKETS; ++bracket)
+    {
+        uint32 counts[BG_TEAMS_COUNT] = { 0, 0 };
+        uint32 invited[BG_TEAMS_COUNT] = { 0, 0 };
+
+        for (uint32 team = 0; team < BG_TEAMS_COUNT; ++team)
+        {
+            for (uint32 type = 0; type < BG_QUEUE_GROUP_TYPES_COUNT; type += BG_TEAMS_COUNT)
+            {
+                for (auto const* ginfo : m_queuedGroups[bracket][type + team])
+                {
+                    counts[team] += ginfo->players.size();
+                    if (ginfo->isInvitedToBgInstanceGuid)
+                        invited[team] += ginfo->players.size();
+                }
+            }
+        }
+
+        if (!counts[BG_TEAM_ALLIANCE] && !counts[BG_TEAM_HORDE])
+            continue;
+
+        anyone = true;
+        census << " [" << bracket << "] A " << counts[BG_TEAM_ALLIANCE] << "/" << invited[BG_TEAM_ALLIANCE]
+               << " H " << counts[BG_TEAM_HORDE] << "/" << invited[BG_TEAM_HORDE];
+    }
+
+    if (!anyone)
+        return;
+
+    m_lastCensusTime = now;
+    sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGQUEUE] bg %u queued (bracket: ally waiting/invited horde waiting/invited):%s",
+             bgTypeId, census.str().c_str());
+}
+
 void BattleGroundQueue::Update(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
     //ACE_Guard<ACE_Recursive_Thread_Mutex> guard(m_lock);
 
     RemoveOfflinePlayer();
+
+    ReportQueueCensus(bgTypeId);
 
     CheckForStrandedGroups();
 
@@ -1338,6 +1390,13 @@ BattleGround* BattleGroundMgr::CreateNewBattleGround(BattleGroundTypeId bgTypeId
 
     // will also set m_bgMap, instanceid
     sMapMgr.CreateBgMap(bg->GetMapId(), bg);
+
+    // TEMPORARY DIAGNOSTIC (bot battleground triage) - see ReportQueueCensus. A
+    // match forming is the one event that tells apart "the bots never fill a
+    // queue" from "matches form and nobody ports in". Remove with the census.
+    sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGQUEUE] created bg %u bracket %u as instance %u",
+             bgTypeId, bracketId, bg->GetInstanceID());
+
     return bg;
 }
 
