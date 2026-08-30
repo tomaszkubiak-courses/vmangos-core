@@ -773,7 +773,9 @@ bool BGJoinAction::JoinQueue(uint32 type)
    uint32 bgTypeId_ = bgTypeId;
 #endif
    uint32 instanceId = 0; // 0 = First Available
-   uint8 joinAsGroup = bot->GetGroup() && bot->GetGroup()->IsLeader(bot->GetObjectGuid());
+   // Alterac Valley has no group queue in 1.12 - the server rejects the request
+   // outright - so a bot leading a group must queue for it on its own.
+   uint8 joinAsGroup = bot->GetGroup() && bot->GetGroup()->IsLeader(bot->GetObjectGuid()) && bgTypeId != BATTLEGROUND_AV;
    bool isPremade = false;
    bool isArena = false;
    bool isRated = false;
@@ -797,22 +799,16 @@ bool BGJoinAction::JoinQueue(uint32 type)
        return false;
    }
 #endif
-   // Battlemaster NPC may not be loaded/active (bots scattered across the world).
-   // The server itself accepts guid raw value 1337 as a queue-via-command bypass
-   // (see WorldSession::HandleBattlemasterJoinOpcode, queuedviaCommand check) -
-   // use that instead of requiring a physically loaded Battlemaster Unit.
-   ObjectGuid bmFallbackGuid = ObjectGuid(uint64(1337));
 // in wotlk only arena requires battlemaster guid
 #ifndef MANGOSBOT_TWO
-   // Always the bypass, never the cached Battlemaster's own guid. A bot only
-   // needs one to be loaded nearby for "bg master" to hold a real guid, and
-   // sending that makes WorldSession::HandleBattlemasterJoinOpcode treat the
-   // request as a real click: it then runs GetNPCIfCanInteractWith, which a bot
-   // standing anywhere else fails. That path returns silently - no error, no
-   // log line - while shouldJoinBg has already counted the bot as queued.
-   // Measured with a player waiting in bracket 2: 28 bots accepted, 0 entries
-   // reached bg.log.
-   ObjectGuid guid = bmFallbackGuid;
+   // Leave the battlemaster guid empty. A bot only needs one loaded nearby for
+   // "bg master" to hold a real guid, and sending that makes the handler treat
+   // the request as a real click on that NPC: it then runs
+   // GetNPCIfCanInteractWith, which a bot standing anywhere else fails. Sending
+   // the bot's own guid instead claims a BG portal it is not standing in, which
+   // fails the same way. WorldSession::RequestBgJoinQueue skips both origin
+   // checks for bot sessions, so the guid carries no meaning here.
+   ObjectGuid guid;
 #else
    ObjectGuid guid = isArena ? unit->GetObjectGuid() : bot->GetObjectGuid();
 #endif
