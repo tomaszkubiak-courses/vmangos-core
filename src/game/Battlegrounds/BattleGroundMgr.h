@@ -111,6 +111,7 @@ class BattleGroundQueue
 
     private:
         void DropStaleQueueEntry(ObjectGuid guid);
+        void CheckForStrandedGroups();
         void RemoveOfflinePlayer();
         bool HasPlayersInQueue(BattleGroundBracketId bracketId);
         void CheckFreeSlots(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId);
@@ -152,6 +153,8 @@ class BattleGroundQueue
         uint32 m_waitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS][COUNT_OF_PLAYERS_TO_AVERAGE_WAIT_TIME];
         uint32 m_waitTimeLastPlayer[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];
         uint32 m_sumOfWaitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];
+
+        bool m_reportedStrandedGroups = false;
 };
 
 /*

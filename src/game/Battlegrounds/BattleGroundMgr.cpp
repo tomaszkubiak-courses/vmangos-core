@@ -905,11 +905,36 @@ bool BattleGroundQueue::CheckCreateNewBg(BattleGroundTypeId bgTypeId, BattleGrou
     return createdPremadeBg || createdNormalBg;
 }
 
+// Every group in m_queuedGroups is reachable from at least one entry in m_queuedPlayers,
+// and a group holds at least one player, so there can never be more groups than players.
+// More means a group was stranded: nothing points at it any more, so RemovePlayer will
+// never find it, it is never erased, and it keeps taking part in match making. Report the
+// first one, once per queue - a shutdown minidump showed 26 stranded groups against zero
+// queued players, one of them already freed and its memory handed out again.
+void BattleGroundQueue::CheckForStrandedGroups()
+{
+    if (m_reportedStrandedGroups)
+        return;
+
+    size_t groupCount = 0;
+    for (auto const& bracket : m_queuedGroups)
+        for (uint32 j = 0; j < BG_QUEUE_GROUP_TYPES_COUNT; ++j)
+            groupCount += bracket[j].size();
+
+    if (groupCount <= m_queuedPlayers.size())
+        return;
+
+    m_reportedStrandedGroups = true;
+    sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "BattleGroundQueue: %zu queued groups for only %zu queued players - at least one group is stranded and will never be removed.", groupCount, m_queuedPlayers.size());
+}
+
 void BattleGroundQueue::Update(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
     //ACE_Guard<ACE_Recursive_Thread_Mutex> guard(m_lock);
 
     RemoveOfflinePlayer();
+
+    CheckForStrandedGroups();
 
     if (!HasPlayersInQueue(bracketId))
         return;
