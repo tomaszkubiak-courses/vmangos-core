@@ -299,6 +299,21 @@ bool MovementAction::UseTaxi(PlayerbotAI* ai, uint32 entry, bool needNpc)
         }
     }
 
+    // ActivateTaxiPathTo reports every node of the path the bot has not discovered to the
+    // GMs as "Taxi: Attempt to use unknown node" before refusing the flight. The departure
+    // node is learned just above from the flight master standing on it, but the destination
+    // cannot be learned that way, and the travel node graph hands out flight legs without
+    // consulting the bot's taxi mask at all. A leg ending on an undiscovered node therefore
+    // only ever produced a cheat report, once per retry, until the caller gave up on it
+    // (observed live: one bot filed three reports from Booty Bay in twenty seconds).
+    // Fail the leg here instead - the caller already knows how to walk it.
+    if (!bot->IsTaxiCheater() &&
+        (!bot->GetTaxi().IsTaximaskNodeKnown(tEntry->from) || !bot->GetTaxi().IsTaximaskNodeKnown(tEntry->to)))
+    {
+        sLog.outDetail("Bot %s cannot fly %u->%u: node not discovered", bot->GetName(), tEntry->from, tEntry->to);
+        return false;
+    }
+
     uint32 botMoney = bot->GetMoney();
     if (ai->HasCheat(BotCheatMask::gold) || ai->HasCheat(BotCheatMask::taxi))
     {
