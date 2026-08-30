@@ -91,6 +91,13 @@ void WorldSession::RequestBgJoinQueue(ObjectGuid battlemaster, uint32 instanceId
     bool isPremade = false;
     Group* grp;
 
+    // A bot never receives this request from a client: the playerbot AI builds the
+    // packet inside the core and hands it straight to the handler, so there is no
+    // battlemaster it clicked on and no portal it is standing in. The origin checks
+    // below exist to validate what a client claims, and running them on a bot only
+    // rejects every queue attempt and reports it to the GMs as a cheat.
+    bool const requestFromBot = IsBotSession();
+
 #if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_6_1
     if (battlemaster == GetPlayer()->GetObjectGuid())
         queuedAtBGPortal = true;
@@ -105,30 +112,36 @@ void WorldSession::RequestBgJoinQueue(ObjectGuid battlemaster, uint32 instanceId
     }
     if (bgTypeId == BATTLEGROUND_AV && joinAsGroup)
     {
-        ProcessAnticheatAction("PassiveAnticheat", "Attempt to queue for AV as group", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+        if (!requestFromBot)
+            ProcessAnticheatAction("PassiveAnticheat", "Attempt to queue for AV as group", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
         return;
     }
 
 #if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_6_1
-    if (queuedAtBGPortal)
+    if (!requestFromBot)
     {
-        auto const& bgQueuePos = _player->GetBattleGroundEntryPoint();
-        if (_player->GetMapId() != bgQueuePos.mapId || !_player->IsWithinDist3d(bgQueuePos, 50.0f))
+        if (queuedAtBGPortal)
         {
-            ProcessAnticheatAction("PassiveAnticheat", "Attempt to queue for BG through out of range portal", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
-            return;
+            auto const& bgQueuePos = _player->GetBattleGroundEntryPoint();
+            if (_player->GetMapId() != bgQueuePos.mapId || !_player->IsWithinDist3d(bgQueuePos, 50.0f))
+            {
+                ProcessAnticheatAction("PassiveAnticheat", "Attempt to queue for BG through out of range portal", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                return;
+            }
         }
-    }
-    else
-    {
-        if (!_player->GetNPCIfCanInteractWith(battlemaster, UNIT_NPC_FLAG_BATTLEMASTER))
+        else
         {
-            ProcessAnticheatAction("PassiveAnticheat", "Attempt to queue for BG through invalid creature", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
-            return;
+            if (!_player->GetNPCIfCanInteractWith(battlemaster, UNIT_NPC_FLAG_BATTLEMASTER))
+            {
+                ProcessAnticheatAction("PassiveAnticheat", "Attempt to queue for BG through invalid creature", CHEAT_ACTION_LOG | CHEAT_ACTION_REPORT_GMS);
+                return;
+            }
         }
     }
 #else
-    if (!_player->FindNearestInteractableNpcWithFlag(UNIT_NPC_FLAG_BATTLEMASTER))
+    if (requestFromBot)
+        queuedAtBGPortal = false;
+    else if (!_player->FindNearestInteractableNpcWithFlag(UNIT_NPC_FLAG_BATTLEMASTER))
     {
         auto const& bgQueuePos = _player->GetBattleGroundEntryPoint();
         if (_player->GetMapId() != bgQueuePos.mapId || !_player->IsWithinDist3d(bgQueuePos, 50.0f))

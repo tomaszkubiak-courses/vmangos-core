@@ -970,7 +970,15 @@ bool Map::ScriptCommand_AttackStart(ScriptInfo const& script, WorldObject* sourc
 
     if (!pAttacker->IsValidAttackTarget(pTarget))
     {
-        sLog.Out(LOG_SCRIPTS, LOG_LVL_ERROR, "SCRIPT_COMMAND_ATTACK_START (script id %u) for an invalid attack target, skipping.", script.id);
+        // A target that cannot be attacked *right now* - dead, spawning, on a taxi,
+        // flagged unselectable or immune - says nothing about the script. Only a target
+        // the attacker could never attack, a friendly one above all, is a data error
+        // worth a GM's attention.
+        if (pTarget->IsTargetableBy(pAttacker))
+            sLog.Out(LOG_SCRIPTS, LOG_LVL_ERROR, "SCRIPT_COMMAND_ATTACK_START (script id %u) for an invalid attack target, skipping.", script.id);
+        else
+            sLog.Out(LOG_SCRIPTS, LOG_LVL_DETAIL, "SCRIPT_COMMAND_ATTACK_START (script id %u) for a target that is not attackable right now, skipping.", script.id);
+
         return ShouldAbortScript(script);
     }
 

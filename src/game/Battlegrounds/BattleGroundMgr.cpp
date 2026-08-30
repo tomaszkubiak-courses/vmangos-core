@@ -186,6 +186,7 @@ GroupQueueInfo* BattleGroundQueue::AddGroup(Player* leader, Group* grp, BattleGr
                 }
                 else
                 {
+                    DropStaleQueueEntry(member->GetObjectGuid());
                     PlayerQueueInfo& pl_info = m_queuedPlayers[member->GetObjectGuid()];
                     pl_info.online = true;
                     pl_info.lastOnlineTime = 0;
@@ -201,6 +202,7 @@ GroupQueueInfo* BattleGroundQueue::AddGroup(Player* leader, Group* grp, BattleGr
         }
         else
         {
+            DropStaleQueueEntry(leader->GetObjectGuid());
             PlayerQueueInfo& pl_info = m_queuedPlayers[leader->GetObjectGuid()];
             pl_info.online           = true;
             pl_info.lastOnlineTime   = 0;
@@ -216,7 +218,14 @@ GroupQueueInfo* BattleGroundQueue::AddGroup(Player* leader, Group* grp, BattleGr
         if (!ginfo->players.empty())
             m_queuedGroups[bracketId][index].push_back(ginfo);
         else
-            return ginfo; // group size was above limit
+        {
+            // Group size was above the limit, so every member was queued solo by the
+            // recursive calls above and this one holds nobody. It was never added to
+            // m_queuedGroups, so nothing will ever free it - do it here and let the
+            // caller see that there is no group info to read a wait time from.
+            delete ginfo;
+            return nullptr;
+        }
 
         //announce to world, this code needs mutex
         if (!isPremade && sWorld.getConfig(CONFIG_UINT32_BATTLEGROUND_QUEUE_ANNOUNCER_JOIN))
@@ -281,6 +290,11 @@ void BattleGroundQueue::PlayerInvitedToBgUpdateAverageWaitTime(GroupQueueInfo* g
 
 uint32 BattleGroundQueue::GetAverageQueueWaitTime(GroupQueueInfo* ginfo, BattleGroundBracketId bracketId)
 {
+    // AddGroup has nothing to hand back when a group was over the size limit and every
+    // member ended up queued solo. 0 is what this returns for "not available" anyway.
+    if (!ginfo)
+        return 0;
+
     uint8 teamIndex = BG_TEAM_ALLIANCE;                    //default set to BG_TEAM_ALLIANCE - or non rated arenas!
     if (ginfo->groupTeam == HORDE)
         teamIndex = BG_TEAM_HORDE;
@@ -290,6 +304,24 @@ uint32 BattleGroundQueue::GetAverageQueueWaitTime(GroupQueueInfo* ginfo, BattleG
     else
         //if there aren't enough values return 0 - not available
         return 0;
+}
+
+// A player holds at most one entry in m_queuedPlayers, and that entry is the only way
+// back to the GroupQueueInfo they belong to. Adding them again with operator[] would
+// overwrite it and strand the previous group in m_queuedGroups: nothing points at it
+// any more, so it is never erased, never freed, and keeps taking part in match making
+// on behalf of players who left. The player's own queue slot array is cleared on logout
+// while the queue entry deliberately stays behind (offline queue), so a relog that does
+// not go through BattleGroundMgr::PlayerLoggedIn walks straight into this.
+void BattleGroundQueue::DropStaleQueueEntry(ObjectGuid guid)
+{
+    if (m_queuedPlayers.find(guid) == m_queuedPlayers.end())
+        return;
+
+    sLog.Out(LOG_BASIC, LOG_LVL_DETAIL, "BattleGroundQueue: %s was still queued when joining again, dropping the previous entry.", guid.GetString().c_str());
+    // Any invite the old entry was holding is abandoned by this, so the battleground it
+    // named has to get its free slot back.
+    RemovePlayer(guid, true);
 }
 
 // remove player from queue and from group info, if group info is empty then remove it too
@@ -339,6 +371,12 @@ void BattleGroundQueue::RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount)
     if (bracketId == -1)
     {
         sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "BattleGroundQueue: ERROR Cannot find groupinfo for %s", guid.GetString().c_str());
+        // The group this entry names is in no queue any more, so it may already be
+        // freed - do not touch it. Returning with the entry in place leaves the player
+        // queued forever from m_queuedPlayers' point of view, and the next AddGroup for
+        // them would overwrite it and strand whichever group it points at now, so drop
+        // the entry instead.
+        m_queuedPlayers.erase(itr);
         return;
     }
     sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "BattleGroundQueue: Removing %s, from bracketId %u", guid.GetString().c_str(), (uint32)bracketId);
@@ -867,11 +905,36 @@ bool BattleGroundQueue::CheckCreateNewBg(BattleGroundTypeId bgTypeId, BattleGrou
     return createdPremadeBg || createdNormalBg;
 }
 
+// Every group in m_queuedGroups is reachable from at least one entry in m_queuedPlayers,
+// and a group holds at least one player, so there can never be more groups than players.
+// More means a group was stranded: nothing points at it any more, so RemovePlayer will
+// never find it, it is never erased, and it keeps taking part in match making. Report the
+// first one, once per queue - a shutdown minidump showed 26 stranded groups against zero
+// queued players, one of them already freed and its memory handed out again.
+void BattleGroundQueue::CheckForStrandedGroups()
+{
+    if (m_reportedStrandedGroups)
+        return;
+
+    size_t groupCount = 0;
+    for (auto const& bracket : m_queuedGroups)
+        for (uint32 j = 0; j < BG_QUEUE_GROUP_TYPES_COUNT; ++j)
+            groupCount += bracket[j].size();
+
+    if (groupCount <= m_queuedPlayers.size())
+        return;
+
+    m_reportedStrandedGroups = true;
+    sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "BattleGroundQueue: %zu queued groups for only %zu queued players - at least one group is stranded and will never be removed.", groupCount, m_queuedPlayers.size());
+}
+
 void BattleGroundQueue::Update(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
     //ACE_Guard<ACE_Recursive_Thread_Mutex> guard(m_lock);
 
     RemoveOfflinePlayer();
+
+    CheckForStrandedGroups();
 
     if (!HasPlayersInQueue(bracketId))
         return;

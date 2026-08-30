@@ -2683,6 +2683,23 @@ void Map::ScriptsProcess()
         ScriptAction const step = iter->second;
         lock.unlock();
 
+        // A script whose source object has left the world can never make progress:
+        // every step still queued resolves the same missing guid, fails, and logs an
+        // error of its own. Game events unspawn creatures without regard for the
+        // scripts running on them - the Southshore Crier of event 152 leaves 45 steps
+        // outstanding when its 35 minutes are up - so drop the remainder instead.
+        if (!step.sourceGuid.IsEmpty())
+        {
+            WorldObject* pOwner = GetWorldObjectOrPlayer(step.sourceGuid);
+            if (!pOwner || !pOwner->IsInWorld())
+            {
+                lock.lock();
+                TerminateScript(step);
+                iter = m_scriptSchedule.begin();
+                continue;
+            }
+        }
+
         WorldObject* source = nullptr;
         WorldObject* target = nullptr;
 

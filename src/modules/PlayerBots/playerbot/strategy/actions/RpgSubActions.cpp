@@ -168,7 +168,14 @@ bool RpgTaxiAction::Execute(Event& event)
     for (uint32 i = 0; i < sTaxiPathStore.GetNumRows(); ++i)
     {
         TaxiPathEntry const* entry = sTaxiPathStore.LookupEntry(i);
-        if (entry && entry->from == node && (bot->GetTaxi().IsTaximaskNodeKnown(entry->to) || bot->IsTaxiCheater()))
+
+        // The departure point has to be known as well, not just the destination.
+        // ActivateTaxiPathTo checks every node of the path it is handed and reports an
+        // unknown one to the GMs as "Taxi: Attempt to use unknown node" before refusing
+        // the flight, so offering a path whose near end the bot has not discovered only
+        // ever produced a cheat report.
+        if (entry && entry->from == node &&
+            (bot->IsTaxiCheater() || (bot->GetTaxi().IsTaximaskNodeKnown(entry->from) && bot->GetTaxi().IsTaximaskNodeKnown(entry->to))))
         {
             // Only destinations usable by the bot's own faction. Previously
             // the sole check was whether the flight point is KNOWN - but with
@@ -208,7 +215,9 @@ bool RpgTaxiAction::Execute(Event& event)
     Creature* flightMaster = bot->GetNPCIfCanInteractWith(guidP, UNIT_NPC_FLAG_FLIGHTMASTER);
     if (!flightMaster)
     {
-        sLog.outError("Bot %s cannot talk to flightmaster (%zu location available)", bot->GetName(), nodes.size());
+        // The bot walked out of interaction range while the action was running. It is
+        // retried on a later tick, so this is not an error.
+        sLog.outDetail("Bot %s cannot talk to flightmaster (%zu location available)", bot->GetName(), nodes.size());
         return false;
     }
 #ifdef MANGOSBOT_TWO                
@@ -227,7 +236,9 @@ bool RpgTaxiAction::Execute(Event& event)
     if (!bot->ActivateTaxiPathTo({ entry->from, entry->to }, flightMaster, 0))
     {
         bot->SetMoney(money);
-        sLog.outError("Bot %s cannot fly %u (%zu location available)", bot->GetName(), path, nodes.size());
+        // Refused by the core, most often because the bot is not standing close enough
+        // to the departure point yet. Retried on a later tick.
+        sLog.outDetail("Bot %s cannot fly %u (%zu location available)", bot->GetName(), path, nodes.size());
         return false;
     }
 

@@ -310,6 +310,19 @@ class WorldSession
         PlayerBotEntry* GetBot() const { return m_bot.get(); }
         void SetBot(std::shared_ptr<PlayerBotEntry> const& b) { m_bot = b; }
 
+        // True for a character no client is driving, whichever bot system owns it. The
+        // core's own bots in src/game/PlayerBots carry a PlayerBotEntry; the playerbots
+        // module builds a socketless session and marks that instead, so a check on one
+        // marker alone misses every character the other system drives.
+        bool IsBotSession() const
+        {
+#ifdef BUILD_PLAYERBOTS
+            if (IsPlayerbotSession())
+                return true;
+#endif
+            return GetBot() != nullptr;
+        }
+
         // Warden / Anticheat
         void InitWarden();
         void SetSessionKey(BigNumber const& sessionKey) { m_sessionKey = sessionKey; }

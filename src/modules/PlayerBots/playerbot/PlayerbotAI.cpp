@@ -8523,7 +8523,10 @@ void PlayerbotAI::EnchantItemT(uint32 spellid, uint8 slot, Item* item)
       !((1 << pItem->GetProto()->InventoryType) & spellInfo->EquippedItemInventoryTypeMask))
    {
 
-      sLog.outError("%s: items could not be enchanted, wrong item type equipped", bot->GetName());
+      // The enchant list is per class and spec, so it names enchants for every slot the
+      // spec can fill. Whichever weapon or armour type the bot actually ended up with,
+      // some of those will not apply to it. Skipping them is the normal outcome.
+      sLog.outDetail("%s: items could not be enchanted, wrong item type equipped", bot->GetName());
 
       return;
    }
