@@ -31,6 +31,19 @@ bool AcceptAllQuestsAction::ProcessQuest(Player* requester, Quest const* quest, 
     if (turtleOnlyBlacklist.count(quest->GetQuestId()))
         return false;
 
+    // Do not take a quest that is red for this bot. CleanQuestLogAction drops
+    // gray and red quests before anything else, and dropping one resets it to
+    // available, so the giver the bot is still standing next to hands it back
+    // and the pair repeats: 682 of the 869 quests dropped in a two hour run
+    // were red, most of them the level 60 war effort collections, which carry
+    // MinLevel 1 and so are offered to a bot of any level. TravelMgr already
+    // refuses to travel for a quest this far above the bot (TravelMgr.cpp,
+    // GetQuestLevel() >= level + 5); this is the same line, applied where the
+    // quest is taken. A bot with a real master keeps taking whatever it is
+    // pointed at - that bot does not clean its own log either.
+    if (!ai->HasActivePlayerMaster() && bot->GetLevel() + 5 <= bot->GetQuestLevelForPlayer(quest))
+        return false;
+
     if (AcceptQuest(requester, quest, questGiver->GetObjectGuid()))
     {
         if (sPlayerbotAIConfig.globalSoundEffects)
