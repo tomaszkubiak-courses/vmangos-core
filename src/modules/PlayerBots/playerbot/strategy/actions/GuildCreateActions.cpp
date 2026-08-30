@@ -124,13 +124,24 @@ bool PetitionOfferAction::Execute(Event& event)
     // it only logs "[PetitionHandler] No petition exists for charter with guid N"
     // and does nothing. Offer one the guild manager still knows about.
     Item* petition = nullptr;
+    Petition* petitionRecord = nullptr;
     for (Item* item : petitions)
     {
-        if (item && sGuildMgr.GetPetitionByCharterGuid(item->GetObjectGuid()))
-        {
-            petition = item;
-            break;
-        }
+        if (!item)
+            continue;
+
+        Petition* record = sGuildMgr.GetPetitionByCharterGuid(item->GetObjectGuid());
+
+        // A charter that already carries its last signature cannot be signed by anyone
+        // else: HandlePetitionSignOpcode refuses it and the client greys the Sign button
+        // out. Offering it around is pure noise - and it was the normal state here,
+        // because bots never turned a completed charter in.
+        if (!record || record->IsComplete())
+            continue;
+
+        petition = item;
+        petitionRecord = record;
+        break;
     }
 
     if (!petition)
@@ -165,19 +176,17 @@ bool PetitionOfferAction::Execute(Event& event)
     data << petition->GetObjectGuid();
     data << guid;
 
-    auto result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE player_account = '%u' AND petition_guid = '%u'", player->GetSession()->GetAccountId(), petition->GetObjectGuid().GetCounter());
-
-    if (result)
-    {
+    // Both of these used to be queries against `petition_sign`.`petition_guid` keyed by
+    // the charter's item guid. That column holds the petition id instead, so the "has
+    // this account signed already" guard never fired - which is why the same bot kept
+    // offering the same charter to someone who had already signed it - and the signature
+    // count written back below was always 0. The manager has both in memory.
+    if (petitionRecord->GetSignatureForAccount(player->GetSession()->GetAccountId()))
         return false;
-    }
 
     bot->GetSession()->BotHandleOfferPetitionOpcode(data);
 
-    result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE petition_guid = '%u'", petition->GetObjectGuid().GetCounter());
-    uint8 signs = result ? (uint8)result->GetRowCount() : 0;
-
-    context->GetValue<uint8>("petition signs")->Set(signs);
+    context->GetValue<uint8>("petition signs")->Set(petitionRecord->GetSignatureCount());
 
     return true;
 };
@@ -249,6 +258,42 @@ bool PetitionTurnInAction::Execute(Event& event)
     if (petitions.empty())
         return false;
 
+    // Hand in the charter that actually has its signatures, not whichever one happens to
+    // sit first in the bags: a bot can carry a charter whose petition record is gone, and
+    // HandleTurnInPetitionOpcode refuses anything short of the full count.
+    Item* petition = nullptr;
+    Petition* petitionRecord = nullptr;
+    for (Item* item : petitions)
+    {
+        if (!item)
+            continue;
+
+        Petition* record = sGuildMgr.GetPetitionByCharterGuid(item->GetObjectGuid());
+        if (record && record->IsComplete())
+        {
+            petition = item;
+            petitionRecord = record;
+            break;
+        }
+    }
+
+    if (!petition)
+        return false;
+
+    // Charter names are drawn from ai_playerbot_guild_names, which only excludes names
+    // already taken by a guild - two bots can and do end up carrying charters with the
+    // same name. HandleTurnInPetitionOpcode then answers ERR_GUILD_NAME_EXISTS_S and
+    // returns, leaving "can hand in petition" true forever, so the loser would walk back
+    // to a guild master every time and never form a guild. Take a fresh name instead.
+    if (sGuildMgr.GetGuildByName(petitionRecord->GetName()))
+    {
+        std::string const newName = RandomPlayerbotFactory::CreateRandomGuildName();
+        if (newName.empty())
+            return false;
+
+        petitionRecord->Rename(newName);
+    }
+
     for (std::list<ObjectGuid>::iterator i = vendors.begin(); i != vendors.end(); ++i)
     {
         ObjectGuid vendorguid = *i;
@@ -257,11 +302,6 @@ bool PetitionTurnInAction::Execute(Event& event)
             continue;
 
         WorldPacket data(CMSG_TURN_IN_PETITION, 8);
-
-        Item* petition = petitions.front();
-
-        if (!petition)
-            return false;
 
         data << petition->GetObjectGuid();
 

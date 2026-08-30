@@ -1270,9 +1270,22 @@ uint8 PetitionSignsValue::Calculate()
     if (petitions.empty())
         return 0;
 
-    auto result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE petition_guid = '%u'", petitions.front()->GetObjectGuid().GetCounter());
+    // `petition_sign`.`petition_guid` is the petition's own id (Petition::GetId), not the
+    // guid of the charter item it belongs to - see PetitionSignature::SaveToDB. Querying
+    // it with the item guid matched nothing, ever, so this value was always 0, "can hand
+    // in petition" was never true and no bot ever turned a charter in: 345 petitions and
+    // 323 of them fully signed had produced exactly zero guilds. The guild manager holds
+    // the signatures in memory anyway, so no query is needed at all.
+    for (Item* item : petitions)
+    {
+        if (!item)
+            continue;
 
-    return result ? (uint8)result->GetRowCount() : 0;
+        if (Petition const* petition = sGuildMgr.GetPetitionByCharterGuid(item->GetObjectGuid()))
+            return petition->GetSignatureCount();
+    }
+
+    return 0;
 };
 
 bool CanBuyTabard::Calculate()
