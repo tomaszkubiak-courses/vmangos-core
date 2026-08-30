@@ -1949,10 +1949,16 @@ class Player final: public Unit
         /*********************************************************/
 
     private:
+        // No vanilla cinematic runs anywhere near this long - the longest, the
+        // human intro, is under a minute and a half. Ending the cinematic here
+        // only ever affects a client that has stopped answering.
+        static uint32 const CINEMATIC_MAX_DURATION = 5 * MINUTE * IN_MILLISECONDS;
+
         uint32 m_currentCinematicEntry;
         Position m_cinematicStartPos;
         uint32 m_cinematicLastCheck;
         uint32 m_cinematicElapsedTime;
+        bool m_cinematicHasWaypoints;
         void UpdateCinematic(uint32 diff);
     public:
         void SendCinematicStart(uint32 CinematicSequenceId);

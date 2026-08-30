@@ -1327,6 +1327,7 @@ class ObjectMgr
         void LoadCinematicsWaypoints();
         Position const* GetCinematicPosition(uint32 cinematicId, uint32 elapsed_time);
         Position const* GetCinematicInitialPosition(uint32 cinematicId);
+        bool HasCinematicWaypoints(uint32 cinematicId) const;
         std::vector<CinematicWaypointEntry> m_CinematicWaypoints;
         // Phasing
         void LoadPlayerPhaseFromDb();
