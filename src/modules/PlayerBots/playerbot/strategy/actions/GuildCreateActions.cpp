@@ -119,6 +119,23 @@ bool PetitionOfferAction::Execute(Event& event)
     if (petitions.empty())
         return false;
 
+    // A charter whose petition record is gone - the guild was created, or the
+    // petition was removed under it - is still an item in the bags, and offering
+    // it only logs "[PetitionHandler] No petition exists for charter with guid N"
+    // and does nothing. Offer one the guild manager still knows about.
+    Item* petition = nullptr;
+    for (Item* item : petitions)
+    {
+        if (item && sGuildMgr.GetPetitionByCharterGuid(item->GetObjectGuid()))
+        {
+            petition = item;
+            break;
+        }
+    }
+
+    if (!petition)
+        return false;
+
     ObjectGuid guid = event.getObject();
 
     Player* master = GetMaster();
@@ -145,10 +162,10 @@ bool PetitionOfferAction::Execute(Event& event)
 #ifndef MANGOSBOT_ZERO
     data << uint32(0);
 #endif
-    data << petitions.front()->GetObjectGuid();
+    data << petition->GetObjectGuid();
     data << guid;
 
-    auto result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE player_account = '%u' AND petition_guid = '%u'", player->GetSession()->GetAccountId(), petitions.front()->GetObjectGuid().GetCounter());
+    auto result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE player_account = '%u' AND petition_guid = '%u'", player->GetSession()->GetAccountId(), petition->GetObjectGuid().GetCounter());
 
     if (result)
     {
@@ -157,7 +174,7 @@ bool PetitionOfferAction::Execute(Event& event)
 
     bot->GetSession()->BotHandleOfferPetitionOpcode(data);
 
-    result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE petition_guid = '%u'", petitions.front()->GetObjectGuid().GetCounter());
+    result = CharacterDatabase.PQuery("SELECT player_guid FROM petition_sign WHERE petition_guid = '%u'", petition->GetObjectGuid().GetCounter());
     uint8 signs = result ? (uint8)result->GetRowCount() : 0;
 
     context->GetValue<uint8>("petition signs")->Set(signs);

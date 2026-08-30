@@ -195,8 +195,6 @@ bool RpgTaxiAction::Execute(Event& event)
     }
 
     uint32 path = nodes[urand(0, nodes.size() - 1)];
-    uint32 money = bot->GetMoney();
-    bot->SetMoney(money + 100000);
 
     TaxiPathEntry const* entry = sTaxiPathStore.LookupEntry(path);
     if (!entry)
@@ -216,8 +214,19 @@ bool RpgTaxiAction::Execute(Event& event)
 #ifdef MANGOSBOT_TWO                
     bot->GetTaxi().ClearTaxiDestinations();
 #endif
+
+    // Bots fly for free: lend the fare, then put the purse back exactly as it
+    // was. The top-up has to be balanced on every exit from here - it used to
+    // be applied before the lookups and the flight master check above, and
+    // none of those failure returns restored it, so each failed attempt left
+    // the bot 10 gold richer. 21 failures in one 85-minute run minted 210
+    // gold into an economy the bots trade and run auctions in.
+    uint32 money = bot->GetMoney();
+    bot->SetMoney(money + 100000);
+
     if (!bot->ActivateTaxiPathTo({ entry->from, entry->to }, flightMaster, 0))
     {
+        bot->SetMoney(money);
         sLog.outError("Bot %s cannot fly %u (%zu location available)", bot->GetName(), path, nodes.size());
         return false;
     }
@@ -834,7 +843,7 @@ bool RpgEnchantAction::Execute(Event& event)
                     if (bot->GetGroup() && bot->GetGroup()->IsMember(guidP))
                         ai->TellPlayerNoFacing(GetMaster(), "Let me enchant this " + chat->formatItem(item) + " with " + chat->formatSpell(spellId) + " for you " + player->GetName() + ".", PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
                     else
-                        bot->Say("Let me enchant this " + chat->formatItem(item) + " with " + chat->formatSpell(spellId) + " for you " + player->GetName() + ".", (bot->GetTeam() == ALLIANCE ? LANG_COMMON : LANG_ORCISH));
+                        bot->Say(ChatHelper::stripUnsupportedLinks("Let me enchant this " + chat->formatItem(item) + " with " + chat->formatSpell(spellId) + " for you " + player->GetName() + "."), (bot->GetTeam() == ALLIANCE ? LANG_COMMON : LANG_ORCISH));
 
                     WorldPacket p;
                     uint32 status = TRADE_STATUS_TRADE_ACCEPT;

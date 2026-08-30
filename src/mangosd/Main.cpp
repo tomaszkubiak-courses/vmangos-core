@@ -38,6 +38,10 @@
 #include "Errors.h"
 
 #ifdef WIN32
+#include <stdio.h>
+#endif
+
+#ifdef WIN32
 #include "ServiceWin32.h"
 char serviceName[] = "mangosd";
 char serviceLongName[] = "MaNGOS world service";
@@ -151,6 +155,16 @@ extern int main(int argc, char **argv)
 {
 #ifdef WIN32
     SetUnhandledExceptionFilter(&MangosUnhandledExceptionFilter);
+
+    // The Windows CRT caps a process at 512 simultaneously open FILE streams
+    // by default. mangosd shares that budget between the world log files, the
+    // DBC/map/vmap/mmap loaders, the MySQL client and anything a module keeps
+    // open, and it is reachable: a 200-bot run with per-bot action logs
+    // enabled crossed it 39 minutes in, after which every unrelated fopen in
+    // the process failed - reported as 152 "VMapManager2: could not load"
+    // errors for model files that were on disk and intact. Raise the ceiling
+    // so an unrelated subsystem cannot starve map loading.
+    _setmaxstdio(2048);
 #endif
 
     ServerStartupArguments args;

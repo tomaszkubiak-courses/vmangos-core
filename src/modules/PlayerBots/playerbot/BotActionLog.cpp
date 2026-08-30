@@ -31,7 +31,9 @@
 
 namespace ai { namespace botdiag {
 
-std::unordered_map<uint32, std::FILE*> BotActionLog::sFiles;
+std::unordered_map<uint32, BotActionLog::OpenFile> BotActionLog::sFiles;
+std::unordered_map<uint32, std::string> BotActionLog::sPaths;
+uint64 BotActionLog::sUseCounter = 0;
 
 // sFiles is reachable from any map thread (Spell.cpp / Unit.cpp hooks fire
 // on whatever thread is updating that bot's map). Guard every read/write so
@@ -107,20 +109,37 @@ std::FILE* BotActionLog::Open(PlayerbotAI* ai)
 
     uint32 guid = bot->GetGUIDLow();
 
+    std::string path;
+    bool firstOpen = false;
     {
         std::lock_guard<std::mutex> g(sFilesMutex);
         auto it = sFiles.find(guid);
-        if (it != sFiles.end() && it->second)
-            return it->second;
+        if (it != sFiles.end() && it->second.fp)
+        {
+            it->second.lastUse = ++sUseCounter;
+            return it->second.fp;
+        }
+
+        // Reuse the path from an earlier open, so a handle evicted under the
+        // cap resumes the bot's existing file instead of starting a new one
+        // under a fresh timestamp.
+        auto pathItr = sPaths.find(guid);
+        if (pathItr != sPaths.end())
+            path = pathItr->second;
+        else
+            firstOpen = true;
     }
 
-    EnsureLogDir();
-    std::string path = BuildPath(bot);
-    if (path.empty()) return nullptr;
+    if (path.empty())
+    {
+        EnsureLogDir();
+        path = BuildPath(bot);
+        if (path.empty()) return nullptr;
+    }
 
     // Append rather than truncate: BuildPath embeds a timestamp so collisions
-    // are unlikely, but append is the right default if one ever happens
-    // (e.g. clock-skew, manual file resurrection).
+    // are unlikely, but append is also what lets an evicted handle resume the
+    // file it was already writing.
     FILE* f = fopen(path.c_str(), "a");
     if (!f)
     {
@@ -131,21 +150,33 @@ std::FILE* BotActionLog::Open(PlayerbotAI* ai)
 
     {
         std::lock_guard<std::mutex> g(sFilesMutex);
-        // Another thread may have raced us through the open()+fopen window
+        // Another thread may have raced us through the find()+fopen window
         // for the same guid. If so, close our handle and use theirs.
         auto race = sFiles.find(guid);
-        if (race != sFiles.end() && race->second)
+        if (race != sFiles.end() && race->second.fp)
         {
             fclose(f);
-            return race->second;
+            race->second.lastUse = ++sUseCounter;
+            return race->second.fp;
         }
-        sFiles[guid] = f;
+
+        // Stay inside the process-wide FILE budget. Eviction only closes the
+        // stream; the path stays in sPaths and the next write reopens it.
+        while (sFiles.size() >= kMaxOpenFiles)
+            EvictOldestLocked();
+
+        sPaths[guid] = path;
+        sFiles[guid] = OpenFile{ f, ++sUseCounter };
     }
+
+    if (!firstOpen)
+        return f;
+
     SC_LOG("BotActionLog opened bot=%s path=%s", bot->GetName(), path.c_str());
 
     // Header line: human-readable; subsequent lines are tag-prefixed
     // events.
-    fprintf(f, "# BotActionLog v1 — bot=%s guid=%u accountId=%u opened=%s\n",
+    fprintf(f, "# BotActionLog v1 - bot=%s guid=%u accountId=%u opened=%s\n",
             bot->GetName(), guid,
             bot->GetSession() ? bot->GetSession()->GetAccountId() : 0u,
             path.c_str());
@@ -154,19 +185,40 @@ std::FILE* BotActionLog::Open(PlayerbotAI* ai)
     return f;
 }
 
+void BotActionLog::EvictOldestLocked()
+{
+    auto oldest = sFiles.end();
+    for (auto it = sFiles.begin(); it != sFiles.end(); ++it)
+        if (oldest == sFiles.end() || it->second.lastUse < oldest->second.lastUse)
+            oldest = it;
+
+    if (oldest == sFiles.end())
+        return;
+
+    if (oldest->second.fp)
+        fclose(oldest->second.fp);
+    sFiles.erase(oldest);
+}
+
 void BotActionLog::Close(PlayerbotAI* ai)
 {
     if (!ai) return;
     Player* bot = ai->GetBot();
     if (!bot) return;
 
-    uint32 guid = bot->GetGUIDLow();
+    Close(bot->GetGUIDLow());
+    SC_LOG("BotActionLog closed bot=%s", bot->GetName());
+}
+
+void BotActionLog::Close(uint32 guid)
+{
     std::FILE* handle = nullptr;
     {
         std::lock_guard<std::mutex> g(sFilesMutex);
+        sPaths.erase(guid);
         auto it = sFiles.find(guid);
         if (it == sFiles.end()) return;
-        handle = it->second;
+        handle = it->second.fp;
         sFiles.erase(it);
     }
     if (handle)
@@ -175,7 +227,25 @@ void BotActionLog::Close(PlayerbotAI* ai)
         fflush(handle);
         fclose(handle);
     }
-    SC_LOG("BotActionLog closed bot=%s", bot->GetName());
+}
+
+void BotActionLog::CloseAll()
+{
+    std::unordered_map<uint32, OpenFile> taken;
+    {
+        std::lock_guard<std::mutex> g(sFilesMutex);
+        taken.swap(sFiles);
+        sPaths.clear();
+    }
+    for (auto& entry : taken)
+    {
+        if (!entry.second.fp)
+            continue;
+        fprintf(entry.second.fp, "# end-of-log (CloseAll called)\n");
+        fflush(entry.second.fp);
+        fclose(entry.second.fp);
+    }
+    SC_LOG("BotActionLog closed %u remaining handles", (uint32)taken.size());
 }
 
 std::FILE* BotActionLog::GetHandle(PlayerbotAI* ai)
@@ -186,8 +256,11 @@ std::FILE* BotActionLog::GetHandle(PlayerbotAI* ai)
     {
         std::lock_guard<std::mutex> g(sFilesMutex);
         auto it = sFiles.find(bot->GetGUIDLow());
-        if (it != sFiles.end() && it->second)
-            return it->second;
+        if (it != sFiles.end() && it->second.fp)
+        {
+            it->second.lastUse = ++sUseCounter;
+            return it->second.fp;
+        }
     }
     // Lazy-open on first use. Open() itself gates on AiPlayerbot.EnableActionLog,
     // returning nullptr (and not creating any file) when the flag is off.

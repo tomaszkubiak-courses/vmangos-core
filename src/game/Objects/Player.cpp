@@ -13347,6 +13347,16 @@ void Player::RewardQuest(Quest const* pQuest, uint32 reward, WorldObject* questE
             DestroyItemCount(pQuest->ReqItemId[i], pQuest->ReqItemCount[i], true);
     }
 
+    // Take back the item the quest handed out when it was accepted. Abandoning
+    // a quest already does this through RemoveQuestAtSlot; turning one in did
+    // not, so a source item that is not also a required item stayed in the bag
+    // for good - the Lieutenant's Insignia from "Hidden Enemies" being the one
+    // that got reported. ObjectMgr::LoadQuests clears the flag for the chains
+    // whose next quest still needs the item. The msg argument is false because
+    // there is nothing to reject here: the quest is already being rewarded.
+    if (pQuest->ShouldDestroySrcItemOnReward())
+        TakeOrReplaceQuestStartItems(questId, false, false);
+
     RemoveTimedQuest(questId);
 
     if (BattleGround* bg = GetBattleGround())
@@ -22492,7 +22502,17 @@ void Player::AddCooldown(SpellEntry const* spellEntry, ItemPrototype const* item
         auto& cdData = cdDataItr->second;
         if (!cdData->IsPermanent() && (!cdData->IsSpellCDExpired(sWorld.GetCurrentClockTime()) || !cdData->IsCatCDExpired(sWorld.GetCurrentClockTime())))
         {
-            sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Player::AddCooldown> Spell(%u) try to add and already existing cooldown?", spellEntry->Id);
+            // Refusing to overwrite a cooldown that is still running is the
+            // right call, and several routine paths reach it, so this is not
+            // an error. An auto-repeat ranged spell re-arms its own
+            // RANGEDATTACKTIME cooldown on every shot - Spell::CheckCast
+            // already exempts those from the ready check for exactly that
+            // reason - and ApplyEquipCooldown stamps a 30-second cooldown on
+            // an ON_USE item spell that may still be on a longer one from an
+            // earlier use. Between them, Auto Shot, wand Shoot and re-equipped
+            // trinkets accounted for every one of the 371 hits in an
+            // 85-minute run.
+            sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "Player::AddCooldown> Spell(%u) already has a running cooldown, keeping the existing one", spellEntry->Id);
             return;
         }
         wasPermanent = cdData->IsPermanent();

@@ -298,6 +298,12 @@ class Quest
         uint32 OfferRewardEmote[QUEST_EMOTE_COUNT];
         uint32 OfferRewardEmoteDelay[QUEST_EMOTE_COUNT];
 
+        // Whether RewardQuest should destroy the item this quest handed out at
+        // accept time (SrcItemId). True for most quests; ObjectMgr::LoadQuests
+        // clears it for the handful whose source item a following quest still
+        // needs. See ObjectMgr::LoadQuests.
+        bool ShouldDestroySrcItemOnReward() const { return m_destroySrcItemOnReward; }
+
         uint32 GetReqItemsCount() const { return m_reqitemscount; }
         uint32 GetReqCreatureOrGOcount() const { return m_reqCreatureOrGOcount; }
         uint32 GetRewChoiceItemsCount() const { return m_rewchoiceitemscount; }
@@ -309,6 +315,8 @@ class Quest
 
         // cached data
     private:
+        bool m_destroySrcItemOnReward = true;
+
         uint32 m_reqitemscount = 0;
         uint32 m_reqCreatureOrGOcount = 0;
         uint32 m_rewchoiceitemscount = 0;

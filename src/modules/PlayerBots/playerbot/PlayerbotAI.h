@@ -578,6 +578,11 @@ public:
 	Player* GetBot() { return bot; }
     Player* GetMaster() const { return master; }
 
+    // Drop the cached master pointer if the Player it names is gone.
+    // Must be called before any code path dereferences `master` outside
+    // the bot's own update tick. See the comment on SetMaster().
+    void RevalidateMasterPointer();
+
     // accessor for the active engine so
     // cpp can build heartbeat / debug payloads without being
     // a friend class. Read-only.

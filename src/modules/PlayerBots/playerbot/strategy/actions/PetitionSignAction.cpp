@@ -1,6 +1,7 @@
 
 #include "playerbot/playerbot.h"
 #include "PetitionSignAction.h"
+#include "Guild/GuildMgr.h"
 #ifndef MANGOSBOT_ZERO
 #ifdef CMANGOS
 #include "Arena/ArenaTeam.h"
@@ -74,6 +75,15 @@ bool PetitionSignAction::Execute(Event& event)
         }
         delete result;*/
     }
+
+    // The petition can be gone by the time this action runs - the owner may
+    // have turned the charter in or destroyed it since the offer. On vanilla
+    // the only existence check above is inside #ifndef MANGOSBOT_ZERO, so it
+    // is compiled out here and the bot signed blind, which is what produced
+    // "[PetitionHandler] No petition exists for charter with guid N" in the
+    // server log.
+    if (!sGuildMgr.GetPetitionByCharterGuid(petitionGuid))
+        return false;
 
     Player* _inviter = sObjectMgr.GetPlayer(inviter);
     if (!_inviter)

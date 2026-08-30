@@ -255,6 +255,25 @@ PlayerbotAI::~PlayerbotAI()
         delete aiObjectContext;
 }
 
+// Revalidate the cached master pointer against ObjectAccessor BEFORE any
+// code path can deref it. If the master Player was destroyed since
+// SetMaster() was called (typical when master logs out / disconnects),
+// FindPlayer returns nullptr or a different live pointer. We null `master`
+// defensively. The masterGuid shadow (set in SetMaster, see PlayerbotAI.h)
+// is the safe lookup key - we never deref the cached `master` pointer here.
+void PlayerbotAI::RevalidateMasterPointer()
+{
+    if (!master)
+        return;
+
+    Player* live = masterGuid ? sObjectAccessor.FindPlayer(masterGuid) : nullptr;
+    if (live != master)
+    {
+        master = nullptr;
+        masterGuid = ObjectGuid();
+    }
+}
+
 void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 {
     AiObjectContext* context = aiObjectContext;
@@ -263,23 +282,7 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
 
     SC_PHASE("UpdateAI.entry", bot ? bot->GetName() : "(null)");
 
-    // revalidate the
-    // cached master pointer against ObjectAccessor BEFORE any code
-    // path can deref it. If the master Player was destroyed since
-    // SetMaster() was called (typical when master logs out /
-    // disconnects), FindPlayer returns nullptr or a different live
-    // pointer. We null `master` defensively. The masterGuid shadow
-    // (set in SetMaster, see PlayerbotAI.h) is the safe lookup key —
-    // we never deref the cached `master` pointer in this check.
-    if (master)
-    {
-        Player* live = masterGuid ? sObjectAccessor.FindPlayer(masterGuid) : nullptr;
-        if (live != master)
-        {
-            master = nullptr;
-            masterGuid = ObjectGuid();
-        }
-    }
+    RevalidateMasterPointer();
 
     if(aiInternalUpdateDelay > elapsed)
     {
@@ -291,8 +294,17 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
         isWaiting = false;
     }
 
-    // cancel logout in combat
-    if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+    // Cancel a pending logout that combat has invalidated.
+    //
+    // This used to also fire on UNIT_STATE_STUNNED, which is a different
+    // thing entirely: HandleLogoutRequestOpcode sets the UNIT_FLAG_STUNNED
+    // *field flag* to root the player during the 20-second timer, and never
+    // touches the unit *state*. UNIT_STATE_STUNNED means a real stun from a
+    // spell, so any stunned bot - logging out or not - ran the cancel every
+    // AI tick, sending a LogoutCancelAck nobody asked for and broadcasting
+    // "Logout cancelled!" each time. That was 1467 of 25580 Chat.log lines
+    // in one 85-minute run. IsLogingOut() is the whole condition.
+    if (bot->GetSession()->IsLogingOut())
     {
         if (sServerFacade.IsInCombat(bot) || (master && sServerFacade.IsInCombat(master) && sServerFacade.GetDistance2d(bot, master) < 30.0f))
         {
@@ -1257,7 +1269,9 @@ void PlayerbotAI::UpdateAIInternal(uint32 elapsed, bool minimal)
         }
     }
     // logout if logout timer is ready or if instant logout is possible
-    if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+    // (UNIT_STATE_STUNNED used to be part of this test - see the note in
+    // UpdateAIInternal; it is a spell stun, not the logout root)
+    if (bot->GetSession()->IsLogingOut())
     {
         WorldSession* botWorldSessionPtr = bot->GetSession();
         bool logout = botWorldSessionPtr->ShouldLogOut(time(nullptr));
@@ -1418,8 +1432,8 @@ void PlayerbotAI::Reset(bool full)
         WorldSession* botWorldSessionPtr = bot->GetSession();
         bool logout = botWorldSessionPtr->ShouldLogOut(time(nullptr));
 
-        // cancel logout
-        if (!logout && (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut()))
+        // cancel logout (see the UNIT_STATE_STUNNED note further up)
+        if (!logout && bot->GetSession()->IsLogingOut())
         {
             WorldPacket p;
             bot->GetSession()->BotHandleLogoutCancelOpcode(p);
@@ -1595,7 +1609,7 @@ void PlayerbotAI::HandleCommand(uint32 type, const std::string& text, Player& fr
     }
     else if (filtered == "logout")
     {
-        if (!(bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut()))
+        if (!bot->GetSession()->IsLogingOut())
         {
             if (type == CHAT_MSG_WHISPER)
                 TellPlayer(&fromPlayer, BOT_TEXT("logout_start"));
@@ -1606,7 +1620,7 @@ void PlayerbotAI::HandleCommand(uint32 type, const std::string& text, Player& fr
     }
     else if (filtered == "logout cancel")
     {
-        if (bot->HasUnitState(UNIT_STATE_STUNNED) || bot->GetSession()->IsLogingOut())
+        if (bot->GetSession()->IsLogingOut())
         {
             if (type == CHAT_MSG_WHISPER)
                 TellPlayer(&fromPlayer, BOT_TEXT("logout_cancel"));
@@ -1894,7 +1908,11 @@ void PlayerbotAI::HandleBotOutgoingPacket(const WorldPacket& packet)
                     if (bot->InBattleGround() && !(isMentioned || (msgtype != CHAT_MSG_CHANNEL && !isFromFreeBot)))
                         return;
 
-                    if (HasRealPlayerMaster() && guid1 != GetMaster()->GetObjectGuid())
+                    // A channel broadcast reaches this bot from whichever map
+                    // thread the speaker is on, not from this bot's own tick, so
+                    // `master` has not been revalidated since it was cached.
+                    RevalidateMasterPointer();
+                    if (HasRealPlayerMaster() && guid1 != masterGuid)
                         return;
 
                     if (lang == LANG_ADDON)
@@ -3182,6 +3200,10 @@ ChatChannelSource PlayerbotAI::GetChatChannelSource(Player* bot, uint32 type, st
 
 bool PlayerbotAI::SayToGuild(std::string msg, bool likePlayer)
 {
+    // A bot's own text can carry links this client cannot open; see
+    // ChatHelper::stripUnsupportedLinks.
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3228,6 +3250,8 @@ bool PlayerbotAI::SayToGuild(std::string msg, bool likePlayer)
 
 bool PlayerbotAI::SayToWorld(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3252,6 +3276,8 @@ bool PlayerbotAI::SayToWorld(std::string msg)
 
 bool PlayerbotAI::SayToGeneral(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3285,6 +3311,8 @@ bool PlayerbotAI::SayToGeneral(std::string msg)
 
 bool PlayerbotAI::SayToTrade(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3326,6 +3354,8 @@ bool PlayerbotAI::SayToTrade(std::string msg)
 
 bool PlayerbotAI::SayToLFG(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3358,6 +3388,8 @@ bool PlayerbotAI::SayToLFG(std::string msg)
 
 bool PlayerbotAI::SayToLocalDefense(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (msg.empty())
     {
         return false;
@@ -3391,6 +3423,8 @@ bool PlayerbotAI::SayToLocalDefense(std::string msg)
 
 bool PlayerbotAI::SayToWorldDefense(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
 #ifdef MANGOSBOT_ZERO
     //check if 11 honor rank
     if (bot->GetHonorMgr().GetRank().rank < 11)
@@ -3423,6 +3457,8 @@ bool PlayerbotAI::SayToWorldDefense(std::string msg)
 
 bool PlayerbotAI::SayToGuildRecruitment(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     //check for bot's level? level 60?
     if (msg.empty())
     {
@@ -3466,6 +3502,8 @@ bool PlayerbotAI::SayToGuildRecruitment(std::string msg)
 
 bool PlayerbotAI::SayToParty(std::string msg, bool likePlayer)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (!bot->GetGroup())
     {
         return false;
@@ -3505,6 +3543,8 @@ bool PlayerbotAI::SayToParty(std::string msg, bool likePlayer)
 
 bool PlayerbotAI::SayToRaid(std::string msg)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     if (!bot->GetGroup() || !bot->GetGroup()->isRaidGroup())
     {
         return false;
@@ -3590,6 +3630,8 @@ bool PlayerbotAI::Say(std::string msg, bool likePlayer)
 
 bool PlayerbotAI::Whisper(std::string msg, std::string receiverName, bool likePlayer)
 {
+    msg = ChatHelper::stripUnsupportedLinks(msg);
+
     ObjectGuid receiver = sObjectMgr.GetPlayerGuidByName(receiverName);
     Player* rPlayer = sObjectMgr.GetPlayer(receiver);
 
@@ -3639,6 +3681,8 @@ bool PlayerbotAI::TellPlayerNoFacing(Player* player, std::string text, Playerbot
 {
     if(!player)
         return false;
+
+    text = ChatHelper::stripUnsupportedLinks(text);
 
     if (!ignoreSilent && HasStrategy("silent", BotState::BOT_STATE_NON_COMBAT))
         return false;

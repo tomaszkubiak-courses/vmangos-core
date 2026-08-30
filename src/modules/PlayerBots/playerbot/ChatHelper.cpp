@@ -1180,6 +1180,59 @@ std::string ChatHelper::formatBoolean(bool flag)
     return flag ? "|cff00ff00ON|r" : "|cffffff00OFF|r";
 }
 
+std::string ChatHelper::stripUnsupportedLinks(const std::string& text)
+{
+    // The 1.12.1 client's ItemRef.lua only knows the link types the vanilla UI can
+    // itself produce - clicking anything else pops "Unknown link type". The core's
+    // own isValidChatMessage, written for this client, accepts "item" and
+    // "enchant", so those two pass through untouched. Everything else - quest and
+    // spell links, which arrived with 2.0, and the "found" and "entry" types the
+    // module invented - keeps its colour and its bracketed label but loses the
+    // hyperlink, so clicking it does nothing rather than throwing.
+    //
+    // This runs where a message is handed to the client. The module builds its own
+    // commands out of the same formatters and reads the guids back out of them
+    // with parseGameobjects and parseWorldEntries, so those strings must keep the
+    // link syntax.
+    std::string out;
+    out.reserve(text.size());
+
+    size_t pos = 0;
+    while (pos < text.size())
+    {
+        size_t start = text.find("|H", pos);
+        if (start == std::string::npos)
+            break;
+
+        // End of the |H<type>:<data>| header, where the label begins.
+        size_t header = text.find("|h", start + 2);
+        if (header == std::string::npos)
+            break;
+
+        size_t typeEnd = text.find(':', start + 2);
+        std::string type = (typeEnd == std::string::npos || typeEnd > header) ? text.substr(start + 2, header - start - 2) : text.substr(start + 2, typeEnd - start - 2);
+
+        if (type == "item" || type == "enchant")
+        {
+            // Leave the link alone and carry on past its header.
+            out.append(text, pos, header + 2 - pos);
+            pos = header + 2;
+            continue;
+        }
+
+        size_t label = text.find("|h", header + 2);
+        if (label == std::string::npos)
+            break;
+
+        out.append(text, pos, start - pos);
+        out.append(text, header + 2, label - header - 2);
+        pos = label + 2;
+    }
+
+    out.append(text, pos, std::string::npos);
+    return out;
+}
+
 void ChatHelper::eraseAllSubStr(std::string& mainStr, const std::string& toErase)
 {
     size_t pos = std::string::npos;
