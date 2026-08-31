@@ -3888,6 +3888,45 @@ void RandomPlayerbotMgr::HandleCommand(uint32 type, const std::string& text, Pla
     });
 }
 
+// Drop every cached master pointer that names `player`, in every holder.
+//
+// A bot's `master` is a raw Player* refreshed only by RevalidateMasterPointer at
+// the top of that bot's own UpdateAI. Anything that reaches a bot from outside
+// its tick - LogPlayerLocation below walks all of them once per manager update -
+// therefore reads whatever the pointer held when the master was last seen. That
+// is fine while the master is alive and fatal once it is not, which is what
+// killed the world thread on 2026-08-31 05:21: HasRealPlayerMaster read the
+// module slot of a freed Player and dereferenced the garbage it found there.
+//
+// Real players were already covered, because their logout runs RemoveBotMgr and
+// so reaches OnPlayerLogout. A bot has no PlayerbotMgr, so its logout reached
+// nothing and left its followers holding it. Hooked from Playerbot_OnBeforeLogout
+// instead, which fires for every character.
+void RandomPlayerbotMgr::ClearMasterReferences(Player* player)
+{
+    if (!player)
+        return;
+
+    auto clearOne = [player](Player* bot)
+    {
+        PlayerbotAI* ai = GetBotAI(bot);
+        if (!ai || ai->GetMaster() != player)
+            return;
+
+        ai->SetMaster(nullptr);
+        if (!bot->InBattleGround())
+            ai->ResetStrategies();
+    };
+
+    ForEachPlayerbot(clearOne);
+
+    // Alt bots belong to their owner's holder, not to this one, and a group can
+    // put a random bot's Player in front of them as master just the same.
+    for (auto const& entry : GetPlayers())
+        if (PlayerbotMgr* mgr = GetBotMgr(entry.second))
+            mgr->ForEachPlayerbot(clearOne);
+}
+
 void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
 {
     bool hadPlayerBot = GetPlayerBot(player->GetGUIDLow());
@@ -3897,17 +3936,7 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
     if (!hadPlayerBot && GetBotAI(player) && GetBotAI(player)->IsRealPlayer() && player->GetGroup() && sPlayerbotAIConfig.IsFreeAltBot(player))
         player->GetSession()->SetDisconnectedSession(); //Prevent groupkick
 
-    ForEachPlayerbot([&](Player* bot) {
-        PlayerbotAI* ai = GetBotAI(bot);
-        if (player == ai->GetMaster())
-        {
-            ai->SetMaster(NULL);
-            if (!bot->InBattleGround())
-            {
-                ai->ResetStrategies();
-            }
-        }
-    });
+    ClearMasterReferences(player);
 
     players.erase(player->GetGUIDLow());
 }

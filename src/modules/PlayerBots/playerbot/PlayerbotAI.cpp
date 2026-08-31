@@ -6282,6 +6282,11 @@ enum ActivityType
 
 ActivePiorityType PlayerbotAI::GetPriorityType()
 {
+    // Reached from the managers as well as from this bot's own tick
+    // (AllowActivity, once every five seconds per activity type), so the master
+    // pointer read below may be older than the last logout.
+    RevalidateMasterPointer();
+
     //First priority - priorities disabled or has player master. Always active.
     if (sPlayerbotAIConfig.disableActivityPriorities || HasRealPlayerMaster())
         return ActivePiorityType::HAS_REAL_PLAYER_MASTER;

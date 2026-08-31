@@ -105,6 +105,7 @@ public:
         void HandleCommand(uint32 type, const std::string& text, Player& fromPlayer, std::string channelName = "", Team team = TEAM_BOTH_ALLOWED, uint32 lang = LANG_UNIVERSAL, const std::string& to = "");
         std::string HandleRemoteCommand(std::string request);
         void OnPlayerLogout(Player* player);
+        void ClearMasterReferences(Player* player);
         void OnPlayerLogin(Player* player);
         void OnPlayerLoginError(uint32 bot);
         Player* GetRandomPlayer();
