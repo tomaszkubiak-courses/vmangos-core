@@ -324,6 +324,35 @@ void BattleGroundQueue::DropStaleQueueEntry(ObjectGuid guid)
     RemovePlayer(guid, true);
 }
 
+// A GroupQueueInfo is owned by the m_queuedGroups list that holds it, and RemovePlayer
+// erases it from the list its own search found before freeing it. A second list holding
+// the same pointer would therefore survive the delete, and match making would go on
+// reading freed memory: the 2026-08-31 run logged
+// "[BGQUEUE] bg 1 queued ... H 1948281205/0" from 03:39 until the process died - a
+// players.size() read out of a 40 byte block already recycled into playerbot strings -
+// and a shutdown minidump the day before showed the same thing in the destructor.
+//
+// How a group comes to be linked twice is not established; reading the queue code did
+// not settle it. So drop the extra links before the free rather than after, and name the
+// list each one was in, which is the part the reading could not give.
+void BattleGroundQueue::UnlinkGroupEverywhere(GroupQueueInfo* group, ObjectGuid lastPlayer)
+{
+    for (uint32 bracket = 0; bracket < MAX_BATTLEGROUND_BRACKETS; ++bracket)
+    {
+        for (uint32 type = 0; type < BG_QUEUE_GROUP_TYPES_COUNT; ++type)
+        {
+            GroupsQueueType& queued = m_queuedGroups[bracket][type];
+            for (GroupsQueueType::iterator itr = std::find(queued.begin(), queued.end(), group);
+                 itr != queued.end();
+                 itr = std::find(itr, queued.end(), group))
+            {
+                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "BattleGroundQueue: the group %s last belonged to was still linked in bracket %u queue type %u after being erased from its own queue - dropping the extra link, which would have been left pointing at freed memory.", lastPlayer.GetString().c_str(), bracket, type);
+                itr = queued.erase(itr);
+            }
+        }
+    }
+}
+
 // remove player from queue and from group info, if group info is empty then remove it too
 void BattleGroundQueue::RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount)
 {
@@ -406,6 +435,7 @@ void BattleGroundQueue::RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount)
     if (group->players.empty())
     {
         m_queuedGroups[bracketId][index].erase(groupItr);
+        UnlinkGroupEverywhere(group, guid);
         delete group;
     }
 }

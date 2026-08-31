@@ -111,6 +111,7 @@ class BattleGroundQueue
 
     private:
         void DropStaleQueueEntry(ObjectGuid guid);
+        void UnlinkGroupEverywhere(GroupQueueInfo* group, ObjectGuid lastPlayer);
         void CheckForStrandedGroups();
         void RemoveOfflinePlayer();
         bool HasPlayersInQueue(BattleGroundBracketId bracketId);
