@@ -1116,6 +1116,11 @@ AiPlayerbot.RandomBotCountChangeMaxInterval = 7200
 #(0-1) enable or disable random teleports
 # AiPlayerbot.EnableRandomTeleports = 1
 
+# (0-100) Percentage of horde random bots placed in a capital when they log in,
+# split evenly between Orgrimmar and Thunder Bluff. The rest keep the normal
+# random placement. 0 disables it.
+# AiPlayerbot.HordeCitySpawnPercent = 0
+
 # How far random bots are teleported after death
 AiPlayerbot.RandomBotTeleportDistance = 100
 

@@ -186,6 +186,7 @@ public:
         uint32 GetPlayersLevel() { return playersLevel; }
     protected:
         virtual void OnBotLoginInternal(Player * const bot) override;
+        static void HordeCitySpawnOnLogin(Player* bot);
     private:
         //pid values are set in constructor
         botPID pid = botPID(1, 50, -50, 0, 0, 0);
