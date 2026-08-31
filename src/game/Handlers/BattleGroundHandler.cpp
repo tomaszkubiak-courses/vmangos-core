@@ -374,6 +374,8 @@ void WorldSession::HandleBattlefieldListOpcode(WorldPackets::Battleground::Battl
 void WorldSession::HandleBattleFieldPortOpcode(WorldPackets::Battleground::BattleFieldPort const& packet)
 {
     uint8 action = packet.action; // enter battle 0x1, leave queue 0x0
+    // TEMP DIAGNOSTIC [BGPORT] - remove together with the other [BGPORT] lines in this handler.
+    sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: got port opcode, action %u, mapId %u", _player ? _player->GetName() : "<no player>", action, packet.mapId);
 #if SUPPORTED_CLIENT_BUILD > CLIENT_BUILD_1_8_4
     uint32 mapId = packet.mapId;
     BattleGroundTypeId bgTypeId = GetBattleGroundTypeIdByMapId(mapId);
@@ -384,12 +386,12 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPackets::Battleground::Battl
 
     if (bgTypeId == BATTLEGROUND_TYPE_NONE)
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "BattlegroundHandler: invalid bg map (%u) received.", mapId);
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: bail - invalid bg map (%u)", _player->GetName(), mapId);
         return;
     }
     if (!_player->InBattleGroundQueue())
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "BattlegroundHandler: Invalid CMSG_BATTLEFIELD_PORT received from player (%u), he is not in bg_queue.", _player->GetGUIDLow());
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: bail - not in bg queue", _player->GetName());
         return;
     }
 
@@ -400,13 +402,13 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPackets::Battleground::Battl
     GroupQueueInfo ginfo;
     if (!bgQueue.GetPlayerGroupInfoData(_player->GetObjectGuid(), &ginfo))
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "BattlegroundHandler: itrplayerstatus not found.");
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: bail - no GroupQueueInfo for queue type %u", _player->GetName(), bgQueueTypeId);
         return;
     }
     // if action == 1, then instanceId is required
     if (!ginfo.isInvitedToBgInstanceGuid && action == 1)
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "BattlegroundHandler: instance not found.");
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: bail - invited to no instance", _player->GetName());
         return;
     }
 
@@ -418,7 +420,7 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPackets::Battleground::Battl
 
     if (!bg)
     {
-        sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "BattlegroundHandler: bgTemplate not found for type id %u.", bgTypeId);
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: bail - no battleground for type id %u instance %u", _player->GetName(), bgTypeId, ginfo.isInvitedToBgInstanceGuid);
         return;
     }
 
@@ -459,7 +461,7 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPackets::Battleground::Battl
         case 1:                                         // port to battleground
             if (!_player->IsInvitedForBattleGroundQueueType(bgQueueTypeId))
             {
-                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Battleground: Player %s (%u) is not invited in queue type %u !", _player->GetName(), _player->GetGUIDLow(), bgQueueTypeId);
+                sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: bail - not invited for queue type %u", _player->GetName(), bgQueueTypeId);
                 return;                                 // cheating?
             }
 
@@ -492,7 +494,7 @@ void WorldSession::HandleBattleFieldPortOpcode(WorldPackets::Battleground::Battl
             sBattleGroundMgr.SendToBattleGround(_player, ginfo.isInvitedToBgInstanceGuid, bgTypeId);
             // add only in HandleMoveWorldPortAck()
             // bg->AddPlayer(_player,team);
-            sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "Battleground: player %s (%u) joined battle for bg %u, bgtype %u, queue type %u.", _player->GetName(), _player->GetGUIDLow(), bg->GetInstanceID(), bg->GetTypeID(), bgQueueTypeId);
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] %s: teleport sent to bg %u instance %u", _player->GetName(), bg->GetTypeID(), bg->GetInstanceID());
             sLog.Out(LOG_BG, LOG_LVL_DETAIL, "[%u,%u]: %s:%u [%u:%s] enters",
                      bg->GetMapId(), bg->GetInstanceID(),
                      _player->GetName(),

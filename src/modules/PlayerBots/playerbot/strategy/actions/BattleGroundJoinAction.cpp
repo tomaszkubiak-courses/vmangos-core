@@ -1255,7 +1255,11 @@ bool BGStatusAction::Execute(Event& event)
     p >> QueueSlot; // queue id (0...2) - player can be in 3 queues in time
     p >> mapId;     // MapID
     if (mapId == 0)
+    {
+        // TEMP DIAGNOSTIC [BGPORT] - remove with the other [BGPORT] lines in this file.
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] bot %s: status packet with mapId 0, ignored", bot->GetName());
         return false;
+    }
     p >> unk1;      // Unknown
     p >> instanceId;
     p >> statusid;  // status
@@ -1280,6 +1284,10 @@ bool BGStatusAction::Execute(Event& event)
     }
 #endif
 
+    // TEMP DIAGNOSTIC [BGPORT]
+    if (statusid != STATUS_WAIT_QUEUE)
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] bot %s: bg status %u, map %u, slot %u, instance %u", bot->GetName(), statusid, mapId, QueueSlot, instanceId);
+
     bool IsRandomBot = sRandomPlayerbotMgr.IsRandomBot(bot);
     BattleGroundQueueTypeId queueTypeId = bot->GetBattleGroundQueueTypeId(QueueSlot);
     BattleGroundTypeId _bgTypeId = sServerFacade.BgTemplateId(queueTypeId);
@@ -1290,7 +1298,11 @@ bool BGStatusAction::Execute(Event& event)
 #endif
 
     if (!queueTypeId)
+    {
+        // TEMP DIAGNOSTIC [BGPORT]
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] bot %s: bail - no queue type for slot %u", bot->GetName(), QueueSlot);
         return false;
+    }
 
 #ifndef MANGOSBOT_TWO
     BattleGround* bg = sBattleGroundMgr.GetBattleGroundTemplate(_bgTypeId);
@@ -1506,6 +1518,8 @@ bool BGStatusAction::Execute(Event& event)
             return false;
         }
 #endif
+        // TEMP DIAGNOSTIC [BGPORT]
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGPORT] bot %s: sending port for map %u (%s)", bot->GetName(), mapId, _bgType.c_str());
         bot->GetSession()->BotHandleBattleFieldPortOpcode(packet);
 
         ai->ResetStrategies(false);

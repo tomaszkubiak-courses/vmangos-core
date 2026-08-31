@@ -375,6 +375,7 @@ class BattleGround
         int32  m_startDelayTime;
         bool   m_prematureCountDown;
         uint32 m_prematureCountDownTimer;
+        uint32 m_waitJoinDiagTimer;                         // TEMP DIAGNOSTIC - remove with the [BGWAIT] log in Update()
         char const* m_name;
 
         /* Player lists */
