@@ -245,6 +245,13 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
 
 PlayerbotAI::~PlayerbotAI()
 {
+    // Logout and "a real player is taking this character over" both delete the
+    // AI (Playerbot_OnBeforeLogout / Playerbot_OnReleaseToClient), while the
+    // Player is still alive and about to be saved. A jump in flight at that
+    // moment would be persisted at its apex and the character would come back
+    // levitating on every later login.
+    AbortJump("~PlayerbotAI");
+
     for (uint8 i = 0 ; i < (uint8)BotState::BOT_STATE_ALL; i++)
     {
         if (engines[i])
@@ -272,6 +279,111 @@ void PlayerbotAI::RevalidateMasterPointer()
         master = nullptr;
         masterGuid = ObjectGuid();
     }
+}
+
+// Put a bot that is mid-jump back on the ground and forget the jump.
+//
+// JumpAction::DoJump and the SMSG_MOVE_KNOCK_BACK handler both Relocate() the
+// bot to the highest point of its simulated arc and leave it there, expecting
+// the "land after knockback/jump" block in UpdateAI to Relocate() it down to
+// jumpDestination once jumpTime elapses. Any code path that throws the jump
+// state away before that happens leaves the bot hanging at the apex: this core
+// never corrects a player's Z server-side (a real player's client reports the
+// fall, a bot has no client), so nothing ever brings it back down.
+//
+// Found 2026-08-31: Huskoh was standing 3.7y above the floor of the Hall of the
+// Brave in Orgrimmar, the only character of the ten saved in that room not at
+// z 56.76.
+void PlayerbotAI::AbortJump(char const* reason)
+{
+    if (!jumpTime)
+        return;
+
+    jumpTime = 0;
+    fallAfterJump = false;
+
+    if (bot && bot->IsInWorld() && !bot->IsBeingTeleported() && !bot->IsTaxiFlying() && !bot->GetTransport())
+    {
+        float x = bot->GetPositionX();
+        float y = bot->GetPositionY();
+        float z = bot->GetPositionZ();
+
+        // Prefer the landing the jump was aimed at; it was ground-clamped when
+        // the jump started. Fall back to straight down from wherever the bot is.
+        if (jumpDestination && jumpDestination.getMapId() == bot->GetMapId())
+        {
+            x = jumpDestination.getX();
+            y = jumpDestination.getY();
+            z = jumpDestination.getZ();
+        }
+
+        bot->UpdateAllowedPositionZ(x, y, z);
+        bot->Relocate(x, y, z);
+
+        // Player::IsFalling() gates CanMove(); SetFallInformation was set to the
+        // apex when the jump started and only the landing block clears it.
+        bot->SetFallInformation(0.0f);
+        bot->m_movementInfo.SetMovementFlags(MOVEFLAG_NONE);
+        bot->m_movementInfo.jump = MovementInfo::JumpInfo();
+        bot->SendHeartBeat();
+
+        sLog.outDetail("%s: Jump: aborted by %s, landed at %f,%f,%f", bot->GetName(), reason ? reason : "?", x, y, z);
+    }
+
+    ResetJumpDestination();
+}
+
+// Recovery for a bot that is *already* in the air with no jump to finish - one
+// stranded by an older build, or by a path that still drops the landing. The
+// position is persisted by Player::SaveToDB, so a bot stranded once stays
+// levitating across logins until something moves it; AbortJump alone cannot
+// reach those.
+void PlayerbotAI::SnapToGroundIfStranded()
+{
+    if (jumpTime || !bot || !bot->IsInWorld() || !bot->IsAlive())
+        return;
+
+    if (bot->IsBeingTeleported() || bot->IsTaxiFlying() || bot->GetTransport() || bot->IsFalling())
+        return;
+
+    // A swimming bot floats well above the bottom by design.
+    if (bot->IsInWater())
+        return;
+
+    // Only judge a bot that is standing still - a moving one is between spline
+    // points and its Z legitimately lags the ground under it.
+    if (!bot->IsStopped() || bot->m_movementInfo.HasMovementFlag(MOVEFLAG_MASK_MOVING))
+        return;
+
+    // The height lookup walks the vmaps and the dynamic tree; once every 10s
+    // per bot is plenty for something that only happens after a lost landing.
+    time_t now = time(nullptr);
+    if (strandedCheckTimer > now)
+        return;
+    strandedCheckTimer = now + 10;
+
+    float const x = bot->GetPositionX();
+    float const y = bot->GetPositionY();
+    float const z = bot->GetPositionZ();
+
+    // Map::GetHeight, not UpdateAllowedPositionZ: the latter asks TerrainInfo
+    // only, which knows the terrain and the WMO/M2 vmaps but not the dynamic
+    // tree, so a bot standing on a gameobject model - a ramp, a bridge, a
+    // platform - would read as floating and get yanked to the floor below it.
+    float const ground = bot->GetMap()->GetHeight(x, y, z, true);
+    if (ground <= INVALID_HEIGHT)
+        return;
+
+    // 2y covers the slop between a model's feet and the collision mesh under
+    // it. A real drop from a lost jump apex is over 3y.
+    if (z - ground < 2.0f)
+        return;
+
+    bot->Relocate(x, y, ground);
+    bot->SetFallInformation(0.0f);
+    bot->SendHeartBeat();
+
+    sLog.outDetail("%s: Jump: was stranded %f y above the ground at %f,%f, snapped down to %f", bot->GetName(), z - ground, x, y, ground);
 }
 
 void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
@@ -533,6 +645,9 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
             }
         }
     }
+
+    // Nothing above landed the bot? Then it should be on the ground already.
+    SnapToGroundIfStranded();
 
     // cheat options
     if (bot->IsAlive() && ((uint32)GetCheat() > 0 || (uint32)sPlayerbotAIConfig.botCheatMask > 0))
@@ -1425,9 +1540,13 @@ void PlayerbotAI::Reset(bool full)
 
         StopMoving();
 
-        jumpTime = 0;
-        fallAfterJump = false;
-        ResetJumpDestination();
+        // Clearing jumpTime here used to strand the bot: DoJump relocates it to
+        // the apex of the jump arc and the landing only happens on a later
+        // UpdateAI tick, which this clear cancelled. Nothing else pulls a player
+        // down - the core never simulates a player's fall server-side, it trusts
+        // the client's movement packets, and a bot has no client. Put the bot on
+        // the ground first, then drop the state.
+        AbortJump("Reset(full)");
 
         WorldSession* botWorldSessionPtr = bot->GetSession();
         bool logout = botWorldSessionPtr->ShouldLogOut(time(nullptr));

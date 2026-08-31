@@ -718,6 +718,12 @@ public:
     bool IsJumping() { return jumpTime; }
     void SetFallAfterJump() { fallAfterJump = true; }
     void SetJumpTime(uint32 time) { jumpTime = time; }
+    // A jump parks the bot at the apex of its arc and relies on a later
+    // UpdateAI tick to put it back down. Anything that drops the pending
+    // landing has to call this first or the bot stays in the air forever.
+    void AbortJump(char const* reason);
+    // Last-resort recovery for a bot that is already stranded in mid-air.
+    void SnapToGroundIfStranded();
     bool CanMove();
     void StopMoving();
     bool IsInRealGuild();
@@ -831,6 +837,7 @@ protected:
     WorldPosition jumpDestination;
     uint32 jumpTime;
     bool fallAfterJump;
+    time_t strandedCheckTimer = 0;
     uint32 faceTargetUpdateDelay;
     bool isPlayerFriend = false;
     bool isMovingToTransport = false;
