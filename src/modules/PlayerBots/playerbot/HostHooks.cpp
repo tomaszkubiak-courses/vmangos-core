@@ -189,6 +189,11 @@ void Playerbot_OnPlayerLogin(Player* player)
 // Was PlayerbotPlayerScript::OnBeforeLogout.
 void Playerbot_OnBeforeLogout(Player* player)
 {
+    // First, before the Player this names can be destroyed: no bot may go on
+    // holding it as its master. RemoveBotMgr below reaches that sweep only for
+    // characters that own a PlayerbotMgr, which a bot never does.
+    sRandomPlayerbotMgr.ClearMasterReferences(player);
+
     RemoveBotAI(player);
     RemoveBotMgr(player);
 }
