@@ -191,3 +191,15 @@ case the preferred fix is to extend `ScriptCommands` rather than hardcode the co
   that belongs in a commit.
 - Follow the existing message style: an imperative subject line, then wrapped prose that
   explains the problem before the fix.
+
+## Branches
+
+Each fix is written on its own branch cut from `development`. **Merge that branch into local
+`development` first, and push `development`** - do not push the fix branch to GitHub and open
+a pull request against it. Rebase the branch onto `development` before the merge if it was cut
+from an older tip, so the merge is clean, and delete the branch once its work is on
+`development`.
+
+The remote is the fork, `origin` (`github.com/tomaszkubiak-courses/vmangos-core`); `upstream`
+(`vmangos/core`) has its push URL set to `DISABLED` and nothing here goes upstream. There is no
+branch protection on `development`, so the push is accepted directly.
