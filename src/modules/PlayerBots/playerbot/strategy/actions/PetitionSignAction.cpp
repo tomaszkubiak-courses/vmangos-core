@@ -82,10 +82,26 @@ bool PetitionSignAction::Execute(Event& event)
     // is compiled out here and the bot signed blind, which is what produced
     // "[PetitionHandler] No petition exists for charter with guid N" in the
     // server log.
-    if (!sGuildMgr.GetPetitionByCharterGuid(petitionGuid))
-        return false;
+    Petition* offered = sGuildMgr.GetPetitionByCharterGuid(petitionGuid);
 
     Player* _inviter = sObjectMgr.GetPlayer(inviter);
+
+    // TEMP DIAGNOSTIC [PETDIAG] - only when a real player is the one asking, so the
+    // bots signing for each other cost nothing. Remove once the cause is known.
+    if (_inviter && IsRealPlayer(_inviter))
+    {
+        DenyReason reason = DenyReason::PLAYERBOT_DENY_NONE;
+        PlayerbotSecurityLevel level = ai->GetSecurity()->LevelFor(_inviter, &reason, true);
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] %s got offer from %s: petition %s, accept %u, guild %u, invited %u, security %u (need %u) deny %u, bgqueue %u",
+                 bot->GetName(), _inviter->GetName(), offered ? "found" : "MISSING", accept ? 1 : 0,
+                 bot->GetGuildId(), bot->GetGuildIdInvited(), (uint32)level,
+                 (uint32)PlayerbotSecurityLevel::PLAYERBOT_SECURITY_GUILD, (uint32)reason,
+                 bot->InBattleGroundQueue() ? 1 : 0);
+    }
+
+    if (!offered)
+        return false;
+
     if (!_inviter)
         return false;
 
