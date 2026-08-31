@@ -243,7 +243,6 @@ BattleGround::BattleGround()
 
     m_prematureCountDown = false;
     m_prematureCountDownTimer = 0;
-    m_waitJoinDiagTimer = 0; // TEMP DIAGNOSTIC
 
     m_startDelayTime = 0;
     m_startDelayTimes[BG_STARTING_EVENT_FIRST]  = BG_START_DELAY_2M;
@@ -290,35 +289,6 @@ BattleGround::~BattleGround()
 
 void BattleGround::Update(uint32 diff)
 {
-    // TEMP DIAGNOSTIC - why a created battleground never reaches STATUS_IN_PROGRESS.
-    // Remove this block, the m_waitJoinDiagTimer member and its constructor init together.
-    if (GetInstanceID() && GetStatus() <= STATUS_WAIT_JOIN)
-    {
-        m_waitJoinDiagTimer += diff;
-        if (m_waitJoinDiagTimer >= 10 * IN_MILLISECONDS)
-        {
-            m_waitJoinDiagTimer = 0;
-
-            char const* statusName;
-            switch (GetStatus())
-            {
-                case STATUS_NONE:       statusName = "NONE";       break;
-                case STATUS_WAIT_QUEUE: statusName = "WAIT_QUEUE"; break;
-                case STATUS_WAIT_JOIN:  statusName = "WAIT_JOIN";  break;
-                case STATUS_IN_PROGRESS: statusName = "IN_PROGRESS"; break;
-                case STATUS_WAIT_LEAVE: statusName = "WAIT_LEAVE"; break;
-                default:                statusName = "?";          break;
-            }
-
-            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGWAIT] bg %s (%u) instance %u bracket %u-%u status %s players %u (A %u H %u) invited (A %u H %u) startDelay %d events %u",
-                     GetName() ? GetName() : "?", (uint32)GetTypeID(), GetInstanceID(),
-                     GetMinLevel(), GetMaxLevel(), statusName, GetPlayersSize(),
-                     GetPlayersCountByTeam(ALLIANCE), GetPlayersCountByTeam(HORDE),
-                     GetInvitedCount(ALLIANCE), GetInvitedCount(HORDE),
-                     GetStartDelayTime(), (uint32)m_events);
-        }
-    }
-
     if (!GetPlayersSize())
     {
         // BG is empty

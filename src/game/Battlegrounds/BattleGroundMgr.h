@@ -156,11 +156,6 @@ class BattleGroundQueue
         uint32 m_sumOfWaitTimes[BG_TEAMS_COUNT][MAX_BATTLEGROUND_BRACKETS];
 
         bool m_reportedStrandedGroups = false;
-
-        // TEMPORARY DIAGNOSTIC (bot battleground triage). Throttle for the queue
-        // census logged from Update(). Remove together with ReportQueueCensus().
-        uint32 m_lastCensusTime = 0;
-        void ReportQueueCensus(BattleGroundTypeId bgTypeId);
 };
 
 /*
