@@ -40,6 +40,9 @@ private:
     PerformanceData& data;
     std::string name;
     PerformanceStack* stack;
+    // Sampled when the operation starts. finish() runs during process teardown, when the
+    // config singleton it used to read may already be destroyed.
+    bool enabled;
 #ifdef CMANGOS
     std::chrono::milliseconds started;
 #endif
@@ -72,10 +75,15 @@ class PerformanceMonitor
     public:
         PerformanceMonitor();
         virtual ~PerformanceMonitor();
+        // Deliberately never destroyed. Every bot's PlayerbotAIBase::totalPmo holds a
+        // PerformanceData& that lives in mapsData, and PlayerbotHolder - a static that is
+        // constructed before this monitor - tears its remaining bots down at process exit,
+        // after a Meyers singleton here would already be gone. Leaking the instance means
+        // the references those operations write through stay valid for the whole process.
         static PerformanceMonitor& instance()
         {
-            static PerformanceMonitor instance;
-            return instance;
+            static PerformanceMonitor* instance = new PerformanceMonitor();
+            return *instance;
         }
 
     public:
