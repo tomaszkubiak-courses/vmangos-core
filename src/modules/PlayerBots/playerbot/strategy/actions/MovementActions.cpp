@@ -1039,45 +1039,36 @@ void MovementAction::DispatchMovement(TravelPath movePath, bool generatePath, bo
 
     std::vector<WorldPosition> path = movePath.getPointPath();
 
-    if (!generatePath || !BotIsFreeFlying(bot))
-    {
-        WorldPosition movePosition = path.back();
+    // Both branches below read path.back().
+    if (path.empty())
+        return;
 
-#ifdef MANGOSBOT_ZERO
-        // Tortoise's MovePoint signature is (id, x, y, z, options, speed, orientation),
-        // NOT cmangos's (id, x, y, z, ForcedMovement, bool generatePath). The ported call
-        // below used to pass `moveMode` into `options` and the `generatePath` bool into the
-        // `speed` float — so generatePath==true set the velocity to 1.0 yd/s, making bots
-        // crawl slower than walking. Translate the intent into proper MoveOptions instead and
-        // leave speed at its default so it is derived from the run/walk movement flags.
-        uint32 moveOptions = (moveMode == FORCED_MOVEMENT_WALK) ? MOVE_WALK_MODE : MOVE_RUN_MODE;
-        if (generatePath)
-            moveOptions |= MOVE_PATHFINDING;
-        mm.MovePoint(movePosition.getMapId(),
-            movePosition.getX(),
-            movePosition.getY(),
-            movePosition.getZ(),
-            moveOptions);
-#else
-        mm.MovePoint(movePosition.getMapId(),
-            Position(movePosition.getX(), movePosition.getY(), movePosition.getZ(), 0.f),
-            moveMode,
-            bot->IsFlying() ? bot->GetSpeed(MOVE_FLIGHT) : 0.f,
-            bot->IsFlying());
-#endif
-    }
+    // The single point move that used to sit here ran before the path spline below rather
+    // than instead of it, so every move issued two commands: MovePoint pushed a
+    // PointMovementGenerator and launched a spline to the end of the path, and BotMovePath
+    // then launched a second spline straight over it. The generator stayed on the
+    // MotionMaster afterwards, tracking a spline that was no longer the one being flown, and
+    // the wasted first command is a visible hitch at the start of every move. It is the
+    // fallback for a path too short to walk - see usePath below, which is where it lives now.
 
     GeneratePathAvoidingHazards(path);
+
+    // Straight lines between far apart points do not respect the world - see
+    // RepairPathSegments. Has to run after the hazard pass, which inserts points of its own.
+    RepairPathSegments(path);
 
     std::vector<G3D::Vector3> pointPath = WorldPosition().toPointsArray(path);
     float size = WorldPosition().getPathLength(path);
 
-    bool usePath = true;
+    // BotMovePath needs at least two points - MoveSplineInitArgs::Validate rejects anything
+    // shorter and logs an error for it. ResolveMovePath does hand out one point paths
+    // (`outMovePath.addPoint(endPosition)` when it found nothing), and for those the single
+    // point move below is the whole movement, not a duplicate of it. This was hardcoded to
+    // true during the port, which is what left the two competing commands above.
+    bool usePath = pointPath.size() > 1;
 
     if (usePath)
     {
-        bool normalizeZ = true;
-
         for (auto& p : pointPath)
         {
             if (bot->GetTransport())
@@ -1088,7 +1079,9 @@ void MovementAction::DispatchMovement(TravelPath movePath, bool generatePath, bo
         }
 
 #ifndef MANGOSBOT_TWO
-        BotMovePath(bot, pointPath);
+        // masterWalking is the whole reason moveMode exists, and the walk flag was being
+        // dropped here: a bot escorting a walking master ran circles around them.
+        BotMovePath(bot, pointPath, moveMode == FORCED_MOVEMENT_WALK);
 #else
         mm.MovePath(pointPath, moveMode, false);
 #endif
@@ -3179,6 +3172,126 @@ bool MovementAction::IsHazardNearPosition(const WorldPosition& position, HazardP
     }
 
     return false;
+}
+
+bool MovementAction::RepairPathSegments(std::vector<WorldPosition>& movePath)
+{
+    // Where the bots leave the world.
+    //
+    // DispatchMovement hands its point list to BotMovePath, which launches a bare
+    // MoveSplineInit over it - this core has no path movement generator, so there is nothing
+    // between those points and the client. The client draws a straight line from each point
+    // to the next. Every point is put on the ground by UpdateAllowedPositionZ just below, so
+    // the break is invisible in the data: it lives entirely in the segments between them.
+    //
+    // For a navmesh path that is harmless, because Detour returns points a few yards apart
+    // and the straight line between two of those follows the ground closely. But
+    // ResolveMovePath only uses the navmesh for short, same-map moves. Anything longer than
+    // sightDistance, or across maps, comes from sTravelNodeMap::getFullPath - precomputed
+    // links between travel nodes that are never re-checked against the terrain. A link
+    // spanning a hill, a building or a canyon is walked straight over: the bot climbs a wall
+    // no player can climb, or strolls through the middle of a rock.
+    //
+    // So: measure each segment against the ground it crosses, and where the straight line
+    // does not follow the terrain, replace that one segment with the navmesh path between
+    // its ends. Everything else is left exactly as it was.
+
+    if (movePath.size() < 2)
+        return false;
+
+    // A bot on a transport moves in the transport's frame, and a swimming bot is legitimately
+    // off the ground - MoveTo2 deliberately lifts underwater points to the surface just
+    // before this. Neither can be judged against ground height.
+    if (bot->GetTransport() || bot->IsInWater() || bot->HasMovementFlag(MOVEFLAG_SWIMMING))
+        return false;
+
+    // Shorter than this cannot hide terrain worth walking around, and this is the test that
+    // keeps the whole pass free for the dense navmesh paths that are already correct.
+    const float minSegmentLength = 12.0f;
+    // A real slope stays near the line between its ends; a wall or a hillside does not.
+    const float maxGroundDeviation = 4.0f;
+    // Bound the navmesh work one move may cost, and the size of what the client is handed.
+    const uint8 maxRepairs = 6;
+    const size_t maxPoints = 200;
+
+    std::vector<WorldPosition> repaired;
+    repaired.reserve(movePath.size());
+    repaired.push_back(movePath.front());
+
+    uint8 repairs = 0;
+
+    for (size_t i = 1; i < movePath.size(); ++i)
+    {
+        // By value: the push_back below can reallocate the vector this came out of.
+        const WorldPosition from = repaired.back();
+        const WorldPosition& to = movePath[i];
+
+        bool needsRepair = false;
+
+        if (repairs < maxRepairs && repaired.size() < maxPoints &&
+            from.getMapId() == to.getMapId() && !from.isInWater() && !to.isInWater())
+        {
+            const float segmentLength = from.distance(to);
+            if (segmentLength >= minSegmentLength)
+            {
+                const uint32 samples = std::min<uint32>(8u, uint32(segmentLength / 5.0f));
+                for (uint32 sample = 1; sample <= samples && !needsRepair; ++sample)
+                {
+                    const float t = float(sample) / float(samples + 1);
+                    WorldPosition point(from.getMapId(),
+                        from.getX() + (to.getX() - from.getX()) * t,
+                        from.getY() + (to.getY() - from.getY()) * t,
+                        from.getZ() + (to.getZ() - from.getZ()) * t,
+                        0.f);
+
+                    // Water crossed mid-segment is not a fault of the line.
+                    if (point.isInWater())
+                        continue;
+
+                    const float ground = point.getHeight();
+
+                    // Map::GetHeight only searches DEFAULT_HEIGHT_SEARCH (10) yards, so an
+                    // invalid answer is itself the finding: there is no ground anywhere near
+                    // the line here, which is a bot crossing a canyon or riding over a roof.
+                    if (ground <= INVALID_HEIGHT)
+                    {
+                        needsRepair = true;
+                        break;
+                    }
+
+                    // Below the ground is walking through a hill, well above it is walking
+                    // over a wall. Both look the same to somebody watching.
+                    if (fabs(point.getZ() - ground) > maxGroundDeviation)
+                        needsRepair = true;
+                }
+            }
+        }
+
+        if (needsRepair)
+        {
+            std::vector<WorldPosition> detour = to.getPathStepFrom(from, bot);
+
+            // Only take a detour that actually arrives. A partial path would drop the bot
+            // short of the point the rest of the route continues from, which is worse than
+            // the straight line it replaces.
+            if (detour.size() > 1 && to.isPathTo(detour))
+            {
+                ++repairs;
+                for (size_t d = 1; d < detour.size(); ++d)
+                    repaired.push_back(detour[d]);
+
+                continue;
+            }
+        }
+
+        repaired.push_back(to);
+    }
+
+    if (repaired.size() == movePath.size())
+        return false;
+
+    movePath = std::move(repaired);
+    return true;
 }
 
 bool MovementAction::GeneratePathAvoidingHazards(std::vector<WorldPosition>& movePath)

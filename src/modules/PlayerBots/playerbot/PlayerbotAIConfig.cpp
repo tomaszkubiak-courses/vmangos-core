@@ -214,7 +214,15 @@ bool PlayerbotAIConfig::Initialize()
     jumpRandomChance = config.GetFloatDefault("AiPlayerbot.JumpRandomChance", 0.20f);
     jumpInPlaceChance = config.GetFloatDefault("AiPlayerbot.JumpInPlaceChance", 0.50f);
     jumpBackwardChance = config.GetFloatDefault("AiPlayerbot.JumpBackwardChance", 0.10f);
-    jumpHeightLimit = config.GetFloatDefault("AiPlayerbot.JumpHeightLimit", 60.f);
+    // Not the height of the jump - JumpVSpeed decides that, and 7.96 against the core's
+    // 19.2911 gravity puts the apex at v^2/2g = 1.64 yards, which is the real 1.12 jump.
+    // This is the abort guard in CalculateJumpParameters: how far the traced arc may end up
+    // from where it started, measured with fabs, so in practice it only ever binds on the way
+    // down. At 60 a bot would accept a sixty yard drop as a "jump" and throw itself off the
+    // cliff, which is what reads as flying. 14.57 is the core's own number for where a fall
+    // starts hurting (Player::HandleFall - it is the zDiff at which the damage formula
+    // crosses zero), so a deliberate jump now stops exactly short of self harm.
+    jumpHeightLimit = config.GetFloatDefault("AiPlayerbot.JumpHeightLimit", 14.57f);
     jumpVSpeed = config.GetFloatDefault("AiPlayerbot.JumpVSpeed", 7.96f);
     jumpHSpeed = config.GetFloatDefault("AiPlayerbot.JumpHSpeed", 7.0f);
     jumpInBg = config.GetBoolDefault("AiPlayerbot.JumpInBg", false);
