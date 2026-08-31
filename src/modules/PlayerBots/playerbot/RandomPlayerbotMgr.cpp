@@ -3941,8 +3941,77 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
     players.erase(player->GetGUIDLow());
 }
 
+namespace
+{
+    // Horde capitals, coordinates taken from the world DB's game_tele rows for
+    // "Orgrimmar" and "ThunderBluff".
+    struct HordeCitySpawn
+    {
+        uint32 mapId;
+        float x, y, z, o;
+    };
+
+    HordeCitySpawn const hordeCitySpawns[2] =
+    {
+        { 1, 1629.36f, -4373.39f, 31.2564f, 3.54839f },   // Orgrimmar
+        { 1, -1277.37f, 124.804f, 131.287f, 5.22274f }    // Thunder Bluff
+    };
+}
+
+// Places a share of the horde random bots in a capital when they log in, instead
+// of wherever the character was last saved. Off by default: it is not how the
+// module normally distributes bots.
+//
+// The pick is derived from the character guid rather than rolled, so a given bot
+// always lands in the same city and the split does not drift as bots cycle in and
+// out. Login only - the periodic random teleport may move the bot out again like
+// any other.
+void RandomPlayerbotMgr::HordeCitySpawnOnLogin(Player* bot)
+{
+    if (!bot || !bot->IsInWorld() || bot->InBattleGround())
+        return;
+
+    if (!sPlayerbotAIConfig.hordeCitySpawnPercent || bot->GetTeam() != HORDE)
+        return;
+
+    uint32 const guid = bot->GetGUIDLow();
+    if (guid % 100 >= sPlayerbotAIConfig.hordeCitySpawnPercent)
+        return;
+
+    HordeCitySpawn const& city = hordeCitySpawns[guid % 2];
+
+    // Spread them over the square around the point so a hundred bots do not end
+    // up inside each other on the same coordinate.
+    float x = city.x + float(urand(0, 40)) - 20.0f;
+    float y = city.y + float(urand(0, 40)) - 20.0f;
+    float z = city.z;
+
+    if (Map* map = sMapMgr.FindMap(city.mapId, 0))
+    {
+        float const ground = map->GetHeight(x, y, z + 0.5f);
+        if (ground <= INVALID_HEIGHT)
+        {
+            x = city.x;
+            y = city.y;
+        }
+        else
+            z = 0.05f + ground;
+    }
+
+    bot->GetMotionMaster()->Clear();
+    bot->TeleportTo(city.mapId, x, y, z, city.o);
+    bot->SendHeartBeat();
+
+    if (PlayerbotAI* ai = GetBotAI(bot))
+        ai->Reset(true);
+
+    sLog.outDetail("Bot %s spawned in %s", bot->GetName(), (guid % 2) ? "Thunder Bluff" : "Orgrimmar");
+}
+
 void RandomPlayerbotMgr::OnBotLoginInternal(Player * const bot)
 {
+    HordeCitySpawnOnLogin(bot);
+
     sLog.outDetail("%u/%d Bot %s logged in", GetPlayerbotsAmount(), sRandomPlayerbotMgr.GetMaxAllowedBotCount(), bot->GetName());
 	//if (loginProgressBar && playerBots.size() < sRandomPlayerbotMgr.GetMaxAllowedBotCount()) { loginProgressBar->step(); }
 	//if (loginProgressBar && playerBots.size() >= sRandomPlayerbotMgr.GetMaxAllowedBotCount() - 1) {
