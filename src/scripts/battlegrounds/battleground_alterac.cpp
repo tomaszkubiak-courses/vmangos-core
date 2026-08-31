@@ -4592,10 +4592,6 @@ struct MineNPC_AI : public ScriptedAI
                 break;
         }
     }
-    void Aggro(Unit* pWho) override
-    {
-        m_creature->SetInCombatWithZone();
-    }
     void UpdateAI(uint32 const uiDiff) override
     {
         if (!m_creature->SelectHostileTarget() || !m_creature->GetVictim())
