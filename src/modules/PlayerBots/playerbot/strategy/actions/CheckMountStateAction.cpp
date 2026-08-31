@@ -16,6 +16,14 @@ bool CheckMountStateAction::Execute(Event& event)
     Player* requester = event.getOwner() ? event.getOwner() : GetMaster();
     Player* groupMaster = ai->GetGroupMaster();
 
+    // The bot is mounted, so whatever was last cast landed and nothing is being
+    // retried. See Mount() for what the backoff is for.
+    if (bot->IsMounted())
+    {
+        m_nextMountAttempt = 0;
+        m_mountBackoff = 0;
+    }
+
     if (bot->IsMounted() && (bot->GetTransport() || bot->IsTaxiFlying() || bot->IsBeingTeleported()))
     {
         if (ai->HasStrategy("debug mount", BotState::BOT_STATE_NON_COMBAT))
@@ -381,6 +389,18 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
 
     uint32 currentSpeed = AI_VALUE2(uint32, "current mount speed", "self target");
 
+    // A mount is a three second non-combat cast, and Unit::SetInCombatState cancels
+    // any non-combat spell the moment the bot is pulled into combat. In a battleground
+    // that happens inside most attempts, and the bot then started an identical cast on
+    // the very next check because nothing remembered that the last one had died. One
+    // hour of a populated server logged 27745 mount casts, 25569 of them on the three
+    // battleground maps and 11198 of them exactly three seconds after the previous cast
+    // by the same bot. Every attempt calls StopMoving() first, so the bots spent the
+    // match standing still restarting a cast that never landed. Back off instead, and
+    // let Execute() clear the backoff as soon as a cast does land.
+    if (!currentSpeed && time(nullptr) < m_nextMountAttempt)
+        return false;
+
     uint32 maxSpeed = 9999;
 
     if (limitSpeedToGroup && bot->GetGroup() && ai->IsGroupLeader())
@@ -516,6 +536,11 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
 
         if (didMount)
         {
+            // Only the cast has started here; Execute() clears this again once the
+            // bot is actually mounted.
+            m_mountBackoff = m_mountBackoff ? std::min<uint32>(m_mountBackoff * 2, 30) : 5;
+            m_nextMountAttempt = time(nullptr) + m_mountBackoff;
+
             if (wasMoving)
             {
                 ai->HandleCommand(CHAT_MSG_WHISPER, "queue do check mount state", *bot);

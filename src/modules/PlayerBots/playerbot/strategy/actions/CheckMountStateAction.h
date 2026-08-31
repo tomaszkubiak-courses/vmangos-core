@@ -39,5 +39,9 @@ namespace ai
     private:
         bool Mount(Player* requester, bool limitSpeedToGroup = false);
         bool UnMount() const;
+
+        // Backoff between mount attempts that did not land. See Mount().
+        time_t m_nextMountAttempt = 0;
+        uint32 m_mountBackoff = 0;
     };
 }
