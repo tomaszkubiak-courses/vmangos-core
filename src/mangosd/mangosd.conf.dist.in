@@ -2905,7 +2905,8 @@ PvP.PoolSizePerFaction = 0
 #    Battleground.QueueAnnouncer.Start
 #        Enable queue announcer posting to chat at BG start
 #        Default: 0 (disable)
-#                 1 (enable)
+#                 1 (announce name and level bracket)
+#                 2 (also announce how many players per side started the match)
 #
 #    Battleground.QueuesCount
 #        Maximum battleground queues a player can join at the same time

@@ -425,8 +425,17 @@ void BattleGround::Update(uint32 diff)
             PlaySoundToAll(SOUND_BG_START);
 
             //Announce BG starting
-            if (sWorld.getConfig(CONFIG_BOOL_BATTLEGROUND_QUEUE_ANNOUNCER_START))
-                sWorld.SendWorldText(LANG_BG_STARTED_ANNOUNCE_WORLD, GetName(), GetMinLevel(), GetMaxLevel());
+            if (uint32 announceType = sWorld.getConfig(CONFIG_UINT32_BATTLEGROUND_QUEUE_ANNOUNCER_START))
+            {
+                // At this point every invited player has already zoned in, so the counts
+                // are the sides the match actually starts with rather than the sides it
+                // was formed from - a battleground that filled only half of its slots
+                // says so.
+                if (announceType > 1)
+                    sWorld.SendWorldText(LANG_BG_STARTED_ANNOUNCE_WORLD_COUNT, GetName(), GetMinLevel(), GetMaxLevel(), GetPlayersCountByTeam(ALLIANCE), GetPlayersCountByTeam(HORDE));
+                else
+                    sWorld.SendWorldText(LANG_BG_STARTED_ANNOUNCE_WORLD, GetName(), GetMinLevel(), GetMaxLevel());
+            }
         }
     }
     // Despawn des portes apres 2min (preparation) + 1min
