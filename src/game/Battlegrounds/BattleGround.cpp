@@ -624,6 +624,12 @@ void BattleGround::UpdateWorldStateForPlayer(uint32 field, uint32 value, Player*
 
 int32 BattleGround::GetWinnerText(Team winner) const
 {
+    // A premature finish can end the battleground with no winner at all, when
+    // neither side is left with enough players. Announcing a victory there would
+    // credit the alliance for a match nobody won.
+    if (winner != ALLIANCE && winner != HORDE)
+        return 0;
+
     switch (GetTypeID())
     {
         case BATTLEGROUND_AV:
