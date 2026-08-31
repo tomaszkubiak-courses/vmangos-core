@@ -343,29 +343,13 @@ bool CheckMountStateAction::CanMountInBg() const
     //Do not mount with or near flag.
     if (bot->GetBattleGroundTypeId() == BattleGroundTypeId::BATTLEGROUND_WS)
     {
-        BattleGroundWS* bg = (BattleGroundWS*)ai->GetBot()->GetBattleGround();
-
         if (bot->HasAura(23333) || bot->HasAura(23335))
         {
             return false;
         }
 #ifdef MANGOSBOT_ZERO
-        //check near A Flag
-        uint32 lowguid = 90000;
-        uint32 id = 179830;
-        if (!bg)
-            return false;
-        GameObject* AllianceflagStand = bg->GetBgMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, id, lowguid));
-
-        if (bot->IsWithinDistInMap(AllianceflagStand, 3.0f))
-            return false;
-
-        //check near H Flag
-        lowguid = 90001;
-        id = 179831;
-        GameObject* HordeflagStand = bg->GetBgMap()->GetGameObject(ObjectGuid(HIGHGUID_GAMEOBJECT, id, lowguid));
-
-        if (bot->IsWithinDistInMap(HordeflagStand, 3.0f))
+        //check near either flag stand
+        if (bot->FindNearestGameObject(WS_ALLIANCE_FLAG_BASE, 3.0f) || bot->FindNearestGameObject(WS_HORDE_FLAG_BASE, 3.0f))
             return false;
 #endif
     }
