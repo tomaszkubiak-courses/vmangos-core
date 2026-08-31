@@ -23,6 +23,7 @@
 #define MANGOS_BATTLEGROUNDMGR_H
 
 #include <memory>
+#include <mutex>
 #include <vector>
 
 #include "Common.h"
@@ -102,8 +103,10 @@ class BattleGroundQueue
         void PlayerLoggedOut(ObjectGuid guid);
         bool PlayerLoggedIn(Player* player);
 
-        // mutex that should not allow changing private data, nor allowing to update Queue during private data change.
-        //std::recursive_mutex  m_lock;
+        // Everything in here is guarded by BattleGroundMgr::GetLock(), taken by the public
+        // entry points above. The queue used to be reachable only from the world thread, so
+        // upstream could leave its mutex disabled; it is now also reached from every map
+        // update thread.
 
 
         typedef std::map<ObjectGuid, PlayerQueueInfo> QueuedPlayersMap;
@@ -227,6 +230,9 @@ class BattleGroundMgr
         std::unique_ptr<ServerPacket> BuildPlaySoundPacket(uint32 soundId);
 
         /* Battlegrounds */
+        // The caller must hold GetLock() for as long as it uses these iterators: a
+        // battleground destroys itself from its own map's update thread and erases its
+        // registry entry on the way out.
         BattleGroundSet::iterator GetBattleGroundsBegin(BattleGroundTypeId bgTypeId) { return m_battleGrounds[bgTypeId].begin(); };
         BattleGroundSet::iterator GetBattleGroundsEnd(BattleGroundTypeId bgTypeId)   { return m_battleGrounds[bgTypeId].end(); };
 
@@ -238,11 +244,20 @@ class BattleGroundMgr
 
         uint32 CreateBattleGround(BattleGroundTypeId bgTypeId, uint32 minPlayersPerTeam, uint32 maxPlayersPerTeam, uint32 levelMin, uint32 levelMax, uint32 allianceWinSpell, uint32 allianceLoseSpell, uint32 hordeWinSpell, uint32 hordeLoseSpell, char const* battleGroundName, uint32 mapID, float team1StartLocX, float team1StartLocY, float team1StartLocZ, float team1StartLocO, float team2StartLocX, float team2StartLocY, float team2StartLocZ, float team2StartLocO, uint32 playerSkinReflootId);
 
-        void AddBattleGround(uint32 instanceId, BattleGroundTypeId bgTypeId, BattleGround* bg) { m_battleGrounds[bgTypeId][instanceId] = bg; };
-        void RemoveBattleGround(uint32 instanceID, BattleGroundTypeId bgTypeId) { m_battleGrounds[bgTypeId].erase(instanceID); }
+        void AddBattleGround(uint32 instanceId, BattleGroundTypeId bgTypeId, BattleGround* bg)
+        {
+            std::lock_guard<std::recursive_mutex> guard(GetLock());
+            m_battleGrounds[bgTypeId][instanceId] = bg;
+        };
+        void RemoveBattleGround(uint32 instanceID, BattleGroundTypeId bgTypeId)
+        {
+            std::lock_guard<std::recursive_mutex> guard(GetLock());
+            m_battleGrounds[bgTypeId].erase(instanceID);
+        }
         uint32 CreateClientVisibleInstanceId(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId);
         void DeleteClientVisibleInstanceId(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId, uint32 clientInstanceID)
         {
+            std::lock_guard<std::recursive_mutex> guard(GetLock());
             m_clientBattleGroundIds[bgTypeId][bracketId].erase(clientInstanceID);
         }
 
@@ -250,6 +265,24 @@ class BattleGroundMgr
         void DeleteAllBattleGrounds();
 
         void SendToBattleGround(Player* player, uint32 instanceId, BattleGroundTypeId bgTypeId);
+
+        // One recursive mutex for the whole battleground subsystem: the queues, the running
+        // battleground registry, the free slot lists and the queue update scheduler. All of
+        // them are written both from the world thread (BattleGroundMgr::Update, session
+        // handlers) and from map update threads - a battleground deletes itself from its own
+        // map's update, a player leaving the queue on level up runs inside Player::Update,
+        // and a driven character runs the PACKET_PROCESS_WORLD battleground handlers inline
+        // from its own Player::Update. One lock rather than one per structure because those
+        // paths call into each other in both directions, so per-structure locks would need a
+        // lock order nobody can keep; none of these critical sections is on a per-tick hot
+        // path. Recursive because the public entry points call each other (Update ->
+        // RemoveOfflinePlayer -> RemovePlayer, and the registry accessors from inside a
+        // queue update).
+        //
+        // Lock order: this lock is taken before MapManager's, never after - creating a
+        // battleground calls sMapMgr.CreateBgMap() while holding it. Nothing reached under
+        // MapManager's lock comes back into the battleground subsystem.
+        static std::recursive_mutex& GetLock();
 
         /* Battleground queues */
         // these queues are instantiated when creating BattlegroundMrg
@@ -314,7 +347,6 @@ class BattleGroundMgr
         void PlayerLoggedIn(Player* player);
         void PlayerLoggedOut(Player* player);
     private:
-        //std::mutex    schedulerLock;
         BattleMastersMap    m_battleMastersMap;
         CreatureBattleEventIndexesMap m_creatureBattleEventIndexMap;
         GameObjectBattleEventIndexesMap m_gameObjectBattleEventIndexMap;

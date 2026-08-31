@@ -302,7 +302,14 @@ void BattleGround::Update(uint32 diff)
         // ]]
         // BattleGround Template instance cannot be updated, because it would be deleted
         if (!GetInvitedCount(HORDE) && !GetInvitedCount(ALLIANCE))
+        {
+            // Held across the delete: this runs on the battleground's own map update thread,
+            // and until ~BattleGround has reached RemoveBattleGround another thread can still
+            // pull this object out of the registry and use a half-destroyed battleground.
+            std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
             delete this;
+            return;
+        }
         // update queue to avoid bg remaining indefinitely until player logs back in if he logs out after it pops
         else if (GetStatus() <= STATUS_WAIT_JOIN && (GetBgMap()->GetCreateTime() + 2 * MINUTE) < time(nullptr))
             sBattleGroundMgr.ScheduleQueueUpdate(BattleGroundMgr::BgQueueTypeId(GetTypeID()), GetTypeID(), GetBracketId());
@@ -1114,6 +1121,8 @@ void BattleGround::AddOrSetPlayerToCorrectBgGroup(Player* pPlayer, ObjectGuid pl
 /* This method should be called only once ... it adds pointer to queue */
 void BattleGround::AddToBGFreeSlotQueue()
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // make sure to add only once
     if (!m_inBGFreeSlotQueue)
     {
@@ -1125,6 +1134,8 @@ void BattleGround::AddToBGFreeSlotQueue()
 /* This method removes this battleground from free queue - it must be called when deleting battleground - not used now*/
 void BattleGround::RemoveFromBGFreeSlotQueue()
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // set to be able to re-add if needed
     m_inBGFreeSlotQueue = false;
     BgFreeSlotQueueType& bgFreeSlot = sBattleGroundMgr.m_bgFreeSlotQueue[m_typeId];

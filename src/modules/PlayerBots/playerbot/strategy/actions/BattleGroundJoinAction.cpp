@@ -52,6 +52,10 @@ namespace
     uint32 CountRunningBattlegrounds(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
     {
         uint32 running = 0;
+
+        // This runs from a bot's own map update thread, while a finishing battleground
+        // erases itself from the registry on another one.
+        std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
         for (auto it = sBattleGroundMgr.GetBattleGroundsBegin(bgTypeId);
              it != sBattleGroundMgr.GetBattleGroundsEnd(bgTypeId); ++it)
         {
