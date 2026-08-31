@@ -219,6 +219,16 @@ void WorldSession::HandlePetitionSignOpcode(WorldPackets::Petition::PetitionSign
 {
     Petition* petition = sGuildMgr.GetPetitionByCharterGuid(packet.itemGuid);
 
+    // TEMP DIAGNOSTIC [PETDIAG] - traced whenever a real player is the signer or owns
+    // the charter being signed. Remove with the rest of [PETDIAG].
+    bool const diag = !GetBot() || (petition && !petition->GetOwnerGuid().IsEmpty() &&
+        [&]{ Player* owner = ObjectAccessor::FindPlayer(petition->GetOwnerGuid());
+             return owner && !owner->GetSession()->GetBot(); }());
+
+    if (diag)
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] sign attempt by %s on charter %s: petition %s",
+                 _player ? _player->GetName() : "?", packet.itemGuid.GetString().c_str(), petition ? "found" : "MISSING");
+
     if (!petition)
     {
         sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "[PetitionHandler] No petition exists for charter with guid %u for signer %s",
@@ -227,7 +237,10 @@ void WorldSession::HandlePetitionSignOpcode(WorldPackets::Petition::PetitionSign
     }
 
     if (petition->IsComplete()) // reached maximum number of signatures for this petition
+    {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] sign refused: petition already complete");
         return;
+    }
 
     if (petition->GetOwnerGuid() == _player->GetObjectGuid())
     {
@@ -255,11 +268,13 @@ void WorldSession::HandlePetitionSignOpcode(WorldPackets::Petition::PetitionSign
 
     if (_player->GetGuildId())
     {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] sign refused: signer already in guild %u", _player->GetGuildId());
         SendGuildCommandResult(GUILD_INVITE_S, _player->GetName(), ERR_ALREADY_IN_GUILD_S);
         return;
     }
     if (_player->GetGuildIdInvited())
     {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] sign refused: signer already invited to guild %u", _player->GetGuildIdInvited());
         SendGuildCommandResult(GUILD_INVITE_S, _player->GetName(), ERR_ALREADY_INVITED_TO_GUILD_S);
         return;
     }
@@ -288,6 +303,8 @@ void WorldSession::HandlePetitionSignOpcode(WorldPackets::Petition::PetitionSign
             owner->GetSession()->SendGuildCommandResult(GUILD_INVITE_S, _player->GetName(), ERR_ALREADY_INVITED_TO_GUILD_S);
         return;
     }
+
+    if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] sign accepted for %s, count was %u", _player->GetName(), signs);
 
     if (petition->AddNewSignature(_player))
     {
@@ -339,24 +356,41 @@ void WorldSession::HandlePetitionDeclineOpcode(WorldPackets::Petition::PetitionD
 
 void WorldSession::HandleOfferPetitionOpcode(WorldPackets::Petition::OfferPetition const& packet)
 {
+    // TEMP DIAGNOSTIC [PETDIAG] - a real player cannot get a charter signed while bots
+    // sign each other's. Only traced when a real session is involved, so a thousand bots
+    // offering to each other cost nothing. Remove once the cause is known.
+    bool const diag = !GetBot();
+
     Player* player = ObjectAccessor::FindPlayer(packet.playerGuid);
     if (!player)
+    {
+        if (diag)
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer by %s: target %s not found", _player ? _player->GetName() : "?", packet.playerGuid.GetString().c_str());
         return;
+    }
+
+    if (diag)
+        sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer by %s to %s (bot %u, guild %u, invited %u, team %u vs %u)",
+                 _player->GetName(), player->GetName(), player->GetSession()->GetBot() ? 1 : 0,
+                 player->GetGuildId(), player->GetGuildIdInvited(), _player->GetTeam(), player->GetTeam());
 
     if (!sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_GUILD) && GetPlayer()->GetTeam() != player->GetTeam())
     {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer refused: not allied");
         SendGuildCommandResult(GUILD_CREATE_S, "", ERR_GUILD_NOT_ALLIED);
         return;
     }
 
     if (player->GetGuildId())
     {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer refused: target already in guild %u", player->GetGuildId());
         SendGuildCommandResult(GUILD_INVITE_S, _player->GetName(), ERR_ALREADY_IN_GUILD_S);
         return;
     }
 
     if (player->GetGuildIdInvited())
     {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer refused: target already invited to guild %u", player->GetGuildIdInvited());
         SendGuildCommandResult(GUILD_INVITE_S, _player->GetName(), ERR_ALREADY_INVITED_TO_GUILD_S);
         return;
     }
@@ -369,7 +403,10 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPackets::Petition::OfferPetiti
 
     Item const* charter = _player->GetItemByGuid(packet.itemGuid);
     if (!charter)
+    {
+        if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer refused: offerer holds no item %s", packet.itemGuid.GetString().c_str());
         return;
+    }
 
     uint32 petitionGuid = charter->GetEnchantmentId(EnchantmentSlot(0));
 
@@ -382,6 +419,8 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPackets::Petition::OfferPetiti
     }
 
     sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "OFFER PETITION: petition %u to %s", petitionGuid, player->GetName());
+
+    if (diag) sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer sent: petition %u to %s, %u signatures so far", petitionGuid, player->GetName(), petition->GetSignatureCount());
 
     // Get petition signs count
     uint8 signs = petition->GetSignatureCount();
