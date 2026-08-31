@@ -306,7 +306,7 @@ void PerformanceMonitor::Init(uint32 mapId, uint32 instanceId)
 
 } // namespace bot_perf — close before global PerformanceMonitorOperation impl
 
-PerformanceMonitorOperation::PerformanceMonitorOperation(PerformanceData& data, std::string_view name, PerformanceStack* stack) : data(data), name(name), stack(stack)
+PerformanceMonitorOperation::PerformanceMonitorOperation(PerformanceData& data, std::string_view name, PerformanceStack* stack) : data(data), name(name), stack(stack), enabled(sPlayerbotAIConfig.perfMonEnabled)
 {
     started = (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now())).time_since_epoch();
 }
@@ -318,7 +318,7 @@ PerformanceMonitorOperation::~PerformanceMonitorOperation()
 
 void PerformanceMonitorOperation::finish()
 {
-    if (!sPlayerbotAIConfig.perfMonEnabled)
+    if (!enabled)
         return;
 
     std::chrono::milliseconds finished = (std::chrono::time_point_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now())).time_since_epoch();
