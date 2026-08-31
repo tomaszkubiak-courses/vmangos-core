@@ -243,6 +243,7 @@ BattleGround::BattleGround()
 
     m_prematureCountDown = false;
     m_prematureCountDownTimer = 0;
+    m_waitJoinDiagTimer = 0; // TEMP DIAGNOSTIC
 
     m_startDelayTime = 0;
     m_startDelayTimes[BG_STARTING_EVENT_FIRST]  = BG_START_DELAY_2M;
@@ -289,6 +290,22 @@ BattleGround::~BattleGround()
 
 void BattleGround::Update(uint32 diff)
 {
+    // TEMP DIAGNOSTIC - why a created battleground never reaches STATUS_IN_PROGRESS.
+    // Remove this block, the m_waitJoinDiagTimer member and its constructor init together.
+    if (GetInstanceID() && GetStatus() <= STATUS_WAIT_JOIN)
+    {
+        m_waitJoinDiagTimer += diff;
+        if (m_waitJoinDiagTimer >= 10 * IN_MILLISECONDS)
+        {
+            m_waitJoinDiagTimer = 0;
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[BGWAIT] bg %u instance %u bracket %u status %u players %u (A %u H %u) invited (A %u H %u) startDelay %d events %u",
+                     (uint32)GetTypeID(), GetInstanceID(), (uint32)GetBracketId(), (uint32)GetStatus(), GetPlayersSize(),
+                     GetPlayersCountByTeam(ALLIANCE), GetPlayersCountByTeam(HORDE),
+                     GetInvitedCount(ALLIANCE), GetInvitedCount(HORDE),
+                     GetStartDelayTime(), (uint32)m_events);
+        }
+    }
+
     if (!GetPlayersSize())
     {
         // BG is empty
