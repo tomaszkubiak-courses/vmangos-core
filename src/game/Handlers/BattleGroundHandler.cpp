@@ -202,8 +202,14 @@ void WorldSession::RequestBgJoinQueue(ObjectGuid battlemaster, uint32 instanceId
         // _player->GetGroup() was already checked, grp is already initialized
         BattleGroundQueue& bgQueue = sBattleGroundMgr.m_battleGroundQueues[bgQueueTypeId];
 
-        GroupQueueInfo* ginfo = bgQueue.AddGroup(_player, nullptr, bgTypeId, bgBracketId, isPremade, instanceId, nullptr);
-        uint32 avgTime = bgQueue.GetAverageQueueWaitTime(ginfo, bgBracketId);
+        // The group ginfo names is freed as soon as its last player leaves the queue, which
+        // another thread can do between these two calls - hold the lock across both.
+        uint32 avgTime;
+        {
+            std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+            GroupQueueInfo* ginfo = bgQueue.AddGroup(_player, nullptr, bgTypeId, bgBracketId, isPremade, instanceId, nullptr);
+            avgTime = bgQueue.GetAverageQueueWaitTime(ginfo, bgBracketId);
+        }
         // already checked if queueSlot is valid, now just get it
         uint32 queueSlot = _player->AddBattleGroundQueueId(bgQueueTypeId);
         // store entry point coords
@@ -244,8 +250,13 @@ void WorldSession::RequestBgJoinQueue(ObjectGuid battlemaster, uint32 instanceId
         // _player->GetGroup() was already checked, grp is already initialized
         BattleGroundQueue& bgQueue = sBattleGroundMgr.m_battleGroundQueues[bgQueueTypeId];
         sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "Battleground: the following players are joining as group:");
-        GroupQueueInfo* ginfo = bgQueue.AddGroup(_player, grp, bgTypeId, bgBracketId, isPremade, instanceId, &excludedMembers);
-        uint32 avgTime = bgQueue.GetAverageQueueWaitTime(ginfo, bgBracketId);
+        // See above - ginfo must not be used once the lock is dropped.
+        uint32 avgTime;
+        {
+            std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+            GroupQueueInfo* ginfo = bgQueue.AddGroup(_player, grp, bgTypeId, bgBracketId, isPremade, instanceId, &excludedMembers);
+            avgTime = bgQueue.GetAverageQueueWaitTime(ginfo, bgBracketId);
+        }
         for (GroupReference* itr = grp->GetFirstMember(); itr != nullptr; itr = itr->next())
         {
             Player* member = itr->getSource();

@@ -1721,6 +1721,8 @@ bool ChatHandler::HandleBGStatusCommand(char *args)
     uint8 uiAllianceCount, uiHordeCount;
     for (int8 bgTypeId = BATTLEGROUND_AB; bgTypeId >= BATTLEGROUND_AV; --bgTypeId)
     {
+        // A battleground erases its registry entry from its own map's update thread.
+        std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
         for (BattleGroundSet::const_iterator it = sBattleGroundMgr.GetBattleGroundsBegin(BattleGroundTypeId(bgTypeId)); it != sBattleGroundMgr.GetBattleGroundsEnd(BattleGroundTypeId(bgTypeId)); ++it)
         {
             // Pas un "vrai" BG, mais un "modele" de BG.
@@ -1783,12 +1785,16 @@ bool ChatHandler::HandleBGStatusCommand(char *args)
         BattleGroundQueueTypeId bgQueueTypeId = BattleGroundMgr::BgQueueTypeId(BattleGroundTypeId(bgTypeId));
         // Must be a reference (&), otherwise crash later on ...
         BattleGroundQueue& queue = sBattleGroundMgr.m_battleGroundQueues[bgQueueTypeId];
-        for (const auto& itr : queue.m_queuedPlayers)
         {
-            if (itr.second.groupInfo->groupTeam == HORDE)
-                uiHordeCount++;
-            else
-                uiAllianceCount++;
+            // The entries point at group infos that map update threads free.
+            std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+            for (const auto& itr : queue.m_queuedPlayers)
+            {
+                if (itr.second.groupInfo->groupTeam == HORDE)
+                    uiHordeCount++;
+                else
+                    uiAllianceCount++;
+            }
         }
 
         BattleGround* bgTemplate = sBattleGroundMgr.GetBattleGroundTemplate(BattleGroundTypeId(bgTypeId));

@@ -311,6 +311,9 @@ void PlayerBotMgr::Update(uint32 diff)
             uint32 queuedAllianceCount[MAX_BATTLEGROUND_BRACKETS] = {};
             uint32 queuedHordeCount[MAX_BATTLEGROUND_BRACKETS] = {};
             BattleGroundQueue const& bgQueue = sBattleGroundMgr.m_battleGroundQueues[queueType];
+            // Players leave the queue from map update threads, which frees the
+            // GroupQueueInfo these entries point at.
+            std::unique_lock<std::recursive_mutex> queueGuard(BattleGroundMgr::GetLock());
             for (auto const& itr : bgQueue.m_queuedPlayers)
             {
                 if (itr.second.groupInfo->isInvitedToBgInstanceGuid)
@@ -332,6 +335,7 @@ void PlayerBotMgr::Update(uint32 diff)
                         hasPlayerInQueue[bgBracketId] = true;
                 }
             }
+            queueGuard.unlock();
 
             for (uint32 bracketId = BG_BRACKET_ID_FIRST; bracketId < MAX_BATTLEGROUND_BRACKETS; ++bracketId)
             {

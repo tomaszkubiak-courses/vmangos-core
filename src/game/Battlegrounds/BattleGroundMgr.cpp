@@ -60,8 +60,19 @@ BattleGroundQueue::BattleGroundQueue()
     }
 }
 
+// Constructed on first use and deliberately never destroyed. It is first taken long after
+// the BattleGroundMgr singleton is built, so a plain function-local object would be destroyed
+// before it during static teardown - and ~BattleGroundQueue takes this lock.
+std::recursive_mutex& BattleGroundMgr::GetLock()
+{
+    static std::recursive_mutex* lock = new std::recursive_mutex();
+    return *lock;
+}
+
 BattleGroundQueue::~BattleGroundQueue()
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     m_queuedPlayers.clear();
     for (auto& group : m_queuedGroups)
     {
@@ -144,6 +155,8 @@ bool BattleGroundQueue::SelectionPool::AddGroup(GroupQueueInfo* ginfo, uint32 de
 // add group or player (grp == nullptr) to bg queue with the given leader and bg specifications
 GroupQueueInfo* BattleGroundQueue::AddGroup(Player* leader, Group* grp, BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId, bool isPremade, uint32 instanceId, std::vector<uint32>* excludedMembers)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // create new ginfo
     GroupQueueInfo* ginfo = new GroupQueueInfo;
     ginfo->bgTypeId                  = bgTypeId;
@@ -290,6 +303,8 @@ void BattleGroundQueue::PlayerInvitedToBgUpdateAverageWaitTime(GroupQueueInfo* g
 
 uint32 BattleGroundQueue::GetAverageQueueWaitTime(GroupQueueInfo* ginfo, BattleGroundBracketId bracketId)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // AddGroup has nothing to hand back when a group was over the size limit and every
     // member ended up queued solo. 0 is what this returns for "not available" anyway.
     if (!ginfo)
@@ -357,7 +372,7 @@ void BattleGroundQueue::UnlinkGroupEverywhere(GroupQueueInfo* group, ObjectGuid 
 void BattleGroundQueue::RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount)
 {
     //Player* player = sObjectMgr.GetPlayer(guid);
-    //ACE_Guard<ACE_Recursive_Thread_Mutex> guard(m_lock);
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
 
     int32 bracketId = -1;                                     // signed for proper for-loop finish
     QueuedPlayersMap::iterator itr;
@@ -443,7 +458,7 @@ void BattleGroundQueue::RemovePlayer(ObjectGuid guid, bool decreaseInvitedCount)
 //returns true when player playerGuid is in queue and is invited to bgInstanceGuid
 bool BattleGroundQueue::IsPlayerInvited(ObjectGuid playerGuid, uint32 const bgInstanceGuid, uint32 const removeTime)
 {
-    //ACE_Guard<ACE_Recursive_Thread_Mutex> g(m_lock);
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
     QueuedPlayersMap::const_iterator qItr = m_queuedPlayers.find(playerGuid);
     return (qItr != m_queuedPlayers.end()
             && qItr->second.groupInfo->isInvitedToBgInstanceGuid == bgInstanceGuid
@@ -452,7 +467,7 @@ bool BattleGroundQueue::IsPlayerInvited(ObjectGuid playerGuid, uint32 const bgIn
 
 bool BattleGroundQueue::GetPlayerGroupInfoData(ObjectGuid guid, GroupQueueInfo* ginfo)
 {
-    //ACE_Guard<ACE_Recursive_Thread_Mutex> g(m_lock);
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
     QueuedPlayersMap::const_iterator qItr = m_queuedPlayers.find(guid);
     if (qItr == m_queuedPlayers.end())
         return false;
@@ -960,7 +975,7 @@ void BattleGroundQueue::CheckForStrandedGroups()
 
 void BattleGroundQueue::Update(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
-    //ACE_Guard<ACE_Recursive_Thread_Mutex> guard(m_lock);
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
 
     RemoveOfflinePlayer();
 
@@ -1085,6 +1100,8 @@ BattleGroundMgr::~BattleGroundMgr()
 
 void BattleGroundMgr::DeleteAllBattleGrounds()
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // will also delete template bgs:
     for (uint32 i = BATTLEGROUND_TYPE_NONE; i < MAX_BATTLEGROUND_TYPE_ID; ++i)
     {
@@ -1105,9 +1122,8 @@ void BattleGroundMgr::Update(uint32 diff)
     {
         std::vector<uint32> scheduled;
         {
-            //create mutex
-            //ACE_Guard<ACE_Thread_Mutex> guard(schedulerLock);
             //copy vector and clear the other
+            std::lock_guard<std::recursive_mutex> guard(GetLock());
             scheduled = std::vector<uint32>(m_queueUpdateScheduler);
             m_queueUpdateScheduler.clear();
             //release lock
@@ -1269,6 +1285,8 @@ std::unique_ptr<ServerPacket> BattleGroundMgr::BuildPlayerJoinedBattleGroundPack
 
 BattleGround* BattleGroundMgr::GetBattleGroundThroughClientInstance(uint32 instanceId, BattleGroundTypeId bgTypeId)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     //cause at HandleBattleGroundJoinOpcode the clients sends the instanceid he gets from
     //SMSG_BATTLEFIELD_LIST we need to find the battleground with this clientinstance-id
     BattleGround* bg = GetBattleGroundTemplate(bgTypeId);
@@ -1285,6 +1303,8 @@ BattleGround* BattleGroundMgr::GetBattleGroundThroughClientInstance(uint32 insta
 
 BattleGround* BattleGroundMgr::GetBattleGround(uint32 instanceId, BattleGroundTypeId bgTypeId)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     //search if needed
     BattleGroundSet::iterator itr;
     if (bgTypeId == BATTLEGROUND_TYPE_NONE)
@@ -1303,12 +1323,16 @@ BattleGround* BattleGroundMgr::GetBattleGround(uint32 instanceId, BattleGroundTy
 
 BattleGround* BattleGroundMgr::GetBattleGroundTemplate(BattleGroundTypeId bgTypeId)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     //map is sorted and we can be sure that lowest instance id has only BG template
     return m_battleGrounds[bgTypeId].empty() ? nullptr : m_battleGrounds[bgTypeId].begin()->second;
 }
 
 uint32 BattleGroundMgr::CreateClientVisibleInstanceId(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // here, we create an instanceid, which is just for
     // displaying this to the client and without any other use.
     // the client-instanceIds are unique for each battleground-type
@@ -1331,6 +1355,8 @@ uint32 BattleGroundMgr::CreateClientVisibleInstanceId(BattleGroundTypeId bgTypeI
 // create a new battleground that will really be used to play
 BattleGround* BattleGroundMgr::CreateNewBattleGround(BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     // get the template BG
     BattleGround *bgTemplate = GetBattleGroundTemplate(bgTypeId);
     if (!bgTemplate)
@@ -1607,7 +1633,7 @@ void BattleGroundMgr::ToggleTesting()
 
 void BattleGroundMgr::ScheduleQueueUpdate(BattleGroundQueueTypeId bgQueueTypeId, BattleGroundTypeId bgTypeId, BattleGroundBracketId bracketId)
 {
-    //ACE_Guard<ACE_Thread_Mutex> guard(schedulerLock);
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
     //we will use only 1 number created of bgTypeId and queue_id
     uint32 schedule_id = (bgQueueTypeId << 16) | (bgTypeId << 8) | bracketId;
     bool found = false;
@@ -1864,6 +1890,8 @@ void BattleGroundMgr::PlayerLoggedOut(Player* player)
 
 void BattleGroundQueue::PlayerLoggedOut(ObjectGuid guid)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     QueuedPlayersMap::iterator itr;
 
     //remove player from map, if he's there
@@ -1879,6 +1907,8 @@ void BattleGroundQueue::PlayerLoggedOut(ObjectGuid guid)
 
 bool BattleGroundQueue::PlayerLoggedIn(Player* player)
 {
+    std::lock_guard<std::recursive_mutex> guard(BattleGroundMgr::GetLock());
+
     QueuedPlayersMap::iterator itr;
 
     //remove player from map, if he's there
