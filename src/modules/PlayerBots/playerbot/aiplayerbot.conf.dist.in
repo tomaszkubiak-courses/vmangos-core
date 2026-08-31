@@ -47,12 +47,12 @@ AiPlayerbot.RandomBotJoinBG = 1
 # Enable Auto join BG - bots randomly join WSG and 2v2 Arena if server is not lagging
 AiPlayerbot.RandomBotAutoJoinBG = 0
 
-# How many battlegrounds of one type may run in one level bracket before bots stop
+# How many full battlegrounds of one type may run in one level bracket before bots stop
 # queueing for it. Checked only while no real player is queued for that bracket, so it
-# never keeps a bot out of a match somebody is waiting for. At 1, a single running match
-# closes that queue to every bot until it ends - which is why Alterac Valley, needing 20
-# per team and so holding its slot for a long time, forms about twice an hour on a
-# bot-only server while Warsong forms constantly.
+# never keeps a bot out of a match somebody is waiting for. A match that is under way and
+# still has free slots does not count: a bot queueing then is filled into it rather than
+# starting a second one, which is how a running match gets its empty slots refilled -
+# including the slots left by a real player who joined it and later left.
 AiPlayerbot.BgMaxInstancesPerBracket = 1
 
 # Mark many quests <= Bot level as complete (slows down bot creation)

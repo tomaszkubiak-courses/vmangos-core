@@ -69,6 +69,16 @@ namespace
             if (bg->GetStatus() == STATUS_WAIT_LEAVE)
                 continue;
 
+            // Neither is one that is under way and still has room in it. A bot that
+            // queues now does not start a second match, it is poured into this one by
+            // BattleGroundQueue::FillPlayersToBg, which applies no minimum player count -
+            // the same path a real player takes when picking "First Available" and
+            // landing in a running battleground instantly. Counting a half empty match
+            // as a closed slot shut the queue behind it, so nobody ever backfilled and
+            // the match ran short handed to the end.
+            if (bg->GetStatus() == STATUS_IN_PROGRESS && bg->HasFreeSlots())
+                continue;
+
             ++running;
         }
 
@@ -99,7 +109,7 @@ namespace
         if (hasPlayers)
             return false;
 
-        // Nobody real is waiting for this bracket, so one match of it is enough.
+        // Nobody real is waiting for this bracket, so one full match of it is enough.
         if (CountRunningBattlegrounds((BattleGroundTypeId)bgTypeId, (BattleGroundBracketId)bracketId)
                 >= sPlayerbotAIConfig.bgMaxInstancesPerBracket)
             return true;
