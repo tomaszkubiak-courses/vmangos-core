@@ -221,9 +221,9 @@ void WorldSession::HandlePetitionSignOpcode(WorldPackets::Petition::PetitionSign
 
     // TEMP DIAGNOSTIC [PETDIAG] - traced whenever a real player is the signer or owns
     // the charter being signed. Remove with the rest of [PETDIAG].
-    bool const diag = !GetBot() || (petition && !petition->GetOwnerGuid().IsEmpty() &&
+    bool const diag = !IsBotSession() || (petition && !petition->GetOwnerGuid().IsEmpty() &&
         [&]{ Player* owner = ObjectAccessor::FindPlayer(petition->GetOwnerGuid());
-             return owner && !owner->GetSession()->GetBot(); }());
+             return owner && !owner->GetSession()->IsBotSession(); }());
 
     if (diag)
         sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] sign attempt by %s on charter %s: petition %s",
@@ -358,8 +358,9 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPackets::Petition::OfferPetiti
 {
     // TEMP DIAGNOSTIC [PETDIAG] - a real player cannot get a charter signed while bots
     // sign each other's. Only traced when a real session is involved, so a thousand bots
-    // offering to each other cost nothing. Remove once the cause is known.
-    bool const diag = !GetBot();
+    // offering to each other cost nothing. IsBotSession, not GetBot: the module's bots
+    // carry no PlayerBotEntry. Remove once the cause is known.
+    bool const diag = !IsBotSession();
 
     Player* player = ObjectAccessor::FindPlayer(packet.playerGuid);
     if (!player)
@@ -371,7 +372,7 @@ void WorldSession::HandleOfferPetitionOpcode(WorldPackets::Petition::OfferPetiti
 
     if (diag)
         sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[PETDIAG] offer by %s to %s (bot %u, guild %u, invited %u, team %u vs %u)",
-                 _player->GetName(), player->GetName(), player->GetSession()->GetBot() ? 1 : 0,
+                 _player->GetName(), player->GetName(), player->GetSession()->IsBotSession() ? 1 : 0,
                  player->GetGuildId(), player->GetGuildIdInvited(), _player->GetTeam(), player->GetTeam());
 
     if (!sWorld.getConfig(CONFIG_BOOL_ALLOW_TWO_SIDE_INTERACTION_GUILD) && GetPlayer()->GetTeam() != player->GetTeam())
