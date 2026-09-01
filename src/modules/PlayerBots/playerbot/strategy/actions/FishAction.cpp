@@ -120,12 +120,43 @@ bool FishAction::Execute(Event& event)
     if (poles.empty())
         return false;
 
-    Item* pole = poles.front();
-    uint8 bagIndex = pole->GetBagSlot();
-    uint8 slot = pole->GetSlot();
+    // The item list is built from a std::set, so its order follows pointer addresses and
+    // not inventory slots: front() is not the equipped pole just because one is equipped.
+    // Look for the worn one first, and only then for one the bot is actually allowed to
+    // put in its main hand. Taking front() on faith and equipping it unconditionally is
+    // what used to spin here - a pole that could not be equipped left this action in the
+    // same state on every tick, forever.
+    Item* pole = nullptr;
+    for (Item* candidate : poles)
+    {
+        if (candidate->IsEquipped() && candidate->GetSlot() == EQUIPMENT_SLOT_MAINHAND)
+        {
+            pole = candidate;
+            break;
+        }
+    }
 
-    if (slot != EQUIPMENT_SLOT_MAINHAND)
-        EquipAction::EquipItem(ai, GetMaster(), pole);
+    if (!pole)
+    {
+        for (Item* candidate : poles)
+        {
+            uint16 dest;
+            if (bot->CanEquipItem(NULL_SLOT, dest, candidate, true) == EQUIP_ERR_OK)
+            {
+                pole = candidate;
+                break;
+            }
+        }
+
+        // Nothing wearable. Drop the spot so the travel system sends the bot somewhere it
+        // can do something, rather than leaving it stood in the water retrying.
+        if (!pole || !EquipAction::EquipItem(ai, GetMaster(), pole))
+        {
+            RESET_AI_VALUE2(WorldPosition, "custom position", "fish spot");
+            SetDuration(sPlayerbotAIConfig.globalCoolDown);
+            return false;
+        }
+    }
 
     Event fishCastEvent = Event("fish", "7731 " + chat->formatWorldobject(bot));
     bool didCast = CastCustomSpellAction::Execute(fishCastEvent);
