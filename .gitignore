@@ -119,3 +119,6 @@ Progression.h
 
 # Local world DB dumps (not distributed with the core)
 /sql/world_full_*.sql
+
+# Local planning notes, never distributed
+/doc/local/
