@@ -338,6 +338,10 @@ bool MovementAction::MoveOnTransport(PlayerbotAI* ai, GenericTransport* transpor
     Player* bot = ai->GetBot();
     WorldPosition botPos(bot);
 
+    // Read before RandomPointOnTrans, which borrows bot->SetTransport for its pathing and
+    // puts the previous value back afterwards.
+    bool const alreadyAboard = bot->GetTransport() == transport;
+
     uint32 radius = 20;
 
     std::vector<WorldPosition> path;
@@ -350,13 +354,34 @@ bool MovementAction::MoveOnTransport(PlayerbotAI* ai, GenericTransport* transpor
     if (doTeleport)
     {
         bot->GetMap()->PlayerRelocation(bot, transPos.getX(), transPos.getY(), transPos.getZ(), bot->GetOrientation());
+
+        // AddPassenger does nothing whatsoever for a passenger already in the set, so a
+        // bot moved around the deck this way keeps the transport offset it had before the
+        // relocation above. The vessel goes on deriving a world position from that stale
+        // offset on every update, and the two drift apart until the result leaves the map:
+        // "[TRANSPORTS] Object Kikli [guid 72] has invalid position on transport", sixteen
+        // times over one Grom'Gol zeppelin flight. Recompute it from where the bot now is.
+        if (alreadyAboard)
+        {
+            float x = bot->GetPositionX(), y = bot->GetPositionY(), z = bot->GetPositionZ(), o = bot->GetOrientation();
+            transport->CalculatePassengerOffset(x, y, z, &o);
+            bot->m_movementInfo.t_pos.x = x;
+            bot->m_movementInfo.t_pos.y = y;
+            bot->m_movementInfo.t_pos.z = z;
+            bot->m_movementInfo.t_pos.o = o;
+        }
+
         transport->AddPassenger(bot, true);
+
         // Boarding is the one leg of travel nothing recorded. setNewTarget writes an
         // event for every destination a bot picks - taker, giver, objective - but the
         // vessel it needs to get there was invisible in the log, so "do bots use boats
-        // at all" could only be argued, never counted. It fires once per boarding, so
-        // it costs nothing next to the rest of bot_events.csv.
-        sPlayerbotAIConfig.logEvent(ai, "BoardTransport", transport->GetName(), std::to_string(transport->GetEntry()));
+        // at all" could only be argued, never counted. Only an actual boarding: this
+        // function also runs to shuffle a bot around the deck it is already standing on,
+        // and counting those made one tram ride look like 1917 boardings.
+        if (!alreadyAboard)
+            sPlayerbotAIConfig.logEvent(ai, "BoardTransport", transport->GetName(), std::to_string(transport->GetEntry()));
+
         bot->SendHeartBeat();
         return true;
     }
@@ -375,19 +400,27 @@ bool MovementAction::MoveOnTransport(PlayerbotAI* ai, GenericTransport* transpor
     else
     {
         transport->AddPassenger(bot, true);
-        sPlayerbotAIConfig.logEvent(ai, "BoardTransport", transport->GetName(), std::to_string(transport->GetEntry()));
 
-        ai->StopMoving();
+        // Everything below settles a bot onto a vessel it has just stepped onto. Running
+        // it again for a bot already aboard tore up its movement generator on every pass
+        // and logged another boarding; the MotionMaster is cleared and the new path
+        // issued further down either way.
+        if (!alreadyAboard)
+        {
+            sPlayerbotAIConfig.logEvent(ai, "BoardTransport", transport->GetName(), std::to_string(transport->GetEntry()));
 
-        if (!bot->GetMotionMaster()->empty())
-            if (MovementGenerator* movgen = bot->GetMotionMaster()->top())
-                movgen->Interrupt(*bot);
+            ai->StopMoving();
 
-        bot->SendHeartBeat();
+            if (!bot->GetMotionMaster()->empty())
+                if (MovementGenerator* movgen = bot->GetMotionMaster()->top())
+                    movgen->Interrupt(*bot);
 
-        if (!bot->GetMotionMaster()->empty())
-            if (MovementGenerator* movgen = bot->GetMotionMaster()->top())
-                movgen->Reset(*bot);
+            bot->SendHeartBeat();
+
+            if (!bot->GetMotionMaster()->empty())
+                if (MovementGenerator* movgen = bot->GetMotionMaster()->top())
+                    movgen->Reset(*bot);
+        }
     }
 
     if (ai->HasStrategy("debug move", BotState::BOT_STATE_NON_COMBAT))
@@ -488,7 +521,15 @@ bool MovementAction::UseTransport(PlayerbotAI* ai, uint32 entry, WorldPosition d
             return true;
         }
 
-        if (urand(0, 50))
+        // The bot is aboard and riding to its dock; this only shuffles it around the deck
+        // so it is not a statue for the whole crossing. urand(0, 50) is non-zero fifty
+        // times in fifty one, so it fired on very nearly every pass - a random point on
+        // the deck picked, up to a hundred pathfinder runs to reach it, and the bot
+        // relocated, about every three seconds for the length of the voyage. One tram
+        // ride did it 1917 times. The same idiom is written !urand(0, 50) where this file
+        // wants something to happen rarely; wanting it to happen almost always is what
+        // does not fit. Shuffle occasionally instead.
+        if (!urand(0, 50))
             MoveOnTransport(ai, transport, doTeleport);
 
         ai->TellDebug(ai->GetMaster(), "Waiting ontop of transport " + transportName + " at " + std::to_string((uint32)dockPosition.fDist(transport)) + "y from docking.", "debug move");
