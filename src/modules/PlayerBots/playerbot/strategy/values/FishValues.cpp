@@ -14,7 +14,21 @@ bool CanFishValue::Calculate()
     if (poles.empty()) //No fishing pole.
         return false;
 
-    return true;
+    // Owning a pole is not the same as being able to hold one - a pole below the bot's
+    // fishing skill, or one it cannot equip right now, makes every fishing action a no-op.
+    // Saying yes anyway is how bots were sent across a continent to stand at water they
+    // could never fish.
+    for (Item* pole : poles)
+    {
+        if (pole->IsEquipped() && pole->GetSlot() == EQUIPMENT_SLOT_MAINHAND)
+            return true;
+
+        uint16 dest;
+        if (bot->CanEquipItem(NULL_SLOT, dest, pole, true) == EQUIP_ERR_OK)
+            return true;
+    }
+
+    return false; //No pole the bot can wield.
 }
 
 bool CanOpenFishingDobberValue::Calculate()

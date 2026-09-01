@@ -203,7 +203,7 @@ void EquipAction::EquipItemToSlot(Player* requester, Item* item, uint8 targetSlo
     ai->TellPlayer(requester, BOT_TEXT2("equip_command", args), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
 }
 
-void EquipAction::EquipItem(PlayerbotAI* ai, Player* requester, Item* item, bool silent)
+bool EquipAction::EquipItem(PlayerbotAI* ai, Player* requester, Item* item, bool silent)
 {
     Player* bot = ai->GetBot();
     AiObjectContext* context = ai->GetAiObjectContext();
@@ -214,6 +214,19 @@ void EquipAction::EquipItem(PlayerbotAI* ai, Player* requester, Item* item, bool
 
     uint16 dest;
     InventoryResult result = bot->CanEquipItem(NULL_SLOT, dest, item, !item->IsBag());
+
+    // CanEquipItem's verdict used to be read only to work out which item was being
+    // replaced, and the auto-equip packet went out whether or not the equip could
+    // succeed. A refused equip leaves the item exactly where it was, so any caller that
+    // repeats while the item is not yet worn fires again on the very next tick - and the
+    // event log recorded every one of those attempts as a successful EquipAction. Four
+    // bots spent a night that way, one of them re-equipping the same fishing pole 55104
+    // times over six hours without moving. Containers and quivers are exempt because the
+    // branch below deliberately displaces an equipped bag, which CanEquipItem refuses;
+    // ammo never goes through an equipment slot at all.
+    bool const isBagLike = item->GetProto()->Class == ITEM_CLASS_CONTAINER || item->GetProto()->Class == ITEM_CLASS_QUIVER;
+    if (result != EQUIP_ERR_OK && !isBagLike && item->GetProto()->InventoryType != INVTYPE_AMMO)
+        return false;
 
     Item* oldItem = nullptr;
     Item* oldOffhand = nullptr;
@@ -288,6 +301,8 @@ void EquipAction::EquipItem(PlayerbotAI* ai, Player* requester, Item* item, bool
         args["%item"] = ChatHelper::formatItem(item);
         ai->TellPlayer(requester, BOT_TEXT2("equip_command", args), PlayerbotSecurityLevel::PLAYERBOT_SECURITY_ALLOW_ALL, false);
     }
+
+    return true;
 }
 
 bool EquipUpgradesAction::Execute(Event& event)
