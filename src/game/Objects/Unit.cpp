@@ -10917,11 +10917,36 @@ void Unit::UpdateSplineMovement(uint32 t_diff)
     Movement::Location loc = movespline->ComputePosition();
     if (GenericTransport* t = GetTransport())
     {
-        m_movementInfo.GetTransportPos().x = loc.x;
-        m_movementInfo.GetTransportPos().y = loc.y;
-        m_movementInfo.GetTransportPos().z = loc.z;
-        m_movementInfo.GetTransportPos().o = loc.orientation;
-        t->CalculatePassengerPosition(loc.x, loc.y, loc.z, &loc.orientation);
+        // A spline is computed in transport space only when it was launched with a transport
+        // guid; MoveSplineInit::Launch converts its start point to an offset in that case and
+        // in no other. Whether the *unit* rides a transport says nothing about which space the
+        // running spline is in - it can be attached to a vessel while a world-coordinate spline
+        // is still playing. Storing that world position as the transport offset makes
+        // CalculatePassengerPosition add the vessel's position to it a second time, roughly
+        // doubling the coordinates and pushing them off the map: "[TRANSPORTS] Object Kahlun
+        // [guid 73] has invalid position on transport", 52 times in seven seconds on the
+        // Grom'Gol zeppelin. The unit is frozen the whole time, because the invalid-coord
+        // guard below then skips its relocation on every update.
+        if (movespline->GetTransportGuid() == t->GetGUIDLow())
+        {
+            m_movementInfo.GetTransportPos().x = loc.x;
+            m_movementInfo.GetTransportPos().y = loc.y;
+            m_movementInfo.GetTransportPos().z = loc.z;
+            m_movementInfo.GetTransportPos().o = loc.orientation;
+            t->CalculatePassengerPosition(loc.x, loc.y, loc.z, &loc.orientation);
+        }
+        else
+        {
+            // World-space spline on a passenger. Keep the offset in step with where the unit
+            // actually is, the way a client walking about a deck reports both positions, so
+            // the vessel's own passenger update does not drag it back to a stale offset.
+            float x = loc.x, y = loc.y, z = loc.z, o = loc.orientation;
+            t->CalculatePassengerOffset(x, y, z, &o);
+            m_movementInfo.GetTransportPos().x = x;
+            m_movementInfo.GetTransportPos().y = y;
+            m_movementInfo.GetTransportPos().z = z;
+            m_movementInfo.GetTransportPos().o = o;
+        }
     }
     if (!MaNGOS::IsValidMapCoord(loc.x, loc.y, loc.z))
         return;
