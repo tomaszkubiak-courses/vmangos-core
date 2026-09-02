@@ -52,11 +52,16 @@ static GongWaveSummon const s_aGongWave2[] =
     { CREATURE_TOMB_REAVER, 2542.82f, 904.936f, 46.8091f, 4.642580f }
 };
 
-// Tuten'kash spawns in the corridor south west of the gong room, not inside the room.
+// Tuten'kash spawns down in the corridor south west of the gong, then walks up to the
+// spot he is found at, which is the target of his own on reset move in the sniff.
 static GongWaveSummon const s_aGongWave3[] =
 {
     { CREATURE_TUTEN_KASH, 2487.94f, 804.222f, 43.1073f, 1.692970f }
 };
+
+static float const TUTEN_KASH_POST_X = 2515.71f;
+static float const TUTEN_KASH_POST_Y = 854.81f;
+static float const TUTEN_KASH_POST_Z = 47.68f;
 
 static uint32 const WAVE_1_SIZE = sizeof(s_aGongWave1) / sizeof(s_aGongWave1[0]);
 static uint32 const WAVE_2_SIZE = sizeof(s_aGongWave2) / sizeof(s_aGongWave2[0]);
@@ -183,7 +188,24 @@ struct instance_razorfen_downs : public ScriptedInstance
                     pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
 
                     for (uint32 i = 0; i < uiWaveSize; ++i)
-                        pGo->SummonCreature(pWave[i].uiEntry, pWave[i].fX, pWave[i].fY, pWave[i].fZ, pWave[i].fO);
+                    {
+                        Creature* pSummon = pGo->SummonCreature(pWave[i].uiEntry, pWave[i].fX, pWave[i].fY, pWave[i].fZ, pWave[i].fO);
+
+                        if (!pSummon)
+                            continue;
+
+                        if (pSummon->GetEntry() == CREATURE_TUTEN_KASH)
+                        {
+                            pSummon->SetWalk(false);
+                            pSummon->GetMotionMaster()->MovePoint(0, TUTEN_KASH_POST_X, TUTEN_KASH_POST_Y, TUTEN_KASH_POST_Z, MOVE_PATHFINDING);
+                        }
+                        else
+                        {
+                            // The tomb creatures are summoned out of sight of the gong, in two
+                            // groups far from each other, and go looking for the party at once.
+                            pSummon->SetInCombatWithZone();
+                        }
+                    }
                 }
             }
         }
