@@ -61,6 +61,14 @@ bool DoneFishingValue::Calculate()
             return false;
     }
 
+    // Standing at a fishing spot between two casts is not being finished. This value drives the
+    // "put your real gear back on" trigger, so answering yes in the gap made the upgrade sweep
+    // pull the pole out of the bot's hand, which the fishing strategy answered by putting it back
+    // - a ping-pong that ran for hours. The spot is what says the bot still means to fish; it is
+    // cleared once a catch ends the session.
+    if (AI_VALUE2(WorldPosition, "custom position", "fish spot"))
+        return false;
+
     return true;
 }
 
