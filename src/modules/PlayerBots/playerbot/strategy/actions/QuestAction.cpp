@@ -209,7 +209,11 @@ bool QuestAction::AcceptQuest(Player* requester, Quest const* quest, uint64 ques
     std::map<std::string, std::string> args;
     args["%quest"] = chat->formatQuest(quest);
     
-    if (bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE)
+    if (ai->RecentlyDroppedQuest(questId))
+    {
+        return false;
+    }
+    else if (bot->GetQuestStatus(questId) == QUEST_STATUS_COMPLETE)
     {
         outputMessage = BOT_TEXT2("quest_error_completed", args);
     }

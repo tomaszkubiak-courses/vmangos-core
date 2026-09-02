@@ -408,6 +408,11 @@ public:
     WorldObject* GetWorldObject(ObjectGuid guid);
     std::vector<Player*> GetPlayersInGroup();
     void DropQuest(uint32 questId);
+    // True while a quest the bot dropped itself is still on cooldown. The log cleaner drops
+    // whatever is not progressing, and without this the bot walked back to the same giver and
+    // took it again - 8 of the 9 most dropped quests in a nine hour run were also among the
+    // most accepted, and one pair ran 33 drops against 25 accepts.
+    bool RecentlyDroppedQuest(uint32 questId) const;
     std::vector<const Quest*> GetAllCurrentQuests();
     std::vector<const Quest*> GetCurrentIncompleteQuests();
     std::set<uint32> GetAllCurrentQuestIds();
@@ -842,6 +847,8 @@ protected:
     bool isPlayerFriend = false;
     bool isMovingToTransport = false;
     bool shouldLogOut = false;
+    // Quest ids this bot dropped, with the time it happened. See RecentlyDroppedQuest().
+    std::map<uint32, time_t> m_droppedQuests;
     bool m_recordMessages = false;
     bool m_recordIncommingMessages = false;
     std::vector<std::string> m_recordedMessages;

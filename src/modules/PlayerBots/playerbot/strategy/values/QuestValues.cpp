@@ -221,6 +221,10 @@ std::list<GuidPosition> ActiveQuestGiversValue::Calculate()
 		if (!bot->CanTakeQuest(quest, false))
 			continue;
 
+		// Do not walk back to a giver for a quest this bot has just thrown out of its own log.
+		if (ai->RecentlyDroppedQuest(questId))
+			continue;
+
 		QuestStatus status = bot->GetQuestStatus(questId);
 
 		if (status != QUEST_STATUS_NONE)
