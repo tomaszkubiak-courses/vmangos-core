@@ -779,12 +779,18 @@ void BattleGroundAV::UpdateScore(BattleGroundTeamIndex teamIdx, int32 points)
 
     if (points < 0)
     {
-        // Ivina < Nostalrius > : removed message and winning condition.
         if (m_teamScores[teamIdx] < 1)
         {
             m_teamScores[teamIdx] = 0;
-            // other team will win:
-            // EndBattleGround((teamIdx == BG_TEAM_ALLIANCE)? HORDE : ALLIANCE);
+
+            // Restored 2026-09-02. Nostalrius disabled this ("removed message and winning
+            // condition"), which left a general's death as the only way an Alterac Valley could
+            // ever end - there is no time limit, and AV is the one battleground the premature
+            // finish timer used to skip. A match where neither side reaches a general therefore
+            // ran forever: one here held 80 players for nine hours and was still going when the
+            // server stopped. Reinforcements are also what the 1.12 client's own scoreboard
+            // counts down, from the world states this same function updates two lines below.
+            EndBattleGround((teamIdx == BG_TEAM_ALLIANCE) ? HORDE : ALLIANCE);
         }
         else if (!m_isInformedNearLose[teamIdx] && m_teamScores[teamIdx] < BG_AV_SCORE_NEAR_LOSE)
         {
