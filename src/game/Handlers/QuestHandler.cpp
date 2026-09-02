@@ -221,7 +221,16 @@ void WorldSession::HandleQuestgiverQueryQuestOpcode(WorldPackets::Quest::Questgi
     }
 
     if (Quest const* pQuest = sObjectMgr.GetQuestTemplate(packet.quest))
+    {
+        // Quests offered by a creature or a gameobject have already been filtered
+        // by the gossip menu, but a quest starting item opens its offer window
+        // straight from the item use, so nothing has checked the requirements yet.
+        // Send the failure reason instead of an offer the player can never accept.
+        if (pObject->GetTypeId() == TYPEID_ITEM && !_player->CanTakeQuest(pQuest, true))
+            return;
+
         _player->PlayerTalkClass->SendQuestGiverQuestDetails(pQuest, pObject->GetObjectGuid(), true);
+    }
 }
 
 void WorldSession::HandleQuestQueryOpcode(WorldPackets::Quest::QueryQuest const& packet)
