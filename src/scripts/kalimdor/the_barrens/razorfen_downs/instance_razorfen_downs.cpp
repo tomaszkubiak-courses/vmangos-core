@@ -21,6 +21,58 @@
 
 #define    MAX_ENCOUNTER  1
 
+struct GongWaveSummon
+{
+    uint32 uiEntry;
+    float fX, fY, fZ, fO;
+};
+
+// Retail sniff of the positions the gong summons its waves at (creature_summon_groups,
+// summoner 148917). The waves stand where they are spawned - none of them is sent to a
+// gathering point.
+static GongWaveSummon const s_aGongWave1[] =
+{
+    { CREATURE_TOMB_FIEND, 2527.02f, 829.979f, 48.0650f, 0.698132f },
+    { CREATURE_TOMB_FIEND, 2524.04f, 834.485f, 48.3703f, 0.802851f },
+    { CREATURE_TOMB_FIEND, 2544.69f, 912.889f, 46.3991f, 2.129300f },
+    { CREATURE_TOMB_FIEND, 2541.49f, 911.176f, 46.2649f, 4.817110f },
+    { CREATURE_TOMB_FIEND, 2544.70f, 907.633f, 46.3801f, 1.605700f },
+    { CREATURE_TOMB_FIEND, 2541.25f, 907.094f, 46.6420f, 2.024580f },
+    { CREATURE_TOMB_FIEND, 2489.91f, 804.795f, 43.2518f, 1.658060f },
+    { CREATURE_TOMB_FIEND, 2488.43f, 801.281f, 42.7037f, 4.293510f },
+    { CREATURE_TOMB_FIEND, 2485.41f, 804.115f, 43.6851f, 3.054330f },
+    { CREATURE_TOMB_FIEND, 2487.34f, 805.911f, 43.0836f, 2.844890f }
+};
+
+static GongWaveSummon const s_aGongWave2[] =
+{
+    { CREATURE_TOMB_REAVER, 2486.83f, 802.874f, 43.1988f, 2.914700f },
+    { CREATURE_TOMB_REAVER, 2489.08f, 806.591f, 43.2110f, 3.682650f },
+    { CREATURE_TOMB_REAVER, 2543.29f, 911.245f, 46.3279f, 0.680678f },
+    { CREATURE_TOMB_REAVER, 2542.82f, 904.936f, 46.8091f, 4.642580f }
+};
+
+// Tuten'kash spawns in the corridor south west of the gong room, not inside the room.
+static GongWaveSummon const s_aGongWave3[] =
+{
+    { CREATURE_TUTEN_KASH, 2487.94f, 804.222f, 43.1073f, 1.692970f }
+};
+
+static uint32 const WAVE_1_SIZE = sizeof(s_aGongWave1) / sizeof(s_aGongWave1[0]);
+static uint32 const WAVE_2_SIZE = sizeof(s_aGongWave2) / sizeof(s_aGongWave2[0]);
+
+// The counter is bumped by the gong being rung and by every wave member dying
+// (creature_ai_events for 7349 and 7351), so a wave is summoned on the ring that
+// follows the last death of the previous one.
+enum eGongCounter
+{
+    GONG_RING_WAVE_1  = 1,
+    GONG_READY_WAVE_2 = GONG_RING_WAVE_1 + WAVE_1_SIZE,
+    GONG_RING_WAVE_2  = GONG_READY_WAVE_2 + 1,
+    GONG_READY_WAVE_3 = GONG_RING_WAVE_2 + WAVE_2_SIZE,
+    GONG_RING_WAVE_3  = GONG_READY_WAVE_3 + 1
+};
+
 struct instance_razorfen_downs : public ScriptedInstance
 {
     instance_razorfen_downs(Map* pMap) : ScriptedInstance(pMap)
@@ -98,77 +150,41 @@ struct instance_razorfen_downs : public ScriptedInstance
         if (uiType == DATA_GONG_WAVES)
         {
             uiGongWaves = uiData;
+            GongWaveSummon const* pWave = nullptr;
+            uint32 uiWaveSize = 0;
+
             switch (uiGongWaves)
             {
-                case 9:
-                case 14:
+                case GONG_READY_WAVE_2:
+                case GONG_READY_WAVE_3:
                     if (GameObject* pGo = instance->GetGameObject(uiGongGUID))
                         pGo->RemoveFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
                     break;
-                case 1:
-                case 10:
-                case 15:
-                {
-                    GameObject* pGo = instance->GetGameObject(uiGongGUID);
-
-                    if (!pGo)
-                        return;
-
-                    pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
-
-                    uint32 uiCreature = 0;
-                    uint8 uiSummonTimes = 0;
-
-                    switch (uiGongWaves)
-                    {
-                        case 1:
-                            uiCreature = CREATURE_TOMB_FIEND;
-                            uiSummonTimes = 7;
-                            break;
-                        case 10:
-                            uiCreature = CREATURE_TOMB_REAVER;
-                            uiSummonTimes = 3;
-                            break;
-                        case 15:
-                            uiCreature = CREATURE_TUTEN_KASH;
-                            break;
-                        default:
-                            break;
-                    }
-
-                    if (Creature* pCreature = pGo->SummonCreature(uiCreature, 2502.635f, 844.140f, 46.896f, 0.633f))
-                    {
-                        if (uiGongWaves == 10 || uiGongWaves == 1)
-                        {
-                            float x, y, z;
-                            for (uint8 i = 0; i < uiSummonTimes; ++i)
-                            {
-                                if (i % 2 == 1)
-                                {
-                                    x = 2502.635f;
-                                    y = 844.140f;
-                                    z = 46.896f;
-                                }
-                                else
-                                {
-                                    x = 2546.33f;
-                                    y = 887.455f;
-                                    z = 47.69f;
-                                }
-                                if (Creature* pSummon = pGo->SummonCreature(uiCreature, x + float(irand(-5, 5)), y + float(irand(-5, 5)), z, 0.633f))
-                                {
-                                    pSummon->SetWalk(false);
-                                    pSummon->GetMotionMaster()->MovePoint(0, 2533.479f + float(irand(-5, 5)), 870.020f + float(irand(-5, 5)), 47.678f, MOVE_PATHFINDING);
-                                }
-                            }
-                        }
-                        pCreature->SetWalk(false);
-                        pCreature->GetMotionMaster()->MovePoint(0, 2533.479f + float(irand(-5, 5)), 870.020f + float(irand(-5, 5)), 47.678f, MOVE_PATHFINDING);
-                    }
+                case GONG_RING_WAVE_1:
+                    pWave = s_aGongWave1;
+                    uiWaveSize = WAVE_1_SIZE;
                     break;
-                }
+                case GONG_RING_WAVE_2:
+                    pWave = s_aGongWave2;
+                    uiWaveSize = WAVE_2_SIZE;
+                    break;
+                case GONG_RING_WAVE_3:
+                    pWave = s_aGongWave3;
+                    uiWaveSize = sizeof(s_aGongWave3) / sizeof(s_aGongWave3[0]);
+                    break;
                 default:
                     break;
+            }
+
+            if (pWave)
+            {
+                if (GameObject* pGo = instance->GetGameObject(uiGongGUID))
+                {
+                    pGo->SetFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT);
+
+                    for (uint32 i = 0; i < uiWaveSize; ++i)
+                        pGo->SummonCreature(pWave[i].uiEntry, pWave[i].fX, pWave[i].fY, pWave[i].fZ, pWave[i].fO);
+                }
             }
         }
 
