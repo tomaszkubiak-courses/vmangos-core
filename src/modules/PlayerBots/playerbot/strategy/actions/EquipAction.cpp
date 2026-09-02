@@ -278,11 +278,27 @@ bool EquipAction::EquipItem(PlayerbotAI* ai, Player* requester, Item* item, bool
             }
         }
 
-        if (!equipedBag) 
+        if (!equipedBag)
         {
+            ObjectGuid const itemGuid = item->GetObjectGuid();
+
             WorldPacket packet(CMSG_AUTOEQUIP_ITEM, 2);
             packet << bagIndex << slot;
             bot->GetSession()->BotHandleAutoEquipItemOpcode(packet);
+
+            // The opcode handler reports nothing back and a refused auto-equip leaves the item
+            // exactly where it was, so CanEquipItem agreeing above is not proof the item is now
+            // worn. Callers that repeat while it is not - the upgrade sweep does, once per stack
+            // of the same item - fired again on the very next tick, and every attempt was logged
+            // as a successful equip. Check the destination slot before claiming anything.
+            // dest only holds a slot when CanEquipItem agreed; the bag and quiver cases that
+            // reach here in spite of a refusal have no destination to check.
+            if (result == EQUIP_ERR_OK)
+            {
+                Item* const equipped = bot->GetItemByPos(dest);
+                if (!equipped || equipped->GetObjectGuid() != itemGuid)
+                    return false;
+            }
         }
     }
 
@@ -405,6 +421,26 @@ bool EquipUpgradesAction::Execute(Event& event)
         if (item->GetProto()->Class == ITEM_CLASS_GLYPH)
             continue;
 #endif
+
+        // A fishing pole is a tool, not gear. The fishing strategy puts one in the main hand on
+        // purpose, and this sweep - which empties the main hand before it starts - then rated the
+        // pole as the best thing available for the now empty slot and handed it straight back.
+        // The fishing strategy took it as its cue to fish again, and the two traded the same pole
+        // in and out at tick rate: three bots did that 55000 times in one night.
+        if (item->GetProto()->Class == ITEM_CLASS_WEAPON && item->GetProto()->SubClass == ITEM_SUBCLASS_WEAPON_FISHING_POLE)
+            continue;
+
+        // Swapping in another stack of what is already worn changes nothing. Thrown weapons come
+        // in stacks of 200 and a bot that had bought 46 of them equipped every single one on each
+        // sweep, because each stack is a separate item and each looked like an upgrade for a slot
+        // holding, by then, an identical dagger.
+        uint16 sameItemDest;
+        if (bot->CanEquipItem(NULL_SLOT, sameItemDest, item, true) == EQUIP_ERR_OK)
+        {
+            Item* const current = bot->GetItemByPos(sameItemDest);
+            if (current && current != item && current->GetEntry() == item->GetEntry())
+                continue;
+        }
 
         ItemUsage usage = AI_VALUE2(ItemUsage, "item usage", ItemQualifier(item).GetQualifier());
         if (usage == ItemUsage::ITEM_USAGE_EQUIP || usage == ItemUsage::ITEM_USAGE_BAD_EQUIP)
