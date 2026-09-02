@@ -43,5 +43,10 @@ namespace ai
         // Backoff between mount attempts that did not land. See Mount().
         time_t m_nextMountAttempt = 0;
         uint32 m_mountBackoff = 0;
+
+        // A cast that has started but has not been seen to land yet. The event log entry is
+        // written when the bot is actually mounted, not when the cast begins.
+        std::string m_pendingMountName;
+        uint32 m_pendingMountSpeed = 0;
     };
 }
