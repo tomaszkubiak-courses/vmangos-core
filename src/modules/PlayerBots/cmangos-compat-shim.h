@@ -251,13 +251,28 @@ inline bool IsPositiveSpell(SpellEntry const* spellInfo, WorldObject const* cast
 #include <chrono>
 
 // === BG_AV_NODE_STATUS_ defines ===
-// cmangos has these in BattleGroundAV.h; Penqle may use different naming.
-// Define as constants so bot's symbolic references compile.
+// The value these have to carry is the second half of an Alterac Valley node event, which this
+// core writes as `teamIdx * BG_AV_MAX_STATES + state` (BattleGroundAV::InitNode, and SpawnEvent
+// on every capture) - alliance 0, horde 1, neutral 2, assaulted 0, controlled 1. That gives
+// 0 alliance assaulted, 1 alliance controlled, 2 horde assaulted, 3 horde controlled,
+// 4 neutral assaulted, 5 neutral controlled.
+//
+// These used to be plain 0, 1, 2, 3 and 4, guessed to make the module's symbols compile. Every
+// one of them was wrong, and the whole of BattleGroundTacticsAV.cpp reads node ownership through
+// them: asking "is this horde tower horde-occupied" tested for 1, which is what an
+// alliance-controlled node reads, so it was false for every horde node in every match. The
+// selector opens with "if the horde holds no tower or graveyard, go kill Drek'Thar", so both
+// sides marched at the enemy general from the first second, captured nothing, and - since this
+// core cannot end an Alterac Valley any other way - the match never finished. One ran for nine
+// hours with 80 bots in it.
+//
+// Derived from the core enums rather than written out, so a change there cannot silently
+// desynchronise this again. The macros expand at the use site, which includes BattleGroundAV.h.
 #ifndef BG_AV_NODE_STATUS_ALLY_OCCUPIED
-#define BG_AV_NODE_STATUS_ALLY_OCCUPIED 0
+#define BG_AV_NODE_STATUS_ALLY_OCCUPIED (BG_AV_TEAM_ALLIANCE * BG_AV_MAX_STATES + POINT_CONTROLLED)
 #endif
 #ifndef BG_AV_NODE_STATUS_HORDE_OCCUPIED
-#define BG_AV_NODE_STATUS_HORDE_OCCUPIED 1
+#define BG_AV_NODE_STATUS_HORDE_OCCUPIED (BG_AV_TEAM_HORDE * BG_AV_MAX_STATES + POINT_CONTROLLED)
 #endif
 
 // === Additional cmangos-only DBC store proxies ===
@@ -296,11 +311,13 @@ inline const char* strstr(std::string const& haystack, const char* needle) {
 // Done via forwarder in Penqle's BattleGroundMgr.h (BgTemplateId → BGTemplateId).
 
 // === BG_AV_NODE_STATUS_ contested (additional) ===
+// "Contested" in the module is what this core calls assaulted: the node has been clicked and is
+// counting down to the new owner. See the note on BG_AV_NODE_STATUS_ALLY_OCCUPIED above.
 #ifndef BG_AV_NODE_STATUS_ALLY_CONTESTED
-#define BG_AV_NODE_STATUS_ALLY_CONTESTED 2
+#define BG_AV_NODE_STATUS_ALLY_CONTESTED (BG_AV_TEAM_ALLIANCE * BG_AV_MAX_STATES + POINT_ASSAULTED)
 #endif
 #ifndef BG_AV_NODE_STATUS_HORDE_CONTESTED
-#define BG_AV_NODE_STATUS_HORDE_CONTESTED 3
+#define BG_AV_NODE_STATUS_HORDE_CONTESTED (BG_AV_TEAM_HORDE * BG_AV_MAX_STATES + POINT_ASSAULTED)
 #endif
 
 // === TEAM_INDEX_ aliases (cmangos) ===
@@ -387,8 +404,9 @@ enum AuctionHouseType {
 
 
 // === BG_AV_NODE_STATUS_NEUTRAL_OCCUPIED ===
+// Snowfall Graveyard starts neutral, which is a third team index here rather than a flag.
 #ifndef BG_AV_NODE_STATUS_NEUTRAL_OCCUPIED
-#define BG_AV_NODE_STATUS_NEUTRAL_OCCUPIED 4
+#define BG_AV_NODE_STATUS_NEUTRAL_OCCUPIED (BG_AV_TEAM_NEUTRAL * BG_AV_MAX_STATES + POINT_CONTROLLED)
 #endif
 
 // === CREATURE_EXTRA_FLAG_INVISIBLE ===
@@ -478,11 +496,14 @@ static CmangosScriptDevAIMgrStub sScriptDevAIMgr;
 #endif
 
 // === BG_AV node/banner defines (cmangos) ===
+// The captain-dead events are ordinary battleground event ids here, not bit flags: 0x10 and 0x20
+// are event 16 and event 32, which this core uses for graveyard and tower defender spawns. The
+// module tests them to decide whether Balinda and Galvangar are still worth attacking.
 #ifndef BG_AV_NODE_CAPTAIN_DEAD_A
-#define BG_AV_NODE_CAPTAIN_DEAD_A 0x10
+#define BG_AV_NODE_CAPTAIN_DEAD_A BG_AV_NodeEventCaptainDead_A
 #endif
 #ifndef BG_AV_NODE_CAPTAIN_DEAD_H
-#define BG_AV_NODE_CAPTAIN_DEAD_H 0x20
+#define BG_AV_NODE_CAPTAIN_DEAD_H BG_AV_NodeEventCaptainDead_H
 #endif
 #ifndef BG_AV_GO_BANNER_ALLIANCE
 #define BG_AV_GO_BANNER_ALLIANCE 178925
