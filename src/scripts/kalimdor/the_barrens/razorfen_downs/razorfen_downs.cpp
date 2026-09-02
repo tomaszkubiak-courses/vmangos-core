@@ -304,9 +304,14 @@ bool QuestAccept_npc_belnistrasz(Player* pPlayer, Creature* pCreature, Quest con
 
 bool GOHello_go_gong(Player* pPlayer, GameObject* pGO)
 {
-    //basic support, not blizzlike data is missing...
     if (ScriptedInstance* pInstance = (ScriptedInstance*)pGO->GetInstanceData())
     {
+        // The script handles the gong itself, so GameObject::Use never reaches the
+        // GAMEOBJECT_TYPE_GOOBER case that would play the swing animation and its sound.
+        // The generic goober path cannot be used here: the spawn has animprogress 100, so
+        // it would despawn the gong for its 90 minute respawn after the first ring.
+        pGO->SendGameObjectCustomAnim();
+
         pInstance->SetData(DATA_GONG_WAVES, pInstance->GetData(DATA_GONG_WAVES) + 1);
         return true;
     }
