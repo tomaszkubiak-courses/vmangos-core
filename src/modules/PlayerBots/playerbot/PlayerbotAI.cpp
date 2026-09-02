@@ -1223,6 +1223,14 @@ void PlayerbotAI::OnDeath()
         {
             SET_AI_VALUE(uint32, "death count", AI_VALUE(uint32, "death count") + 1);
 
+            // Where the bot was headed matters as much as what killed it: a bot that dies on
+            // the way somewhere releases, runs back and dies again. 308 of the 657 deaths with
+            // no killer at all in a nine hour run happened while travelling to a fishing spot,
+            // one bot going back to drown 16 times in 15 minutes.
+            if (TravelTarget* deathTravelTarget = AI_VALUE(TravelTarget*, "travel target"))
+                if (deathTravelTarget->GetPosition())
+                    RememberDeadlyTravelPoint(*deathTravelTarget->GetPosition());
+
             if (sPlayerbotAIConfig.hasLog("deaths.csv"))
             {
                 WorldPosition botPos(bot);
@@ -3012,6 +3020,71 @@ std::vector<Player*> PlayerbotAI::GetPlayersInGroup()
     }
 
     return members;
+}
+
+// A travel point counts as deadly once the bot has died near it this many times without a
+// long gap in between, and stays deadly for this long afterwards.
+static uint32 const deadlyTravelPointDeaths = 3;
+static uint32 const deadlyTravelPointForget = 30 * MINUTE;
+static uint32 const deadlyTravelPointBan = 2 * HOUR;
+static float const deadlyTravelPointRadius = 20.0f;
+static size_t const deadlyTravelPointMax = 16;
+
+void PlayerbotAI::RememberDeadlyTravelPoint(WorldPosition const& position)
+{
+    time_t const now = time(nullptr);
+
+    for (auto& point : m_deadlyTravelPoints)
+    {
+        if (point.position.getMapId() != position.getMapId() || point.position.distance(position) > deadlyTravelPointRadius)
+            continue;
+
+        // A death long after the last one says the place is passable and the bot was just
+        // unlucky, so start counting again rather than adding to an old tally.
+        point.deaths = (now > point.lastDeath + deadlyTravelPointForget) ? 1 : point.deaths + 1;
+        point.lastDeath = now;
+        return;
+    }
+
+    if (m_deadlyTravelPoints.size() >= deadlyTravelPointMax)
+    {
+        auto oldest = m_deadlyTravelPoints.begin();
+        for (auto it = m_deadlyTravelPoints.begin(); it != m_deadlyTravelPoints.end(); ++it)
+        {
+            if (it->lastDeath < oldest->lastDeath)
+                oldest = it;
+        }
+
+        m_deadlyTravelPoints.erase(oldest);
+    }
+
+    DeadlyTravelPoint point;
+    point.position = position;
+    point.lastDeath = now;
+    point.deaths = 1;
+    m_deadlyTravelPoints.push_back(point);
+}
+
+bool PlayerbotAI::IsDeadlyTravelPoint(WorldPosition const& position) const
+{
+    time_t const now = time(nullptr);
+
+    for (auto const& point : m_deadlyTravelPoints)
+    {
+        if (point.deaths < deadlyTravelPointDeaths)
+            continue;
+
+        if (now > point.lastDeath + deadlyTravelPointBan)
+            continue;
+
+        if (point.position.getMapId() != position.getMapId())
+            continue;
+
+        if (point.position.distance(position) <= deadlyTravelPointRadius)
+            return true;
+    }
+
+    return false;
 }
 
 bool PlayerbotAI::RecentlyDroppedQuest(uint32 questId) const

@@ -413,6 +413,11 @@ public:
     // took it again - 8 of the 9 most dropped quests in a nine hour run were also among the
     // most accepted, and one pair ran 33 drops against 25 accepts.
     bool RecentlyDroppedQuest(uint32 questId) const;
+    // Travel points this bot has died at repeatedly. A bot that dies on the way somewhere
+    // corpse runs straight back and dies again; one drowned 16 times in 15 minutes fetching
+    // the same fishing spot.
+    void RememberDeadlyTravelPoint(WorldPosition const& position);
+    bool IsDeadlyTravelPoint(WorldPosition const& position) const;
     std::vector<const Quest*> GetAllCurrentQuests();
     std::vector<const Quest*> GetCurrentIncompleteQuests();
     std::set<uint32> GetAllCurrentQuestIds();
@@ -849,6 +854,15 @@ protected:
     bool shouldLogOut = false;
     // Quest ids this bot dropped, with the time it happened. See RecentlyDroppedQuest().
     std::map<uint32, time_t> m_droppedQuests;
+
+    // Places this bot died on its way to a travel target. See RememberDeadlyTravelPoint().
+    struct DeadlyTravelPoint
+    {
+        WorldPosition position;
+        time_t lastDeath = 0;
+        uint32 deaths = 0;
+    };
+    std::vector<DeadlyTravelPoint> m_deadlyTravelPoints;
     bool m_recordMessages = false;
     bool m_recordIncommingMessages = false;
     std::vector<std::string> m_recordedMessages;
