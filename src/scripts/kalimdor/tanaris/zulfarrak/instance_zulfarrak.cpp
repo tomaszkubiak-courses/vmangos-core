@@ -21,6 +21,11 @@
 #define NPC_GAHZRILLA 7273
 #define PATH_ADDS 81553
 
+enum zfInstanceSays
+{
+    SAY_BLY_MOVE_FORWARD = 3745
+};
+
 int const pyramidSpawnTotal = 54;
 /* list of wave spawns: 0 = wave ID, 1 = creature id, 2 = x, 3 = y
 no z coordinat b/c they're all the same */
@@ -322,6 +327,8 @@ public:
                     MoveNPCIfAlive(ENTRY_RAVEN, 1883.68f, 1227.95f, 9.543f, 4.78f);
                     MoveNPCIfAlive(ENTRY_WEEGLI, 1878.02f, 1227.65f, 9.485f, 4.78f);
                     SetData(EVENT_PYRAMID, PYRAMID_WAVE_3);
+                    if (Creature* pBly = instance->GetCreature(BlyGUID))
+                        DoScriptText(SAY_BLY_MOVE_FORWARD, pBly);
                 }
                 else
                     major_wave_Timer -= diff;
