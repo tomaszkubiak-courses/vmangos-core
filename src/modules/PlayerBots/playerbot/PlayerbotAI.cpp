@@ -3014,6 +3014,20 @@ std::vector<Player*> PlayerbotAI::GetPlayersInGroup()
     return members;
 }
 
+bool PlayerbotAI::RecentlyDroppedQuest(uint32 questId) const
+{
+    // Six hours is long enough that a bot cleaning its log gets on with something else, and
+    // short enough that a quest dropped to make room for a dungeon run comes back into reach
+    // the same evening.
+    static uint32 const dropCooldown = 6 * HOUR;
+
+    auto const it = m_droppedQuests.find(questId);
+    if (it == m_droppedQuests.end())
+        return false;
+
+    return time(nullptr) < it->second + dropCooldown;
+}
+
 void PlayerbotAI::DropQuest(uint32 questIdToDrop)
 {
     for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
@@ -3027,6 +3041,8 @@ void PlayerbotAI::DropQuest(uint32 questIdToDrop)
         {
             if (Quest const* q = sObjectMgr.GetQuestTemplate(questIdToDrop))
                 sPlayerbotAIConfig.logEvent(this, "QuestDropped", q->GetTitle(), std::to_string(questIdToDrop));
+
+            m_droppedQuests[questIdToDrop] = time(nullptr);
 
             bot->SetQuestSlot(slot, 0);
 
