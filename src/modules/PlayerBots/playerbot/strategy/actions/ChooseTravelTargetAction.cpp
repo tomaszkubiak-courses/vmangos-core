@@ -339,6 +339,14 @@ bool ChooseTravelTargetAction::SetBestTarget(Player* requester, TravelTarget* ta
             if (!target->IsForced() && isActive.find(destination) != isActive.end() && !isActive[destination])
                 continue;
 
+            // Somewhere this bot has already died at repeatedly. Sending it back is how a bot
+            // spends its evening corpse running to the same drowning spot.
+            if (!target->IsForced() && position && ai->IsDeadlyTravelPoint(*position))
+            {
+                ai->TellDebug(requester, "Skipping " + destination->GetTitle() + " - died there before", "debug travel");
+                continue;
+            }
+
             if (distanceCheck) //Check if we have moved significantly after getting the destinations.
             {
                 WorldPosition center(requester ? requester : bot);

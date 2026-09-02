@@ -29,6 +29,15 @@ bool MoveToFishAction::Execute(Event& event)
 
     fishSpot = AI_VALUE2(WorldPosition, "custom position", "fish spot");
 
+    // Fishing spots are picked here rather than through the travel target list, so the
+    // "the bot keeps dying there" filter has to be applied by hand. Bots drowned reaching
+    // these: 308 of the 657 deaths with no killer in a nine hour run were on the way to one.
+    if (fishSpot && ai->IsDeadlyTravelPoint(fishSpot))
+    {
+        RESET_AI_VALUE2(WorldPosition, "custom position", "fish spot");
+        fishSpot = WorldPosition();
+    }
+
     if (!fishSpot && qualifier == "travel") //Get travel fish spot if available.
     {
         TravelTarget* target = AI_VALUE(TravelTarget*, "leader travel target");
@@ -40,7 +49,22 @@ bool MoveToFishAction::Execute(Event& event)
     
     if (!fishSpot) //Get any fish spot.
     {
-        fishSpot = *sTravelMgr.GetFishSpot(bot);
+        for (uint8 attempt = 0; attempt < 5; ++attempt)
+        {
+            WorldPosition* candidate = sTravelMgr.GetFishSpot(bot);
+
+            if (!candidate)
+                return false;
+
+            if (!ai->IsDeadlyTravelPoint(*candidate))
+            {
+                fishSpot = *candidate;
+                break;
+            }
+        }
+
+        if (!fishSpot)
+            return false;
 
         TravelPath movePath = sTravelNodeMap.getFullPath(bot, fishSpot, bot);
 
