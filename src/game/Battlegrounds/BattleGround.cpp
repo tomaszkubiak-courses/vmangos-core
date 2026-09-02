@@ -322,7 +322,11 @@ void BattleGround::Update(uint32 diff)
     /*********************************************************/
 
     // if less then minimum players are in on one side, then start premature finish timer
-    if (GetTypeID() != BATTLEGROUND_AV && GetStatus() == STATUS_IN_PROGRESS && sBattleGroundMgr.GetPrematureFinishTime() && (GetPlayersCountByTeam(ALLIANCE) < GetMinPlayersPerTeam() || GetPlayersCountByTeam(HORDE) < GetMinPlayersPerTeam()))
+    // Alterac Valley used to be exempt from this. It is the battleground that needs it most:
+    // it has no time limit, and until the reinforcement condition was restored in
+    // BattleGroundAV::UpdateScore a general's death was the only way it could end at all. An
+    // emptied-out AV simply stayed open - one here ran for nine hours with nobody finishing it.
+    if (GetStatus() == STATUS_IN_PROGRESS && sBattleGroundMgr.GetPrematureFinishTime() && (GetPlayersCountByTeam(ALLIANCE) < GetMinPlayersPerTeam() || GetPlayersCountByTeam(HORDE) < GetMinPlayersPerTeam()))
     {
         if (!m_prematureCountDown)
         {
