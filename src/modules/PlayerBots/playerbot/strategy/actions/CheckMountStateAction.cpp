@@ -22,6 +22,14 @@ bool CheckMountStateAction::Execute(Event& event)
     {
         m_nextMountAttempt = 0;
         m_mountBackoff = 0;
+
+        // The cast landed, so this is the first moment a mount can honestly be recorded.
+        if (!m_pendingMountName.empty())
+        {
+            sPlayerbotAIConfig.logEvent(ai, "CheckMountStateAction", m_pendingMountName, std::to_string(m_pendingMountSpeed));
+            m_pendingMountName.clear();
+            m_pendingMountSpeed = 0;
+        }
     }
 
     if (bot->IsMounted() && (bot->GetTransport() || bot->IsTaxiFlying() || bot->IsBeingTeleported()))
@@ -401,6 +409,11 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
     if (!currentSpeed && time(nullptr) < m_nextMountAttempt)
         return false;
 
+    // Combat cancels the cast outright, and every attempt calls StopMoving() first, so trying
+    // while in combat only halts the bot for nothing.
+    if (!currentSpeed && bot->IsInCombat())
+        return false;
+
     uint32 maxSpeed = 9999;
 
     if (limitSpeedToGroup && bot->GetGroup() && ai->IsGroupLeader())
@@ -523,7 +536,12 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
             uint32 castDuration;
             if (ai->CastSpell(mount.GetSpellId(), bot, nullptr, true, &castDuration))
             {
-                sPlayerbotAIConfig.logEvent(ai, "CheckMountStateAction", sServerFacade.LookupSpellInfo(mount.GetSpellId())->SpellName[0], std::to_string(mount.GetSpeed(canFly)));
+                // Only the cast has started. Remember what it was and let Execute() log it once
+                // the bot is really mounted - recording it here counted casts that never landed
+                // as mounts, which is how one bot's 1076 failed attempts in nine hours read as
+                // 1076 successful ones.
+                m_pendingMountName = sServerFacade.LookupSpellInfo(mount.GetSpellId())->SpellName[0];
+                m_pendingMountSpeed = mount.GetSpeed(canFly);
                 SetDuration(castDuration);
                 didMount = true;
             }
@@ -538,7 +556,11 @@ bool CheckMountStateAction::Mount(Player* requester, bool limitSpeedToGroup)
         {
             // Only the cast has started here; Execute() clears this again once the
             // bot is actually mounted.
-            m_mountBackoff = m_mountBackoff ? std::min<uint32>(m_mountBackoff * 2, 30) : 5;
+            // The ceiling used to be 30 seconds, which turned an attempt that can never land
+            // into a permanent two-a-minute drumbeat: 66 bots trapped in one nine hour Alterac
+            // Valley cast a mount 1076 times each, standing still for every one of them. Keep
+            // doubling well past that, so a bot in a place it cannot mount goes quiet.
+            m_mountBackoff = m_mountBackoff ? std::min<uint32>(m_mountBackoff * 2, 900) : 5;
             m_nextMountAttempt = time(nullptr) + m_mountBackoff;
 
             if (wasMoving)
