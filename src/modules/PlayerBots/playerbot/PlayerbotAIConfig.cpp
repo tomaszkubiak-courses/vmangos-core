@@ -271,12 +271,12 @@ bool PlayerbotAIConfig::Initialize()
     maxRandomBotReviveTime = config.GetIntDefault("AiPlayerbot.MaxRandomReviveTime", 300);
     enableRandomTeleports = config.GetBoolDefault("AiPlayerbot.EnableRandomTeleports", true);
 
-    // Share of horde random bots placed in a capital at login instead of at a
-    // grind location, split evenly between Orgrimmar and Thunder Bluff. Custom
-    // behaviour, so off unless asked for.
-    hordeCitySpawnPercent = config.GetIntDefault("AiPlayerbot.HordeCitySpawnPercent", 0);
-    if (hordeCitySpawnPercent > 100)
-        hordeCitySpawnPercent = 100;
+    // Share of the random bots of each faction placed in one of that faction's three
+    // capitals at login instead of at a grind location, split evenly over the three.
+    // Custom behaviour, so off unless asked for.
+    citySpawnPercent = config.GetIntDefault("AiPlayerbot.CitySpawnPercent", 0);
+    if (citySpawnPercent > 100)
+        citySpawnPercent = 100;
 
     // While nobody real is waiting, bots keep at most this many instances of one
     // battleground type and bracket running. Was hardcoded to 1.
