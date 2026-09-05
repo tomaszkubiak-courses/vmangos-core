@@ -3908,42 +3908,56 @@ void RandomPlayerbotMgr::OnPlayerLogout(Player* player)
 
 namespace
 {
-    // Horde capitals, coordinates taken from the world DB's game_tele rows for
-    // "Orgrimmar" and "ThunderBluff".
-    struct HordeCitySpawn
+    // Capital cities, coordinates taken from the world DB's game_tele rows of the
+    // same name.
+    struct CitySpawn
     {
         uint32 mapId;
         float x, y, z, o;
+        char const* name;
     };
 
-    HordeCitySpawn const hordeCitySpawns[2] =
+    CitySpawn const hordeCitySpawns[3] =
     {
-        { 1, 1629.36f, -4373.39f, 31.2564f, 3.54839f },   // Orgrimmar
-        { 1, -1277.37f, 124.804f, 131.287f, 5.22274f }    // Thunder Bluff
+        { 1, 1629.36f, -4373.39f, 31.2564f, 3.54839f, "Orgrimmar" },
+        { 1, -1277.37f, 124.804f, 131.287f, 5.22274f, "Thunder Bluff" },
+        { 0, 1584.07f, 241.987f, -52.1534f, 0.04965f, "Undercity" }
+    };
+
+    CitySpawn const allianceCitySpawns[3] =
+    {
+        { 0, -4918.88f, -940.406f, 501.564f, 5.42347f, "Ironforge" },
+        { 0, -8833.38f, 628.628f, 94.0066f, 1.06535f, "Stormwind" },
+        { 1, 9949.56f, 2284.21f, 1341.40f, 1.59587f, "Darnassus" }
     };
 }
 
-// Places a share of the horde random bots in a capital when they log in, instead
-// of wherever the character was last saved. Off by default: it is not how the
-// module normally distributes bots.
+// Places a share of the random bots of each faction in one of that faction's three
+// capitals when they log in, instead of wherever the character was last saved. Off
+// by default: it is not how the module normally distributes bots.
+//
+// The share is per faction and is split evenly over the three cities, so
+// CitySpawnPercent = 30 puts 10% of the horde in Orgrimmar, 10% in Thunder Bluff
+// and 10% in Undercity, and the same for Ironforge, Stormwind and Darnassus.
 //
 // The pick is derived from the character guid rather than rolled, so a given bot
 // always lands in the same city and the split does not drift as bots cycle in and
 // out. Login only - the periodic random teleport may move the bot out again like
 // any other.
-void RandomPlayerbotMgr::HordeCitySpawnOnLogin(Player* bot)
+void RandomPlayerbotMgr::CitySpawnOnLogin(Player* bot)
 {
     if (!bot || !bot->IsInWorld() || bot->InBattleGround())
         return;
 
-    if (!sPlayerbotAIConfig.hordeCitySpawnPercent || bot->GetTeam() != HORDE)
+    if (!sPlayerbotAIConfig.citySpawnPercent)
         return;
 
     uint32 const guid = bot->GetGUIDLow();
-    if (guid % 100 >= sPlayerbotAIConfig.hordeCitySpawnPercent)
+    if (guid % 100 >= sPlayerbotAIConfig.citySpawnPercent)
         return;
 
-    HordeCitySpawn const& city = hordeCitySpawns[guid % 2];
+    CitySpawn const* cities = (bot->GetTeam() == HORDE) ? hordeCitySpawns : allianceCitySpawns;
+    CitySpawn const& city = cities[guid % 3];
 
     // Spread them over the square around the point so a hundred bots do not end
     // up inside each other on the same coordinate.
@@ -3954,7 +3968,12 @@ void RandomPlayerbotMgr::HordeCitySpawnOnLogin(Player* bot)
     if (Map* map = sMapMgr.FindMap(city.mapId, 0))
     {
         float const ground = map->GetHeight(x, y, z + 0.5f);
-        if (ground <= INVALID_HEIGHT)
+
+        // Reject a hit that is nowhere near the city floor. Undercity sits under the
+        // Ruins of Lordaeron and Ironforge inside a mountain, so a scattered point
+        // that misses their geometry resolves to the surface far above instead, and
+        // the bot would be dropped outside the city entirely.
+        if (ground <= INVALID_HEIGHT || fabs(ground - city.z) > 5.0f)
         {
             x = city.x;
             y = city.y;
@@ -3970,12 +3989,12 @@ void RandomPlayerbotMgr::HordeCitySpawnOnLogin(Player* bot)
     if (PlayerbotAI* ai = GetBotAI(bot))
         ai->Reset(true);
 
-    sLog.outDetail("Bot %s spawned in %s", bot->GetName(), (guid % 2) ? "Thunder Bluff" : "Orgrimmar");
+    sLog.outDetail("Bot %s spawned in %s", bot->GetName(), city.name);
 }
 
 void RandomPlayerbotMgr::OnBotLoginInternal(Player * const bot)
 {
-    HordeCitySpawnOnLogin(bot);
+    CitySpawnOnLogin(bot);
 
     sLog.outDetail("%u/%d Bot %s logged in", GetPlayerbotsAmount(), sRandomPlayerbotMgr.GetMaxAllowedBotCount(), bot->GetName());
 	//if (loginProgressBar && playerBots.size() < sRandomPlayerbotMgr.GetMaxAllowedBotCount()) { loginProgressBar->step(); }

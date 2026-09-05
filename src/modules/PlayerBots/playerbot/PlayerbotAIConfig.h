@@ -145,7 +145,7 @@ public:
     std::list<std::string> toggleAlwaysOnlineAccounts;
     std::list<std::string> toggleAlwaysOnlineChars;
     bool enableRandomTeleports;
-    uint32 hordeCitySpawnPercent;
+    uint32 citySpawnPercent;
     bool enableMinimalMove;
     uint32 randomBotTeleportDistance;
     bool randomBotTeleportNearPlayer;
