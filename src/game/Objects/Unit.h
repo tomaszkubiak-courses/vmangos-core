@@ -688,7 +688,7 @@ class Unit : public SpellCaster
         void ModPossess(Unit* target, bool apply, AuraRemoveMode removeMode = AURA_REMOVE_BY_DEFAULT, SpellEntry const* pSpellProto = nullptr);
 
     private:
-        void CleanupDeletedAuras();
+        void CleanupDeletedAuras(bool force = false);
 
     public:
         // removing specific aura stack
