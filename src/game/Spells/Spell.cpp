@@ -138,6 +138,15 @@ Spell::Spell(GameObject* caster, SpellEntry const* info, bool triggered, ObjectG
 
 Spell::~Spell()
 {
+    // Release anything still held from AddChanneledAuraHolder. Normally SendChannelUpdate(0)
+    // has already emptied this list, but a spell that is destroyed without ever ending its
+    // channel would otherwise leave the holders marked in use forever, and the target keeps
+    // a deleted holder queued for as long as that mark stands.
+    for (SpellAuraHolder* holder : m_channeledHolders)
+        holder->SetInUse(false);
+    m_channeledHolders.clear();
+    m_channeledUpdateIterator = m_channeledHolders.end();
+
     delete m_spellScript;
     m_destroyed = true;
 }
@@ -4149,11 +4158,12 @@ void Spell::update(uint32 difftime)
                     if (holder->IsDeleted())
                     {
                         Unit* target = m_targets.getUnitTarget();
-                        sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "[Spell] - Channeled update still maintains ref to deleted holder, caster: %s. Target: %s",
+                        sLog.Out(LOG_BASIC, LOG_LVL_DETAIL, "[Spell] - Channeled update still maintains ref to deleted holder, caster: %s. Target: %s",
                             m_caster->GetGuidStr().c_str(),
                             target ? target->GetGuidStr().c_str() : "");
 
-                        // TODO: Is this a leak if we don't delete it here? Unit probably removed from world
+                        // Not a leak: the target queued the holder on its own deleted list and
+                        // keeps it there until this reference is released, then frees it.
                         holder->SetInUse(false);
                         m_channeledHolders.erase(curr);
                         continue;

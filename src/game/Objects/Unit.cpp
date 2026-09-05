@@ -8572,7 +8572,7 @@ void Unit::CleanupsBeforeDelete()
                 GetHostileRefManager().deleteReferences();
         }
         RemoveAllAuras(AURA_REMOVE_BY_DELETE);
-        CleanupDeletedAuras(); // any long range channeled spells need to be cleaned up after aura deletion
+        CleanupDeletedAuras(true); // any long range channeled spells need to be cleaned up after aura deletion
     }
     WorldObject::CleanupsBeforeDelete();
 }
@@ -10286,37 +10286,66 @@ void Unit::StopAttackFaction(uint32 factionId)
     CallForAllControlledUnits(StopAttackFactionHelper(factionId), CONTROLLED_PET | CONTROLLED_GUARDIANS | CONTROLLED_CHARM);
 }
 
-void Unit::CleanupDeletedAuras()
+// Frees the holders and auras that were removed while something still held a
+// reference to them. A holder is in use while a channeled spell keeps it in its
+// own list (Spell::AddChanneledAuraHolder) or while it is being updated, and the
+// caster releases that reference on its own schedule - which may be a later tick,
+// on another map, than the one that removed the aura here. Anything still in use
+// therefore stays queued and is freed on a later pass; dropping it would leave the
+// holder with no owner at all, since the channeled spell only erases its pointer
+// and never deletes it.
+//
+// `force` is for the destruction path only: the queue must be empty before ~Unit,
+// so a holder that is somehow still in use there is abandoned rather than freed
+// under the code that is using it. That leaks, but only for a unit that is going
+// away, and it is what this function used to do in every case.
+void Unit::CleanupDeletedAuras(bool force)
 {
-    for (auto& iter : m_deletedHolders)
+    for (SpellAuraHolderList::iterator iter = m_deletedHolders.begin(); iter != m_deletedHolders.end();)
     {
-        if (iter->IsInUse())
+        SpellAuraHolder* holder = *iter;
+        if (holder->IsInUse())
         {
+            if (!force)
+            {
+                ++iter;
+                continue;
+            }
+
             // Use case:
             // - Spell damage
             // - Player::SetDeathState
             // - Pet::AddObjectToRemoveList
             // Seen happening with spells like [Health Funnel], [Tainted Blood]
-            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[Crash/Auras] Deleting aura holder %u in use (%s)", iter->GetId(), GetObjectGuid().GetString().c_str());
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[Crash/Auras] Abandoning aura holder %u still in use at deletion (%s)", holder->GetId(), GetObjectGuid().GetString().c_str());
             MaNGOS::Errors::PrintStacktrace();
         }
         else
-            delete iter;
+            delete holder;
+
+        iter = m_deletedHolders.erase(iter);
     }
-    m_deletedHolders.clear();
 
     // really delete auras "deleted" while processing its ApplyModify code
-    for (auto& iter : m_deletedAuras)
+    for (AuraList::iterator iter = m_deletedAuras.begin(); iter != m_deletedAuras.end();)
     {
-        if (iter->IsInUse())
+        Aura* aura = *iter;
+        if (aura->IsInUse())
         {
-            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[Crash/Auras] Deleting aura %u in use (%s)", iter->GetId(), GetObjectGuid().GetString().c_str());
+            if (!force)
+            {
+                ++iter;
+                continue;
+            }
+
+            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[Crash/Auras] Abandoning aura %u still in use at deletion (%s)", aura->GetId(), GetObjectGuid().GetString().c_str());
             MaNGOS::Errors::PrintStacktrace();
         }
         else
-            delete iter;
+            delete aura;
+
+        iter = m_deletedAuras.erase(iter);
     }
-    m_deletedAuras.clear();
 }
 
 SpellAuraHolder* Unit::GetSpellAuraHolder(uint32 spellid) const
