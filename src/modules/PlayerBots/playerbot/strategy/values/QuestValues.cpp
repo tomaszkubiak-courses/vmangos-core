@@ -751,3 +751,32 @@ bool HasNearbyQuestTakerValue::Calculate()
 
 	return false;
 };
+
+bool CanTurnInQuestNearbyValue::Calculate()
+{
+    for (auto& guid : AI_VALUE(std::list<ObjectGuid>, "nearest npcs"))
+    {
+        Unit* unit = ai->GetUnit(guid);
+
+        if (!unit || bot->GetDistance(unit) > INTERACTION_DISTANCE)
+            continue;
+
+        if (AI_VALUE2(bool, "can turn in quest npc", (int32)guid.GetEntry()))
+            return true;
+    }
+
+    for (auto& guid : AI_VALUE(std::list<ObjectGuid>, "nearest game objects no los"))
+    {
+        GameObject* gameObject = ai->GetGameObject(guid);
+
+        if (!gameObject || bot->GetDistance(gameObject) > INTERACTION_DISTANCE)
+            continue;
+
+        // Game object questgivers are keyed by the negated entry, the same way
+        // RpgEndQuestTrigger builds its qualifier.
+        if (AI_VALUE2(bool, "can turn in quest npc", -1 * (int32)guid.GetEntry()))
+            return true;
+    }
+
+    return false;
+};

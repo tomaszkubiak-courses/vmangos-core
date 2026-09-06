@@ -102,7 +102,16 @@ bool TalkToQuestGiverAction::TurnInQuest(Player* requester, Quest const* quest, 
     if(quest->GetRewChoiceItemsCount() || quest->GetRewItemsCount())
         ai->DoSpecificAction("equip upgrades");
 
-    return true;
+    // Report what happened, not that it was attempted. Every branch above can
+    // leave the quest exactly where it was: RewardNoItem and RewardSingleItem
+    // give up when CanRewardQuest fails - a full bag is enough - and the
+    // multiple-reward path can hand the choice to a human instead of rewarding
+    // anything. All three wrote a message and returned success anyway. That was
+    // harmless while the only caller was a master's packet, which arrives once
+    // per click; it is not harmless now that a trigger can call this every tick,
+    // because an action that claims success it did not achieve is repeated
+    // forever at the top of the queue.
+    return bot->GetQuestRewardStatus(questID);
 }
 
 void TalkToQuestGiverAction::RewardNoItem(Quest const* quest, WorldObject* questGiver, std::string& out) 
