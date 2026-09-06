@@ -824,8 +824,22 @@ TravelPath MovementAction::ResolveMovePath(const WorldPosition& startPosition, c
     if (!lastMove.lastPath.empty() && !outMovePath.empty() && lastMove.lastPath.getBack().distance(endPosition) <= outMovePath.getBack().distance(endPosition))
         outMovePath = lastMove.lastPath;
 
+    // A destination no pathfinder could reach used to become a single point path straight at it,
+    // which the bot then walks in a straight line through whatever stands in the way. The worst
+    // shape is a target directly overhead: the Ironforge auction house probe caught a bot at
+    // z 453.4 handed one point at the same x/y and z 505.2, a fifty yard climb through the
+    // building, and because the invented path is stored in lastMove it is handed back on every
+    // following call for as long as the destination holds. Nothing walks straight up, so refuse
+    // to invent a step that rises further than it travels along the ground; the caller treats an
+    // empty path as a failed move and picks something else.
     if (outMovePath.empty())
-        outMovePath.addPoint(endPosition);
+    {
+        float const rise = endPosition.getZ() - startPosition.getZ();
+        float const ground = sqrt(startPosition.sqDistance2d(endPosition));
+
+        if (startPosition.getMapId() != endPosition.getMapId() || rise < 5.0f || ground >= rise)
+            outMovePath.addPoint(endPosition);
+    }
 
     return outMovePath;
 }
