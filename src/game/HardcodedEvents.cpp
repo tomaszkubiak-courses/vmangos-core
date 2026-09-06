@@ -257,6 +257,7 @@ void DragonsOfNightmare::CheckSingleVariable(uint32 idx, uint32& value)
 
 bool DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGuid> const& dragons, uint32& alive, time_t respawnTime)
 {
+    bool allFound = true;
     for (auto const& guid : dragons)
     {
         auto cData = sObjectMgr.GetCreatureData(guid.GetCounter());
@@ -264,6 +265,7 @@ bool DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGui
         if (!cData)
         {
             sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "GameEventMgr: [Dragons of Nightmare] creature data %u not found!", guid.GetCounter());
+            allFound = false;
             continue;
         }
 
@@ -277,7 +279,8 @@ bool DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGui
             // Continent maps are only created once somebody is on them, so this is the normal
             // state of an empty continent and not something the caller can act on.
             sLog.Out(LOG_BASIC, LOG_LVL_DEBUG, "GameEventMgr: [Dragons of Nightmare] instance %u of map %u not found!", instanceId, cData->position.mapId);
-            return false;
+            allFound = false;
+            continue;
         }
 
         auto pCreature = map->GetCreature(guid);
@@ -285,6 +288,7 @@ bool DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGui
         if (!pCreature)
         {
             sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "GameEventMgr: [Dragons of Nightmare] creature %u not found!", guid.GetCounter());
+            allFound = false;
             continue;
         }
 
@@ -294,11 +298,12 @@ bool DragonsOfNightmare::GetAliveCountAndUpdateRespawnTime(std::vector<ObjectGui
             ++alive;
     }
 
-    return true;
+    return allFound;
 }
 
 bool DragonsOfNightmare::LoadDragons(std::vector<ObjectGuid>& dragonGUIDs)
 {
+    bool allFound = true;
     for (uint32 entry : NightmareDragons)
     {
         // lookup the dragon
@@ -307,13 +312,14 @@ bool DragonsOfNightmare::LoadDragons(std::vector<ObjectGuid>& dragonGUIDs)
         if (dCreatureGuid.IsEmpty())
         {
             sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "GameEventMgr: [Dragons of Nightmare] creature %u not found in world!", entry);
-            return false;
+            allFound = false;
+            continue;
         }
 
         dragonGUIDs.push_back(dCreatureGuid);
     }
 
-    return true;
+    return allFound;
 }
 
 //void DragonsOfNightmare::GetAliveCount(std::vector<ObjectGuid> dragonGUIDs, uint32& alive)
