@@ -2763,7 +2763,8 @@ PartitionedTravelList TravelMgr::GetPartitions(const WorldPosition& center, cons
     // destination and from outside they are indistinguishable. Remove once the
     // answer is in.
     uint32 probeTotal = destinations.size(), probeNoPartition = 0, probeNoPoint = 0;
-    uint32 probeRejectLevel = 0, probeRejectDistance = 0, probeFarthest = 0;
+    uint32 probeRejectLevel = 0, probeRejectDistance = 0, probeUnreachable = 0;
+    float probeFarthest = 0.0f;
 
     for (auto& dest : destinations)
     {
@@ -2793,9 +2794,18 @@ PartitionedTravelList TravelMgr::GetPartitions(const WorldPosition& center, cons
 
             if (distance > maxDistance)
             {
-                probeRejectDistance++;
-                if (distance > probeFarthest)
-                    probeFarthest = uint32(distance);
+                // WorldPosition::distance answers FLT_MAX for a point on another map with no
+                // known transfer, which is a different answer from "too far to walk". It also
+                // does not survive a cast to uint32, which is why this counter used to report
+                // a farthest point of zero next to a rejection by distance.
+                if (distance >= FLT_MAX * 0.5f)
+                    probeUnreachable++;
+                else
+                {
+                    probeRejectDistance++;
+                    if (distance > probeFarthest)
+                        probeFarthest = distance;
+                }
                 continue;
             }
             
@@ -2809,9 +2819,9 @@ PartitionedTravelList TravelMgr::GetPartitions(const WorldPosition& center, cons
     }
 
     if (pointMap.empty() && probeTotal && (purposeFlag & (uint32)TravelDestinationPurpose::QuestTaker))
-        sLog.outBasic("PARTPROBE: level %u, %u taker destinations, none survived - %u had no partition, %u no usable point; points rejected: %u by level, %u by distance (max allowed %.0f, farthest seen %u)",
+        sLog.outBasic("PARTPROBE: level %u, %u taker destinations, none survived - %u had no partition, %u no usable point; points rejected: %u by level, %u unreachable (other map, no transfer), %u by distance (max allowed %.0f, farthest seen %.0f)",
             info.GetLevel(), probeTotal, probeNoPartition, probeNoPoint,
-            probeRejectLevel, probeRejectDistance, maxDistance, probeFarthest);
+            probeRejectLevel, probeUnreachable, probeRejectDistance, maxDistance, probeFarthest);
 
     sTravelMgr.GetPartitionsLock(false);
 
