@@ -96,7 +96,28 @@ void TravelStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)
         {"val::not::travel target active","refresh travel target", 6.7f},                                     // 90%
         {"val::not::travel target active","choose group travel target", 6.65f},                               // 50%
         {"val::should travel named::trainer trade","request named travel target::trainer trade", 6.51f},      // 25%
-        {"val::has strategy::rpg quest", "request quest travel target", 6.3f}                                 // 95%
+        // Plain quest travel was 6.3 - below Grind 6.35, Boss 6.4, all four
+        // Gather 6.5, Mail 6.6/6.79, grind-for-money 6.77 and trainer class 6.89.
+        // Every one of those is satisfiable at all times, so the unconditional
+        // quest entry only reached the queue when nothing else wanted the slot:
+        // 203 of 8365 travel targets over 2h16m with 2005 bots, 2.4%. The effect
+        // is not that bots quest slowly, it is that they stop. They accept quests
+        // from whatever they walk past, finish the objectives while grinding, and
+        // never travel back to hand in - 10598 quest rows sat at
+        // QUEST_STATUS_COMPLETE, 265 bots were pinned at the 20-quest cap, and
+        // zero bots gained a level in that run.
+        //
+        // The hand-in logic itself is already correct: RequestQuestTravelTargetAction
+        // forces QuestTaker-only fetches once a bot carries five finished quests or
+        // is two short of the cap. It just almost never got to execute. Priced above
+        // trainer class so it competes with the always-true purposes, and left below
+        // Repair/Vendor/AH (6.93+) and the guild entries, which are genuine blockers
+        // rather than pastimes. Note this makes the two narrower quest entries
+        // above (6.84 focus target, 6.78 needs money) unreachable - same action,
+        // stricter trigger, lower relevance. They are left in place rather than
+        // deleted so the priced-down alternative is still visible if this entry
+        // has to be walked back.
+        {"val::has strategy::rpg quest", "request quest travel target", 6.90f}                                // 95%
     };
 
     for (auto& [trigger, action, relevance] : StringActions)
