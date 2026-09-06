@@ -522,6 +522,8 @@ bool PlayerbotAIConfig::Initialize()
     LoadListString<std::list<std::string>>(config.GetStringDefault("AiPlayerbot.AllowedLogFiles", ""), allowedLogFiles);
     LoadListString<std::list<std::string>>(config.GetStringDefault("AiPlayerbot.DebugFilter", "add gathering loot,check values,emote,check mount state,jump"), debugFilter);
 
+    logActionOutcomes = hasLog("bot_action_outcomes.csv");
+
     worldBuffs.clear();
 
     //Get all config values starting with AiPlayerbot.WorldBuff
@@ -1220,6 +1222,56 @@ void PlayerbotAIConfig::logEvent(PlayerbotAI* ai, std::string eventName, std::st
         log("bot_events.csv", out.str().c_str());
     }
 };
+
+void PlayerbotAIConfig::logActionOutcome(std::string const& actionName, ActionOutcome outcome)
+{
+    if (!logActionOutcomes)
+        return;
+
+    std::lock_guard<std::mutex> guard(actionOutcomeMtx);
+
+    actionOutcomes[actionName][(uint8)outcome]++;
+
+    time_t now = time(0);
+
+    if (!actionOutcomeLastDump)
+    {
+        actionOutcomeLastDump = now;
+        return;
+    }
+
+    if (now - actionOutcomeLastDump < 5 * MINUTE)
+        return;
+
+    actionOutcomeLastDump = now;
+    DumpActionOutcomes();
+}
+
+//Caller holds actionOutcomeMtx.
+void PlayerbotAIConfig::DumpActionOutcomes()
+{
+    std::string timestamp = GetTimestampStr() + "+00";
+
+    for (auto& [actionName, counts] : actionOutcomes)
+    {
+        uint32 succeeded = counts[(uint8)ActionOutcome::Succeeded];
+        uint32 failed = counts[(uint8)ActionOutcome::Failed];
+        uint32 impossible = counts[(uint8)ActionOutcome::Impossible];
+        uint32 useless = counts[(uint8)ActionOutcome::Useless];
+        uint32 total = succeeded + failed + impossible + useless;
+
+        if (!total)
+            continue;
+
+        std::ostringstream out;
+        out << timestamp << ",";
+        out << "\"" << actionName << "\",";
+        out << succeeded << "," << failed << "," << impossible << "," << useless << "," << total << ",";
+        out << std::fixed << std::setprecision(4) << (float)succeeded / (float)total;
+
+        log("bot_action_outcomes.csv", out.str().c_str());
+    }
+}
 
 void PlayerbotAIConfig::logEvent(PlayerbotAI* ai, std::string eventName, ObjectGuid guid, std::string info2)
 {

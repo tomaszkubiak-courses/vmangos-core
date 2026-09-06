@@ -306,6 +306,7 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
                         if (actionExecuted)
                         {
                             LogAction("A:%s - OK", action->getName().c_str());
+                            sPlayerbotAIConfig.logActionOutcome(actionName, PlayerbotAIConfig::ActionOutcome::Succeeded);
                             MultiplyAndPush(actionNode->getContinuers(), 0, false, event, "cont");
                             lastRelevance = relevance;
                             delete actionNode;
@@ -314,6 +315,7 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
                         else
                         {
                             LogAction("A:%s - FAILED", action->getName().c_str());
+                            sPlayerbotAIConfig.logActionOutcome(actionName, PlayerbotAIConfig::ActionOutcome::Failed);
                             MultiplyAndPush(actionNode->getAlternatives(), relevance + 0.03, false, event, "alt");
                         }
                     }
@@ -342,6 +344,7 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
                             }
                         }
                         LogAction("A:%s - IMPOSSIBLE", action->getName().c_str());
+                        sPlayerbotAIConfig.logActionOutcome(actionName, PlayerbotAIConfig::ActionOutcome::Impossible);
                         MultiplyAndPush(actionNode->getAlternatives(), relevance + 0.03, false, event, "alt");
                     }
                 }
@@ -371,6 +374,7 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
                     }
                     lastRelevance = relevance;
                     LogAction("A:%s - USELESS", action->getName().c_str());
+                    sPlayerbotAIConfig.logActionOutcome(actionName, PlayerbotAIConfig::ActionOutcome::Useless);
                 }
             }
             delete actionNode;

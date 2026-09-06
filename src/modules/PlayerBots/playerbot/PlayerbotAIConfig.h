@@ -1,6 +1,8 @@
 #pragma once
 
 #include <unordered_set>
+#include <array>
+#include <mutex>
 #include "Config/Config.h"
 #include "Talentspec.h"
 #include "SharedDefines.h"
@@ -477,9 +479,40 @@ public:
 
     bool CanLogAction(PlayerbotAI* ai, std::string actionName, bool isExecute, std::string lastActionName);
 
+    // What the engine did with an action it pulled off the queue. bot_events.csv
+    // records attempts only, so an action that runs constantly and achieves
+    // nothing reads exactly like one that works - the mount retry storm and the
+    // quest travel starvation both hid behind that. These are the four outcomes
+    // Engine::DoNextAction already distinguishes internally.
+    enum class ActionOutcome : uint8
+    {
+        Succeeded = 0,  //Execute() returned true
+        Failed,         //Execute() returned false
+        Impossible,     //isPossible() returned false, or a multiplier zeroed the relevance
+        Useless,        //isUseful() returned false
+        Max
+    };
+
+    // Counted rather than logged per occurrence: one row per action per tick per
+    // bot would be gigabytes an hour at this population, and the question being
+    // asked - which actions never achieve anything - is answered by a rate. The
+    // tally is written to bot_action_outcomes.csv every five minutes, cumulative,
+    // so a rate over any interval is the difference between two snapshots.
+    void logActionOutcome(std::string const& actionName, ActionOutcome outcome);
+
+    // Cached at load: hasLog() is a linear scan over a string list and this sits
+    // on the hottest path in the module, four times per action considered.
+    bool logActionOutcomes = false;
+
 private:
+    void DumpActionOutcomes();
+
     void LoadTalentSpecs();
     void LoadLLMDefaultPrompts(const std::string& fileName);
+
+    std::mutex actionOutcomeMtx;
+    std::unordered_map<std::string, std::array<uint32, (uint8)ActionOutcome::Max>> actionOutcomes;
+    time_t actionOutcomeLastDump = 0;
 
     Config config;
 };

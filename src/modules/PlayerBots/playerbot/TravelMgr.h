@@ -390,13 +390,28 @@ namespace ai
 		void DecRetry(bool isMove) { if (isMove && moveRetryCount > 0) moveRetryCount--; else if (extendRetryCount > 0) extendRetryCount--; }
 
 		void CopyTarget(TravelTarget* const target);
+
+		//The name the travel_map.csv row was written under when this target was
+		//picked. Kept so the row closing the trip can be attributed to the same
+		//purpose; nothing else derives it from the destination.
+		void SetPurposeName(std::string const& name) { purposeName = name; }
+		std::string const& GetPurposeName() const { return purposeName; }
 	private:
 		uint32 GetMaxTravelTime() const { return (1000.0 * Distance(bot)) / bot->GetSpeed(MOVE_RUN); }
+
+		//Writes the closing travel_map.csv row for a trip that is ending. See the
+		//definition for which transitions count as which outcome.
+		void LogTravelOutcome(char const* outcome);
 
 		TravelStatus m_status = TravelStatus::TRAVEL_STATUS_NONE;
 
 		uint32 startTime = WorldTimer::getMSTime();
 		uint32 statusTime = 0;
+
+		//When the bot actually started moving, so the closing row can report how
+		//long the trip took. startTime is reset by every status change.
+		uint32 travelStartTime = 0;
+		std::string purposeName;
 
 		bool forced = false;
 		bool visitor = true;
