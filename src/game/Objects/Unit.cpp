@@ -268,6 +268,24 @@ void Unit::Update(uint32 update_diff, uint32 p_time)
             m_lastManaUseTimer -= update_diff;
     }
 
+    // A combat timer above the ordinary check interval holds this unit in combat regardless of
+    // threat, so that a player cannot sit down the instant the last blow lands. The hold only
+    // means anything while the enemy that armed it is still alive: once that enemy is dead there
+    // is nothing left for it to protect against, and running the rest of the timer out is a
+    // visible stall - the player stays flagged in combat for up to five seconds with nothing left
+    // to fight. Collapse it back to the ordinary interval so the usual threat check decides.
+    // Only a confirmed death clears it; a target that cannot be found may simply have left the
+    // map, and there the hold is still correct.
+    if (m_combatTimer > UNIT_COMBAT_CHECK_TIMER_MAX && !m_combatTimerTarget.IsEmpty())
+    {
+        Unit const* pCombatTimerTarget = GetMap()->GetUnit(m_combatTimerTarget);
+        if (pCombatTimerTarget && !pCombatTimerTarget->IsAlive())
+        {
+            m_combatTimer = UNIT_COMBAT_CHECK_TIMER_MAX - (WorldTimer::getMSTime() % UNIT_COMBAT_CHECK_TIMER_MAX);
+            m_combatTimerTarget.Clear();
+        }
+    }
+
     if (m_combatTimer <= update_diff)
     {
         m_combatTimerTarget.Clear();
