@@ -7,11 +7,11 @@ Working notes, written 2026-08-25. Not a commitment to build any of it.
 - **This fork** — `src/game/PlayerBots/`: 12 files, ~16k lines, compiled directly into the `game`
   library. Upstream VMaNGOS bots, with upstream PRs #2426, #3330, #3336 and #3345 already merged
   in locally.
-- **mod-playerbots** — `D:\wow-server\mod-playerbots`, `github.com/mod-playerbots/mod-playerbots`
-  at commit `2f7d9f77`. An AzerothCore module, 1362 files, ~242k lines, descended from IKE3's
-  mangosbot. Targets WotLK 3.3.5a. It also requires a forked core
-  (`mod-playerbots/azerothcore-wotlk`, branch `Playerbot`) because it needs hook types stock
-  AzerothCore does not define, so it is not a drop-in module even on its own platform.
+- **mod-playerbots** — `github.com/mod-playerbots/mod-playerbots` at commit `2f7d9f77`. An
+  AzerothCore module, 1362 files, ~242k lines, descended from IKE3's mangosbot. Targets WotLK
+  3.3.5a. It also requires a forked core (`mod-playerbots/azerothcore-wotlk`, branch `Playerbot`)
+  because it needs hook types stock AzerothCore does not define, so it is not a drop-in module
+  even on its own platform.
 
 The two systems share only their foundation: a `WorldSession` with no socket, a real character
 logged in behind it, a manager singleton, and a per-bot AI object. Everything above that differs.
@@ -147,12 +147,12 @@ S is under about 300 lines, M is 300 to 1500, L is 1500 to 5000, XL is above 500
 
 Examined 2026-08-25, after the comparison above.
 
-`D:\wow-server\tortoise-wow` — `Shyalya/tortoise-wow`, branch `playerbots-integration-gh`, a fork
-of `Penqle/tortoise-wow`, which restores Turtle-WoW 1.18.1 (client build 7272). **Turtle's core is
-a vmangos derivative**: 85 of roughly 95 `src/game/` entries share names with ours, it has the
-`SUPPORTED_CLIENT_BUILD` cache variable and a generated `Progression.h`, the same `Maps/`,
-`Objects/`, `Spells/`, `Battlegrounds/` layout, and the same `AuraRemovalMgr`, `GuardMgr`,
-`HonorMgr`, `HardcodedEvents` and `Anticheat` subsystems.
+`Shyalya/tortoise-wow`, branch `playerbots-integration-gh`, is a fork of `Penqle/tortoise-wow`,
+which restores Turtle-WoW 1.18.1 (client build 7272). **Turtle's core is a vmangos derivative**:
+85 of roughly 95 `src/game/` entries share names with ours, it has the `SUPPORTED_CLIENT_BUILD`
+cache variable and a generated `Progression.h`, the same `Maps/`, `Objects/`, `Spells/`,
+`Battlegrounds/` layout, and the same `AuraRemovalMgr`, `GuardMgr`, `HonorMgr`, `HardcodedEvents`
+and `Anticheat` subsystems.
 
 What it vendors under `src/modules/PlayerBots/` is **IKE3's cmangos playerbots**, compiled with
 `CMANGOS MANGOSBOT_ZERO ENABLE_PLAYERBOTS` — the *vanilla* codepath. 459 `.cpp` files, ~245k
