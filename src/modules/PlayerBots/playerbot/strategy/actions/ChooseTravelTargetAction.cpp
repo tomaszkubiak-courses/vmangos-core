@@ -120,8 +120,11 @@ void ChooseTravelTargetAction::setNewTarget(Player* requester, TravelTarget* new
         context->GetValue<std::set<ObjectGuid>&>("ignore rpg target")->Set(ignoreList);
     }
 
-    //Actually apply the new target to the travel target used by the bot.
+    //Actually apply the new target to the travel target used by the bot. This
+    //closes the previous trip, so the purpose name is set afterwards - the
+    //closing row belongs to the purpose the bot was travelling for, not this one.
     oldTarget->CopyTarget(newTarget);
+    oldTarget->SetPurposeName(GetTravelPurposeName(AI_VALUE2(std::string, "manual string", "future travel purpose")));
 
     if (oldTarget->IsForced()) //Make sure travel goes into cooldown after getting to the destination.
         oldTarget->SetExpireIn(HOUR * IN_MILLISECONDS);
@@ -301,6 +304,11 @@ void ChooseTravelTargetAction::ReportTravelTarget(Player* bot, Player* requester
             out << round(newTarget->GetDestination()->DistanceTo(botPos)) << ",";
 
         out << "new," << "\"" << destination->GetTitle() << "\",\"" << message << "\"";
+
+        //Elapsed seconds, always zero on the row that opens a trip. It sits before
+        //the purpose so that stays the last column, which is what every existing
+        //one-liner over this file reads.
+        out << ",0";
 
         out << "," << futureTravelPurposeName;
 

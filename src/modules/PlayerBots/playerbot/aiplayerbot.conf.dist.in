@@ -1214,6 +1214,17 @@ AiPlayerbot.RndBotCheats = repair,breath,item
 
 # Allowed log files. See SPP_MAP for more information
 # https://github.com/mostlikely4r/spp-map
+#
+# Two of these are outcome measurements rather than event traces:
+#   travel_map.csv          - one row when a travel target is picked (state "new")
+#                             and one when the trip ends (arrived / abandoned /
+#                             expired), with the elapsed seconds in the
+#                             second-to-last column.
+#   bot_action_outcomes.csv - cumulative per-action tally of what the engine did
+#                             with each action it considered: succeeded, failed,
+#                             impossible, useless. Written every five minutes, so
+#                             it stays small whatever the bot count; a rate over
+#                             any interval is the difference between two blocks.
 AiPlayerbot.AllowedLogFiles = bot_events.csv,deaths.csv
 
 # Filters certain actions from showing up in 'nc +debug' and 'nc +debug action'

@@ -873,6 +873,11 @@ TravelTarget::TravelTarget(PlayerbotAI* ai) : AiObject(ai)
 }
 
 void TravelTarget::SetTarget(TravelDestination* tDestination1, WorldPosition* wPosition1) {
+    //A trip being replaced mid-walk ends here rather than in SetStatus, which
+    //only sees the destination that has already overwritten it.
+    if (tDestination1 != tDestination)
+        LogTravelOutcome("abandoned");
+
     if (dynamic_cast<TemporaryTravelDestination*>(tDestination) && tDestination1 != tDestination)
         delete tDestination;
 
@@ -891,6 +896,20 @@ void TravelTarget::CopyTarget(TravelTarget* const target) {
 }
 
 void TravelTarget::SetStatus(TravelStatus status) {
+    //Close the trip before the status that defined it is gone. Only a target in
+    //TRAVEL is on a journey; READY is skipped because SetTarget sets TRAVEL and
+    //ChooseTravelTargetAction immediately sets READY on top of it, so that pair
+    //is bookkeeping rather than a trip that ended.
+    if (m_status == TravelStatus::TRAVEL_STATUS_TRAVEL && status != TravelStatus::TRAVEL_STATUS_TRAVEL && status != TravelStatus::TRAVEL_STATUS_READY)
+    {
+        LogTravelOutcome(
+            status == TravelStatus::TRAVEL_STATUS_WORK ? "arrived" :
+            status == TravelStatus::TRAVEL_STATUS_EXPIRED ? "expired" : "abandoned");
+    }
+
+    if (status == TravelStatus::TRAVEL_STATUS_TRAVEL && m_status != TravelStatus::TRAVEL_STATUS_TRAVEL)
+        travelStartTime = WorldTimer::getMSTime();
+
     m_status = status;
     startTime = WorldTimer::getMSTime();
 
@@ -913,6 +932,53 @@ void TravelTarget::SetStatus(TravelStatus status) {
         statusTime = tDestination->GetCooldownDelay();
     default: break;
     }
+}
+
+// travel_map.csv used to hold one row per target chosen, with a state column that
+// read "new" on every row ever written. Whether the bot got there, gave up, or ran
+// out of time was simply not recorded, so the only measurable thing about travel
+// was how often it started - and a purpose that always starts and never arrives is
+// indistinguishable from one that works. This writes the second row: same columns,
+// with the state replaced by the outcome and the elapsed time filled in.
+void TravelTarget::LogTravelOutcome(char const* outcome)
+{
+    if (m_status != TravelStatus::TRAVEL_STATUS_TRAVEL)
+        return;
+
+    if (!tDestination || typeid(*tDestination) == typeid(NullTravelDestination))
+        return;
+
+    if (!sPlayerbotAIConfig.hasLog("travel_map.csv"))
+        return;
+
+    WorldPosition botPos(bot);
+    WorldPosition destPos = wPosition ? *wPosition : botPos;
+
+    if (!destPos)
+        destPos = botPos;
+
+    std::ostringstream out;
+    out << sPlayerbotAIConfig.GetTimestampStr() << "+00,";
+    out << bot->GetName() << ",";
+    out << std::fixed << std::setprecision(2);
+
+    out << std::to_string(bot->GetRace()) << ",";
+    out << std::to_string(bot->GetClass()) << ",";
+    out << ai->GetLevelFloat() << ",";
+
+    botPos.printWKT({ botPos, destPos }, out, 1);
+
+    //Distance still to go. On an "arrived" row this is the arrival tolerance, on
+    //the other two it is how much of the trip was wasted.
+    out << round(destPos.distance(botPos)) << ",";
+
+    out << outcome << ",\"" << tDestination->GetTitle() << "\",\"\",";
+
+    out << (travelStartTime ? (WorldTimer::getMSTime() - travelStartTime) / 1000 : 0) << ",";
+
+    out << purposeName;
+
+    sPlayerbotAIConfig.log("travel_map.csv", out.str().c_str());
 }
 
 bool TravelTarget::IsDestinationActive()
@@ -1471,6 +1537,7 @@ void TravelMgr::LoadQuestTravelTable()
     sPlayerbotAIConfig.openLog("unload_obj.csv", "w");
     sPlayerbotAIConfig.openLog("bot_events.csv", "w");
     sPlayerbotAIConfig.openLog("travel_map.csv", "w");
+    sPlayerbotAIConfig.openLog("bot_action_outcomes.csv", "w");
     sPlayerbotAIConfig.openLog("quest_map.csv", "w");
     sPlayerbotAIConfig.openLog("activity_pid.csv", "w");
     sPlayerbotAIConfig.openLog("deaths.csv", "w");
@@ -1478,7 +1545,14 @@ void TravelMgr::LoadQuestTravelTable()
     sPlayerbotAIConfig.openLog("travel_destinations.csv", "w");
     sPlayerbotAIConfig.openLog("deadzone.csv", "w"); 
     sPlayerbotAIConfig.openLog("bot_test_results.log", "w", true);
-    
+
+    if (sPlayerbotAIConfig.hasLog("bot_action_outcomes.csv"))
+    {
+        //Cumulative counts since server start, one block every five minutes. A
+        //rate over any interval is the difference between two blocks.
+        sPlayerbotAIConfig.log("bot_action_outcomes.csv",
+            "Timestamp,action,succeeded,failed,impossible,useless,total,success_rate");
+    }
 
     if (sPlayerbotAIConfig.hasLog("activity_pid.csv"))
     {
