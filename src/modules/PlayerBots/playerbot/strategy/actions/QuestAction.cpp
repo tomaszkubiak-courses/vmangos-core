@@ -8,25 +8,24 @@ using namespace ai;
 
 bool QuestAction::Execute(Event& event)
 {
-    ObjectGuid guid = event.getObject();
+    // An object named by the event is the whole instruction: a master clicked
+    // that questgiver, so act on it and nothing else.
+    if (ObjectGuid guid = event.getObject())
+        return ProcessQuests(guid);
 
     Player* master = GetMaster();
 
-    if (!guid)
+    // Without one, fall back to whatever is selected - but only as a preference,
+    // not as the only candidate. An autonomous bot almost always has something
+    // selected and it is almost always the mob it last fought, so returning the
+    // result of that one lookup meant the sweep below never ran and the bot
+    // never noticed the questgiver it was standing next to. This path is now
+    // reached by a trigger rather than only by a master's packet, so the
+    // selection is a hint at best.
+    if (ObjectGuid selected = master ? master->GetTargetGuid() : bot->GetTargetGuid())
     {
-        if (!master)
-        {
-            guid = bot->GetTargetGuid();
-        }
-        else
-        {
-            guid = master->GetTargetGuid();
-        }
-    }
-
-    if (guid)
-    {
-        return ProcessQuests(guid);
+        if (ProcessQuests(selected))
+            return true;
     }
 
     bool result = false;

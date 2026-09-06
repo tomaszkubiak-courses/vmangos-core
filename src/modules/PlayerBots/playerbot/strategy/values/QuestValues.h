@@ -233,4 +233,18 @@ namespace ai
 
         virtual bool Calculate() override;
     };
+
+    //A quest can be handed in to something the bot could interact with right now.
+    //Deliberately not "has nearby quest taker": that one searches rpg range, skips
+    //the entry the bot is currently travelling to, and answers "is a hand-in worth
+    //walking to". This answers "can a hand-in happen from where the bot stands",
+    //over the same two lists and the same interaction radius TalkToQuestGiverAction
+    //itself sweeps, so a true here means that action has something to do.
+    class CanTurnInQuestNearbyValue : public BoolCalculatedValue
+    {
+    public:
+        CanTurnInQuestNearbyValue(PlayerbotAI* ai) : BoolCalculatedValue(ai, "can turn in quest nearby", 2) {}
+
+        virtual bool Calculate() override;
+    };
 }
