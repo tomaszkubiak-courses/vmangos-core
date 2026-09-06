@@ -6326,7 +6326,12 @@ void Unit::SetInCombatWithVictim(Unit* pVictim, bool touchOnly/* = false*/, uint
                     if (pOwner->IsTargetableBy(pVictim) && !pOwner->IsFeigningDeathSuccessfully())
                         pVictim->AddThreat(pOwner);
 
-                    pOwner->SetInCombatWithVictim(pVictim, false, combatTimer >= UNIT_PVP_COMBAT_TIMER ? combatTimer : UNIT_PVP_COMBAT_TIMER, false);
+                    // Pass the timer on unchanged, so that the owner is treated exactly like a
+                    // direct attacker of the victim. Forcing UNIT_PVP_COMBAT_TIMER here would
+                    // deny the owner the early clear in SetInCombatState, and since the pet
+                    // refreshes the timer on every hit, the owner would stay in combat for the
+                    // full timer after the pet lands the killing blow on an ordinary creature.
+                    pOwner->SetInCombatWithVictim(pVictim, false, combatTimer, false);
                 }
             }
         }
