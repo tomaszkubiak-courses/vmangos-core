@@ -68,7 +68,6 @@ bool CleanQuestLogAction::Execute(Event& event)
     {
         DropQuestType(requester, totalQuests, MAX_QUEST_LOG_SIZE - 6); //Drop gray/red quests.
         DropQuestType(requester, totalQuests, MAX_QUEST_LOG_SIZE - 6, false, true); //Drop gray/red quests with progress.
-        DropQuestType(requester, totalQuests, MAX_QUEST_LOG_SIZE - 6, false, true, true); //Drop gray/red completed quests.
     }
 
     if (MAX_QUEST_LOG_SIZE - totalQuests > 4)
@@ -81,18 +80,21 @@ bool CleanQuestLogAction::Execute(Event& event)
 
     DropQuestType(requester, totalQuests, MAX_QUEST_LOG_SIZE - 2, true, true); //Drop quests with progress.
 
-    if (MAX_QUEST_LOG_SIZE - totalQuests > 0)
-        return true;
-
-    DropQuestType(requester, totalQuests, MAX_QUEST_LOG_SIZE - 1, true, true, true); //Drop completed quests.
-
-    if (MAX_QUEST_LOG_SIZE - totalQuests > 0)
-        return true;
-
-    return false;
+    // A quest at QUEST_STATUS_COMPLETE is never dropped, and there used to be
+    // one more call here claiming to do exactly that, passing an isComplete flag
+    // that DropQuestType declared and never read. It had no effect and could not
+    // have had one: the loop skips every completed quest unconditionally. Both
+    // the flag and the two calls that set it are gone rather than made to work.
+    //
+    // Made to work they would be the wrong medicine. A completed quest is
+    // finished work with a reward attached, and quest rewards are the only gear
+    // these bots get - 10598 such rows were sitting in bot logs when this was
+    // measured. The answer to a log full of them is to hand them in, which is
+    // what the "can turn in quest nearby" trigger now drives, not to delete them.
+    return MAX_QUEST_LOG_SIZE - totalQuests > 0;
 }
 
-void CleanQuestLogAction::DropQuestType(Player* requester, uint8 &numQuest, uint8 wantNum, bool isGreen, bool hasProgress, bool isComplete)
+void CleanQuestLogAction::DropQuestType(Player* requester, uint8 &numQuest, uint8 wantNum, bool isGreen, bool hasProgress)
 {
     std::vector<uint8> slots;
 

@@ -242,6 +242,7 @@ namespace ai
             creators["in raid fight"] = [](PlayerbotAI* ai) { return new InRaidFightTrigger(ai); };
 
             creators["val"] = [](PlayerbotAI* ai) { return new ValueTrigger(ai); };
+            creators["quest log nearly full"] = [](PlayerbotAI* ai) { return new QuestLogNearlyFullTrigger(ai); };
 
             creators["rpg"] = [](PlayerbotAI* ai) { return new RpgTrigger(ai); };
             creators["rpg wander"] = [](PlayerbotAI* ai) { return new RpgWanderTrigger(ai); };

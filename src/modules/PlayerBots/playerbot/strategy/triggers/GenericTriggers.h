@@ -565,6 +565,19 @@ namespace ai
         virtual bool IsActive() override { name = getQualifier();  return AI_VALUE(bool, getQualifier()); }
     };
 
+    //The quest log is nearly full and the bot cannot accept much more.
+    //Deliberately a trigger rather than a "val::" bool: the check interval is the
+    //throttle. A bot whose log cannot be cleaned - every quest still worth doing -
+    //keeps the condition true indefinitely, and this bounds the futile scan to
+    //once every few seconds rather than once per engine tick.
+    class QuestLogNearlyFullTrigger : public Trigger
+    {
+    public:
+        QuestLogNearlyFullTrigger(PlayerbotAI* ai) : Trigger(ai, "quest log nearly full", 5) {}
+
+        virtual bool IsActive() override { return AI_VALUE(uint8, "free quest log slots") <= 2; }
+    };
+
     class SnareTargetTrigger : public DebuffTrigger
     {
     public:
