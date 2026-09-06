@@ -189,6 +189,16 @@ case the preferred fix is to extend `ScriptCommands` rather than hardcode the co
   carried one before the rule existed; do not add a seventh.
 - `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` is the only Claude-related trailer
   that belongs in a commit.
+- **Never commit this machine's local details either.** No absolute path or directory layout
+  (a Windows drive path, a WSL `/mnt/...` path, anything under the user's home), no machine or
+  account name, no live credential. This covers source, comments, documentation,
+  migration files and commit messages alike. A path in prose cannot be corrected the way a
+  config value can, so it is simply wrong for every other checkout: name the thing by its role
+  ("the server directory", "the client this realm serves"), define that role once, and use the
+  name after that. A public repository slug, a commit hash or an upstream URL is not a local
+  detail and stays. `/doc/local/` is gitignored precisely so local notes have somewhere to
+  live; a clearly generic worked example, like the `C:/vmangos/...` tree in
+  `doc/BUILDING_WINDOWS.md`, is fine because it is not this machine's real layout.
 - Follow the existing message style: an imperative subject line, then wrapped prose that
   explains the problem before the fix.
 
