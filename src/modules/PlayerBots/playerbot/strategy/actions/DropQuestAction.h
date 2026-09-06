@@ -43,7 +43,7 @@ namespace ai
         virtual std::vector<std::string> GetUsedValues() { return {"can fight equal"}; }
 #endif 
 
-        void DropQuestType(Player* requester, uint8& numQuest, uint8 wantNum = 100, bool isGreen = false, bool hasProgress = false, bool isComplete = false);
+        void DropQuestType(Player* requester, uint8& numQuest, uint8 wantNum = 100, bool isGreen = false, bool hasProgress = false);
 
         static bool HasProgress(Player* bot, Quest const* quest);
     };
