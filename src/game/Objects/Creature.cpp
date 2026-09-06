@@ -1164,8 +1164,10 @@ void Creature::RegenerateHealth()
         {
             float HealthIncreaseRate = sWorld.getConfig(CONFIG_FLOAT_RATE_HEALTH);
 
-            addvalue = uint32(GetRegenHPPerSpirit() * HealthIncreaseRate);
-            addvalue *= 4; // The timer ticks every 4 seconds.
+            // GetRegenHPPerSpirit returns the amount regenerated in one player
+            // tick, so scale it to the length of the creature tick.
+            float const tickRatio = float(REGEN_TIME_CREATURE_FULL) / float(REGEN_TIME_PLAYER_FULL);
+            addvalue = uint32(GetRegenHPPerSpirit() * HealthIncreaseRate * tickRatio);
         }
     }
     else
