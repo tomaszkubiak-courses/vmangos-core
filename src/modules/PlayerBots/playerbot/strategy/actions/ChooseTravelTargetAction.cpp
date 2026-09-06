@@ -1234,9 +1234,20 @@ bool RequestNamedTravelTargetAction::Execute(Event& event)
             return false;
         }
 
-        *AI_VALUE(FutureDestinations*, "future travel destinations") = std::async(std::launch::async, [entries = trainerEntries, partitions = travelPartitions, travelInfo = PlayerTravelInfo(bot), center]()
+        // Trainer trips are capped in length. The default ceiling is 10000 yards,
+        // and a trainer is the one destination a bot will always have somewhere
+        // on its continent, so without a cap it accepts an arbitrarily long walk.
+        // Measured over 2h16m with 2005 bots: trainer trips had a median of 403
+        // yards but a 90th percentile of 5674 - roughly twelve minutes unmounted
+        // for one visit, repeated because the trainer purpose is satisfiable
+        // again the moment the bot levels. A trainer beyond this range is not
+        // worth crossing a continent for; failing the fetch lets a nearer purpose
+        // - a quest - take the slot instead.
+        const float maxTrainerTravelDistance = 2000.f;
+
+        *AI_VALUE(FutureDestinations*, "future travel destinations") = std::async(std::launch::async, [entries = trainerEntries, partitions = travelPartitions, travelInfo = PlayerTravelInfo(bot), center, maxTrainerTravelDistance]()
             {
-                return sTravelMgr.GetPartitions(center, partitions, travelInfo, (uint32)TravelDestinationPurpose::Trainer, entries, false);
+                return sTravelMgr.GetPartitions(center, partitions, travelInfo, (uint32)TravelDestinationPurpose::Trainer, entries, false, maxTrainerTravelDistance);
             });
     }
     else if (travelName == "mount")
@@ -1344,15 +1355,24 @@ bool RequestNamedTravelTargetAction::isAllowed() const
         return true;
     else if (name == "guild order")
         return true;
+    // Both gates below read `> 100` and urand(1, 100) never exceeds 100, so
+    // neither ever fired: mount and every trainer purpose were allowed on all
+    // 100% of rolls. TravelStrategy annotates both entries "25%", which is what
+    // they were meant to be. The cost was measured over 2h16m with 2005 bots:
+    // "trainer class" took 4821 of 8365 travel targets, 58% of everything the
+    // population did with its time, against 203 for quests. The trainer purpose
+    // is also permanently satisfiable - "should travel named" is true whenever
+    // anything is trainable and the bot can pay for it - so nothing else throttles
+    // it either.
     else if (name == "mount")
     {
-        if (urand(1, 100) > 100)
+        if (urand(1, 100) > 25)
             return false;
         return true;
     }
     else if (name.find("trainer") == 0)
     {
-        if (urand(1, 100) > 100)
+        if (urand(1, 100) > 25)
             return false;
         return true;
     }
