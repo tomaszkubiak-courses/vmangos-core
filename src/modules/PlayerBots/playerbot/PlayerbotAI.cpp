@@ -5100,6 +5100,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
         if (IsJumping() || bot->IsFalling())
         {
             spell->cancel();
+            delete spell;
             return false;
         }
 
@@ -5114,6 +5115,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
             }
 
             spell->cancel();
+            delete spell;
             return false;
         }
     }
@@ -5301,6 +5303,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, GameObject* goTarget, Item* itemTarg
         if (IsJumping() || bot->IsFalling())
         {
             spell->cancel();
+            delete spell;
             return false;
         }
 
@@ -5315,6 +5318,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, GameObject* goTarget, Item* itemTarg
             }
 
             spell->cancel();
+            delete spell;
             return false;
         }
     }
@@ -5425,12 +5429,14 @@ bool PlayerbotAI::CastSpell(uint32 spellId, float x, float y, float z, Item* ite
     }
     else
     {
+        delete spell;
         return false;
     }
 
     if (pSpellInfo->Effect[0] == SPELL_EFFECT_OPEN_LOCK ||
         pSpellInfo->Effect[0] == SPELL_EFFECT_SKINNING)
     {
+        delete spell;
         return false;
     }
 
@@ -5441,6 +5447,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, float x, float y, float z, Item* ite
         if (IsJumping() || bot->IsFalling())
         {
             spell->cancel();
+            delete spell;
             return false;
         }
 
@@ -5455,6 +5462,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, float x, float y, float z, Item* ite
             }
 
             spell->cancel();
+            delete spell;
             return false;
         }
     }
@@ -5730,7 +5738,10 @@ bool PlayerbotAI::CastVehicleSpell(uint32 spellId, Unit* target, float projectil
         else if (siegePos.isSet())
             dest = WorldLocation(bot->GetMapId(), siegePos.x + frand(-5.0f, 5.0f), siegePos.y + frand(-5.0f, 5.0f), siegePos.z, 0.0f);
         else
+        {
+            delete spell;
             return false;
+        }
 
         targets.setDestination(dest.x, dest.y, dest.z);
         targets.setSpeed(projectileSpeed);
