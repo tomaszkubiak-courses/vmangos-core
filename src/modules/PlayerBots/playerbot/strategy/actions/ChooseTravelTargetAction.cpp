@@ -355,6 +355,15 @@ bool ChooseTravelTargetAction::SetBestTarget(Player* requester, TravelTarget* ta
                 continue;
             }
 
+            // Somewhere this bot has repeatedly given up on reaching. Without this the bot
+            // picks it again the instant the last trip ends, which is how one rogue spent a
+            // whole nine hour run re-choosing the same cross-continent trip 106 times.
+            if (!target->IsForced() && position && ai->IsFailedTravelPoint(*position))
+            {
+                ai->TellDebug(requester, "Skipping " + destination->GetTitle() + " - never got there before", "debug travel");
+                continue;
+            }
+
             if (distanceCheck) //Check if we have moved significantly after getting the destinations.
             {
                 WorldPosition center(requester ? requester : bot);

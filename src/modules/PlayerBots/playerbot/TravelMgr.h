@@ -399,8 +399,11 @@ namespace ai
 	private:
 		uint32 GetMaxTravelTime() const { return (1000.0 * Distance(bot)) / bot->GetSpeed(MOVE_RUN); }
 
-		//Writes the closing travel_map.csv row for a trip that is ending. See the
-		//definition for which transitions count as which outcome.
+		//Closes a trip that is ending: tells the bot whether the destination was
+		//reached, so an unreachable one stops being picked, then writes the
+		//travel_map.csv row. See the definitions for which transitions count as
+		//which outcome.
+		void EndTrip(char const* outcome);
 		void LogTravelOutcome(char const* outcome);
 
 		TravelStatus m_status = TravelStatus::TRAVEL_STATUS_NONE;
