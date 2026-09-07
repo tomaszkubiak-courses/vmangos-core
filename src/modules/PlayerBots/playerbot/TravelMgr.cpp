@@ -971,6 +971,23 @@ uint32 TravelTarget::GetMaxTravelTime() const
 // bot next to the thing it wanted.
 void TravelTarget::EndTrip(char const* outcome)
 {
+    // A target sitting in READY was chosen but never departed, because nothing has called
+    // MoveToTravelTargetAction on it yet - it is the state every new target rests in. Both
+    // this and LogTravelOutcome used to return here for anything but TRAVEL, so replacing a
+    // target in that state closed the trip without a word: of 13555 journeys started in a ten
+    // hour run only 5520 ever produced a closing row, and the missing 8035 were invisible to
+    // travel_map.csv entirely. That is not a rounding error in the arrival rate, it is 59% of
+    // the denominator, so no measurement of travel could be trusted.
+    //
+    // Report those, but under their own outcome. "abandoned" carries a meaning the other
+    // branches rely on - the bot set out and gave up - and a target that never left the
+    // starting line has said nothing about whether the destination was any good.
+    if (m_status == TravelStatus::TRAVEL_STATUS_READY)
+    {
+        LogTravelOutcome("replaced");
+        return;
+    }
+
     if (m_status != TravelStatus::TRAVEL_STATUS_TRAVEL)
         return;
 
@@ -1003,7 +1020,8 @@ void TravelTarget::EndTrip(char const* outcome)
 // with the state replaced by the outcome and the elapsed time filled in.
 void TravelTarget::LogTravelOutcome(char const* outcome)
 {
-    if (m_status != TravelStatus::TRAVEL_STATUS_TRAVEL)
+    //READY is here for the "replaced" row EndTrip writes; see the note there.
+    if (m_status != TravelStatus::TRAVEL_STATUS_TRAVEL && m_status != TravelStatus::TRAVEL_STATUS_READY)
         return;
 
     if (!tDestination || typeid(*tDestination) == typeid(NullTravelDestination))
