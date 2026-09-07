@@ -13,6 +13,9 @@ namespace ai
     class WorldPointSquare
     {
     public:
+        //Squares are held and deleted through base pointers, so the destructor has to be virtual.
+        virtual ~WorldPointSquare() = default;
+
         virtual bool IsIn(const WorldPosition& point) const {
             return point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y;
         }
