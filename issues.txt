@@ -1,0 +1,13 @@
+1a. check if mentioned below creatures are related to any quest:
+Makasgar
+Hagg Taurenbane
+Rocklance
+Morridune
+Samantha Swifthoof
+Grel'borg the Miser
+1b. some of them are connected to quests in tortoise-wow, but not sure which one. and also some specific to tortoise-wow mechanics might be involved in them. please check.
+1c. maybe you have a suggestion how to use them? add them as a quest creatures?
+2. quest: Egg Hunt
+when Sillithid Mound gets triggered, only one creature has spawned (or none). check if it's correct
+3. creatures in Loch Modan have pretty high chances of dropping: Stonesplinter Axe. check if it's correct
+4. Fix COMMANDS.md - add description what commands do. now there is a list of commands and example of usage. yet there is no description

@@ -181,12 +181,27 @@ bool AttackAction::Attack(Player* requester, Unit* target)
         // Don't attack target if it is waiting for attack or in stealth
         if (!ai->HasStrategy("stealthed", BotState::BOT_STATE_COMBAT) && !isWaitingForAttack)
         {
+            bool const meleeAttack = !ai->IsRanged(bot) || (sServerFacade.GetDistance2d(bot, target) < 5.0f);
+
+            // Unit::Attack answers false when the bot is already attacking this same victim
+            // in this same way - there is nothing left for it to change. That is success as
+            // far as this action is concerned, but it used to be reported as failure, which
+            // meant the action was logged as failing on every tick of every fight (2359651
+            // of 2361259 executions of "melee" in a nine and a half hour run), the
+            // continuers were never run, and the engine pushed the alternatives at a higher
+            // relevance instead of settling - so an engaged bot churned through its whole
+            // action set once per tick.
+            bool const alreadyEngaged = bot->GetVictim() == target && (!meleeAttack || bot->HasUnitState(UNIT_STATE_MELEE_ATTACKING));
+
             ai->PlayAttackEmote(1);
-            result = bot->Attack(target, !ai->IsRanged(bot) || (sServerFacade.GetDistance2d(bot, target) < 5.0f));
+            result = bot->Attack(target, meleeAttack);
             SC_LOG("attack-cmd bot->Attack bot=%s tgt=%s result=%d",
                    bot ? bot->GetName() : "(null)",
                    target ? target->GetName() : "(null)",
                    (int)result);
+
+            if (!result && alreadyEngaged)
+                result = true;
         }
         else
         {
