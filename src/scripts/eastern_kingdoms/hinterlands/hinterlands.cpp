@@ -234,6 +234,15 @@ enum LardsPicnicBasketData
     NPC_KIDNAPPEUR_VILEBRANCH     = 14748
 };
 
+// The kidnappers do not appear on top of the player, they close in from three
+// fixed points around the basket.
+static float const lardsPicnicBasketSpawns[3][4] =
+{
+    { 421.357f, -4806.02f, 11.9855f, 3.12414f },
+    { 399.936f, -4824.07f,  9.13856f, 5.39307f },
+    { 378.172f, -4784.85f, -2.44194f, 4.29351f }
+};
+
 struct go_lards_picnic_basketAI: public GameObjectAI
 {
     go_lards_picnic_basketAI(GameObject* pGo) : GameObjectAI(pGo)
@@ -287,8 +296,8 @@ bool GOHello_go_lards_picnic_basket(Player* pPlayer, GameObject* pGO)
             if (pMarkAI->CheckCanStartEvent())
             {
                 pMarkAI->SetInUse();
-                for (int i = 0; i < 3; ++i)
-                    pPlayer->SummonCreature(NPC_KIDNAPPEUR_VILEBRANCH, pPlayer->GetPositionX(), pPlayer->GetPositionY(), pPlayer->GetPositionZ(), 0, TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 30000);
+                for (auto const& position : lardsPicnicBasketSpawns)
+                    pPlayer->SummonCreature(NPC_KIDNAPPEUR_VILEBRANCH, position[0], position[1], position[2], position[3], TEMPSUMMON_TIMED_OR_DEAD_DESPAWN, 30000);
             }
         }
     }
