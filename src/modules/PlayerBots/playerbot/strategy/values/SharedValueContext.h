@@ -49,15 +49,12 @@ namespace ai
     class SharedObjectContext
     {
     public:
-        SharedObjectContext() { valueContexts.Add(new SharedValueContext()); };
+        SharedObjectContext() : placeholderAi(new PlayerbotAI()) { valueContexts.Add(new SharedValueContext()); };
 
     public:
         virtual UntypedValue* GetUntypedValue(const std::string& name)
         {
-            PlayerbotAI* ai = new PlayerbotAI();
-            UntypedValue* value = valueContexts.GetObject(name, ai);
-            delete ai;
-            return value;
+            return valueContexts.GetObject(name, placeholderAi);
         }
 
         template<class T>
@@ -80,6 +77,14 @@ namespace ai
         }
     protected:
         NamedObjectContextList<UntypedValue> valueContexts;
+
+        // Shared values belong to no bot, but every Value stores the PlayerbotAI it was
+        // constructed with and dereferences it later - SingleCalculatedValue::Get passes it
+        // to PerformanceMonitor::start on the first Get. This bot-less placeholder therefore
+        // has to outlive the values, which live as long as the context. It is deliberately
+        // never deleted: the context is a singleton and the values it owns are torn down at
+        // static destruction time in no defined order.
+        PlayerbotAI* placeholderAi;
     };
 #define sSharedObjectContext MaNGOS::Singleton<SharedObjectContext>::Instance()
 }
