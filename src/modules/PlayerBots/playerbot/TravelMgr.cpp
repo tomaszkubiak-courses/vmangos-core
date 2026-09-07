@@ -925,7 +925,7 @@ void TravelTarget::SetStatus(TravelStatus status) {
         statusTime = HOUR *  1000;
         break;
     case TravelStatus::TRAVEL_STATUS_TRAVEL:
-        statusTime = GetMaxTravelTime() * 2 + sPlayerbotAIConfig.maxWaitForMove;
+        statusTime = std::max<uint32>(GetMaxTravelTime() + sPlayerbotAIConfig.maxWaitForMove, sPlayerbotAIConfig.travelTimeMinimum);
         break;
     case TravelStatus::TRAVEL_STATUS_WORK:
         statusTime = tDestination->GetExpireDelay();
@@ -934,6 +934,33 @@ void TravelTarget::SetStatus(TravelStatus status) {
         statusTime = tDestination->GetCooldownDelay();
     default: break;
     }
+}
+
+// The budget for a journey used to be twice the straight-line distance at run speed. A
+// straight line is not what a bot walks: terrain, water and the travel node graph all make
+// the real path longer, and the bot fights, loots, dies and corpse runs on the way, so twice
+// was not enough slack. It also said nothing about a trip that changes maps, where most of
+// the time is spent standing on a dock waiting for a boat that no distance can express.
+// Trips expiring short of the target was the second largest travel failure in a nine and a
+// half hour run: 10140 of 61550, with a mean of 1461 yards still to go.
+uint32 TravelTarget::GetMaxTravelTime() const
+{
+    float const distance = Distance(bot);
+
+    //Nothing to budget for: CheckStatus expires an unroutable target outright.
+    if (!std::isfinite(distance))
+        return 0;
+
+    float speed = bot->GetSpeed(MOVE_RUN);
+    if (speed <= 0.0f)
+        speed = 7.0f;
+
+    uint32 time = uint32((1000.0f * distance * sPlayerbotAIConfig.travelTimeSlack) / speed);
+
+    if (wPosition && wPosition->getMapId() != bot->GetMapId())
+        time += sPlayerbotAIConfig.travelMapTransferTime;
+
+    return time;
 }
 
 // A trip that ends anywhere but at the destination is the only evidence the bot has that a
