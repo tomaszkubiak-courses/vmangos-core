@@ -2,6 +2,7 @@
 #include <numeric>
 #include <iomanip>
 #include <cstring>
+#include <cmath>
 
 #include "playerbot/strategy/values/SharedValueContext.h"
 #include "playerbot/strategy/values/TravelValues.h"
@@ -953,9 +954,14 @@ void TravelTarget::EndTrip(char const* outcome)
     {
         bool const arrived = !strcmp(outcome, "arrived");
 
+        float const left = wPosition->distance(WorldPosition(bot));
+
         if (arrived)
             ai->RememberReachedTravelPoint(*wPosition);
-        else if (wPosition->distance(WorldPosition(bot)) > 100.0f)
+        //A destination that is no longer routable at all is not evidence about the
+        //destination - the bot changed maps under it, and it will be routable again
+        //as soon as the bot is back on a continent.
+        else if (std::isfinite(left) && left > 100.0f)
             ai->RememberFailedTravelPoint(*wPosition);
     }
 
@@ -1087,6 +1093,20 @@ void TravelTarget::CheckStatus()
     if (statusTime != 0 && GetTimeLeft() <= 0 && !IsForced())
     {
         ai->TellDebug(ai->GetMaster(), "Travel target expired because the status time was exceeded.", "debug travel");
+        SetStatus(TravelStatus::TRAVEL_STATUS_EXPIRED);
+        ai->GetAiObjectContext()->ClearValues("no active travel destinations");
+        return;
+    }
+
+    // The destination was routable when it was picked, and the bot has since changed maps -
+    // taken into a battleground, usually. WorldPosition::distance answers FLT_MAX for a map
+    // pair with no known transfer, so the trip cannot progress, but nothing noticed: it sat
+    // on a target it could not move towards until the clock ran out, and the clock is
+    // derived from that same infinite distance. 524 trips in a nine and a half hour run
+    // closed with an unreachable destination still attached.
+    if (m_status == TravelStatus::TRAVEL_STATUS_TRAVEL && wPosition && !IsForced() && !std::isfinite(Distance(bot)))
+    {
+        ai->TellDebug(ai->GetMaster(), "Travel target expired because the destination is no longer reachable from here.", "debug travel");
         SetStatus(TravelStatus::TRAVEL_STATUS_EXPIRED);
         ai->GetAiObjectContext()->ClearValues("no active travel destinations");
         return;

@@ -364,6 +364,18 @@ bool ChooseTravelTargetAction::SetBestTarget(Player* requester, TravelTarget* ta
                 continue;
             }
 
+            // Inside a dungeon the bot is not in. A map transfer exists for the portal, so
+            // the distance comes back finite and the destination ranks like any other, but
+            // nothing here walks a bot through an instance portal as a leg of a journey and
+            // the dungeon strategies are not attached to any engine in this port. Bots were
+            // being sent to a quest giver inside Uldaman and an NPC inside Gnomeregan, and
+            // retried it for the length of the run without once arriving.
+            if (!target->IsForced() && position && position->isInstance() && position->getMapId() != bot->GetMapId())
+            {
+                ai->TellDebug(requester, "Skipping " + destination->GetTitle() + " - inside an instance we are not in", "debug travel");
+                continue;
+            }
+
             if (distanceCheck) //Check if we have moved significantly after getting the destinations.
             {
                 WorldPosition center(requester ? requester : bot);
