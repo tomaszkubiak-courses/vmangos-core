@@ -509,7 +509,13 @@ bool PlayerbotAIConfig::Initialize()
 		    if (count >= 0 && !factory.isAvailableRace(cls, race))
 		        sLog.outError("AiPlayerbot.ClassRaceProb.%u.%u asks for %d bots, but that class cannot be that race. Ignoring it.",
 		            cls, race, count);
-		    else if (count >= 0)
+		    // A zero is the natural way to write "none of these", and it used to be
+		    // stored as one. CreateRandomBots then kept the entry in its remaining
+		    // map, created a bot for it anyway and decremented the count through
+		    // zero - a uint32, so it wrapped to 4294967295 and the combination was
+		    // never erased. The account loop then ran until every character slot on
+		    // every random bot account was full of whatever race the zero named.
+		    else if (count > 0)
 		    {
 		        fixedClassRaceCounts[{cls, race}] = count;
 		    }
