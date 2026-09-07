@@ -981,6 +981,20 @@ AiPlayerbot.GlobalCooldown = 1500
 # Max wait time when moving
 #AiPlayerbot.MaxWaitForMove = 5000
 
+# How much longer than the straight-line run at run speed a bot may take to reach a travel
+# destination before the trip expires. The estimate is a straight line, so it is always
+# shorter than the path actually walked, and the bot fights, loots and dies along the way.
+# (Default 4)
+#AiPlayerbot.TravelTimeSlack = 4
+
+# Extra time allowed, in milliseconds, for a trip that ends on a different map than it
+# started on. No distance accounts for standing on a dock waiting for a boat. (Default 240000)
+#AiPlayerbot.TravelMapTransferTime = 240000
+
+# Shortest time, in milliseconds, any trip is given regardless of how close the destination
+# is, so a bot can path around an obstacle instead of expiring on the spot. (Default 60000)
+#AiPlayerbot.TravelTimeMinimum = 60000
+
 # Delay between two bot actions (default 100)
 AiPlayerbot.ReactDelay = 100
 

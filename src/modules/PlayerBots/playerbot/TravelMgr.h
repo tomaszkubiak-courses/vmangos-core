@@ -397,7 +397,9 @@ namespace ai
 		void SetPurposeName(std::string const& name) { purposeName = name; }
 		std::string const& GetPurposeName() const { return purposeName; }
 	private:
-		uint32 GetMaxTravelTime() const { return (1000.0 * Distance(bot)) / bot->GetSpeed(MOVE_RUN); }
+		//How long the journey ahead should reasonably take. See the definition: the
+		//distance behind it is a straight line, so the answer needs slack.
+		uint32 GetMaxTravelTime() const;
 
 		//Closes a trip that is ending: tells the bot whether the destination was
 		//reached, so an unreachable one stops being picked, then writes the
