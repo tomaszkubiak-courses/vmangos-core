@@ -3087,6 +3087,89 @@ bool PlayerbotAI::IsDeadlyTravelPoint(WorldPosition const& position) const
     return false;
 }
 
+// A destination counts as unreachable once the bot has given up on it this many times without
+// a long gap in between, and is then left alone for this long. The radius has to be wider than
+// the deadly one: a death happens at a point on the way, while a failure is recorded against
+// the destination itself, and the same quest giver is offered at slightly different positions
+// depending on which spawn of it the travel system picked.
+static uint32 const failedTravelPointFailures = 4;
+static uint32 const failedTravelPointForget = 30 * MINUTE;
+static uint32 const failedTravelPointBan = 2 * HOUR;
+static float const failedTravelPointRadius = 60.0f;
+static size_t const failedTravelPointMax = 32;
+
+void PlayerbotAI::RememberFailedTravelPoint(WorldPosition const& position)
+{
+    time_t const now = time(nullptr);
+
+    for (auto& point : m_failedTravelPoints)
+    {
+        if (point.position.getMapId() != position.getMapId() || point.position.distance(position) > failedTravelPointRadius)
+            continue;
+
+        // A failure long after the last one says the place is reachable and the bot was just
+        // interrupted, so start counting again rather than adding to an old tally.
+        point.failures = (now > point.lastFailure + failedTravelPointForget) ? 1 : point.failures + 1;
+        point.lastFailure = now;
+        return;
+    }
+
+    if (m_failedTravelPoints.size() >= failedTravelPointMax)
+    {
+        auto oldest = m_failedTravelPoints.begin();
+        for (auto it = m_failedTravelPoints.begin(); it != m_failedTravelPoints.end(); ++it)
+        {
+            if (it->lastFailure < oldest->lastFailure)
+                oldest = it;
+        }
+
+        m_failedTravelPoints.erase(oldest);
+    }
+
+    FailedTravelPoint point;
+    point.position = position;
+    point.lastFailure = now;
+    point.failures = 1;
+    m_failedTravelPoints.push_back(point);
+}
+
+// Getting there is proof the place was never the problem, so the tally goes away entirely
+// rather than decaying - otherwise a destination the bot visits on every pass slowly
+// accumulates the interruptions of a whole session and bans itself.
+void PlayerbotAI::RememberReachedTravelPoint(WorldPosition const& position)
+{
+    for (auto it = m_failedTravelPoints.begin(); it != m_failedTravelPoints.end(); ++it)
+    {
+        if (it->position.getMapId() != position.getMapId() || it->position.distance(position) > failedTravelPointRadius)
+            continue;
+
+        m_failedTravelPoints.erase(it);
+        return;
+    }
+}
+
+bool PlayerbotAI::IsFailedTravelPoint(WorldPosition const& position) const
+{
+    time_t const now = time(nullptr);
+
+    for (auto const& point : m_failedTravelPoints)
+    {
+        if (point.failures < failedTravelPointFailures)
+            continue;
+
+        if (now > point.lastFailure + failedTravelPointBan)
+            continue;
+
+        if (point.position.getMapId() != position.getMapId())
+            continue;
+
+        if (point.position.distance(position) <= failedTravelPointRadius)
+            return true;
+    }
+
+    return false;
+}
+
 bool PlayerbotAI::RecentlyDroppedQuest(uint32 questId) const
 {
     // Six hours is long enough that a bot cleaning its log gets on with something else, and

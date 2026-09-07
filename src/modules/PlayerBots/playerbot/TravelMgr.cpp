@@ -1,6 +1,7 @@
 #include "playerbot/TravelMgr.h"
 #include <numeric>
 #include <iomanip>
+#include <cstring>
 
 #include "playerbot/strategy/values/SharedValueContext.h"
 #include "playerbot/strategy/values/TravelValues.h"
@@ -876,7 +877,7 @@ void TravelTarget::SetTarget(TravelDestination* tDestination1, WorldPosition* wP
     //A trip being replaced mid-walk ends here rather than in SetStatus, which
     //only sees the destination that has already overwritten it.
     if (tDestination1 != tDestination)
-        LogTravelOutcome("abandoned");
+        EndTrip("abandoned");
 
     if (dynamic_cast<TemporaryTravelDestination*>(tDestination) && tDestination1 != tDestination)
         delete tDestination;
@@ -902,7 +903,7 @@ void TravelTarget::SetStatus(TravelStatus status) {
     //is bookkeeping rather than a trip that ended.
     if (m_status == TravelStatus::TRAVEL_STATUS_TRAVEL && status != TravelStatus::TRAVEL_STATUS_TRAVEL && status != TravelStatus::TRAVEL_STATUS_READY)
     {
-        LogTravelOutcome(
+        EndTrip(
             status == TravelStatus::TRAVEL_STATUS_WORK ? "arrived" :
             status == TravelStatus::TRAVEL_STATUS_EXPIRED ? "expired" : "abandoned");
     }
@@ -932,6 +933,33 @@ void TravelTarget::SetStatus(TravelStatus status) {
         statusTime = tDestination->GetCooldownDelay();
     default: break;
     }
+}
+
+// A trip that ends anywhere but at the destination is the only evidence the bot has that a
+// place is not worth aiming at, and until this ran the evidence was thrown away: the same
+// destination was simply picked again. Only a trip that ended far from the target counts
+// against it - one that ended on the doorstep failed for some other reason, usually the
+// quest or the condition behind it going inactive, and banning the doorstep would strand the
+// bot next to the thing it wanted.
+void TravelTarget::EndTrip(char const* outcome)
+{
+    if (m_status != TravelStatus::TRAVEL_STATUS_TRAVEL)
+        return;
+
+    if (!tDestination || typeid(*tDestination) == typeid(NullTravelDestination))
+        return;
+
+    if (wPosition && *wPosition)
+    {
+        bool const arrived = !strcmp(outcome, "arrived");
+
+        if (arrived)
+            ai->RememberReachedTravelPoint(*wPosition);
+        else if (wPosition->distance(WorldPosition(bot)) > 100.0f)
+            ai->RememberFailedTravelPoint(*wPosition);
+    }
+
+    LogTravelOutcome(outcome);
 }
 
 // travel_map.csv used to hold one row per target chosen, with a state column that

@@ -418,6 +418,14 @@ public:
     // the same fishing spot.
     void RememberDeadlyTravelPoint(WorldPosition const& position);
     bool IsDeadlyTravelPoint(WorldPosition const& position) const;
+    // Travel points this bot has failed to reach. Nothing used to penalise a destination for
+    // being unreachable, so the same one was picked again the moment the trip ended: in a
+    // nine and a half hour run 61 bot/destination pairs were retried twenty times or more,
+    // the worst 106 times, and only 3.1% of all trips ever arrived. Two of those bots were
+    // aiming at an NPC inside Uldaman and one at an NPC inside Gnomeregan.
+    void RememberFailedTravelPoint(WorldPosition const& position);
+    void RememberReachedTravelPoint(WorldPosition const& position);
+    bool IsFailedTravelPoint(WorldPosition const& position) const;
     std::vector<const Quest*> GetAllCurrentQuests();
     std::vector<const Quest*> GetCurrentIncompleteQuests();
     std::set<uint32> GetAllCurrentQuestIds();
@@ -863,6 +871,15 @@ protected:
         uint32 deaths = 0;
     };
     std::vector<DeadlyTravelPoint> m_deadlyTravelPoints;
+
+    // Places this bot gave up on reaching. See RememberFailedTravelPoint().
+    struct FailedTravelPoint
+    {
+        WorldPosition position;
+        time_t lastFailure = 0;
+        uint32 failures = 0;
+    };
+    std::vector<FailedTravelPoint> m_failedTravelPoints;
     bool m_recordMessages = false;
     bool m_recordIncommingMessages = false;
     std::vector<std::string> m_recordedMessages;
