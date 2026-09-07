@@ -46,6 +46,14 @@ Notable CMake options (the full list is printed at configure time by `cmake/show
   includes: a change relying on a header pulled in transitively through the PCH only fails there.
 - `MYSQL_ROOT_DIR` (empty, Windows only) — path to an external MySQL client library, laid out like
   a Connector/C package (`include/mysql.h`, `lib/libmysql.lib`). Overrides the vendored client.
+- `ENABLE_ASAN` (OFF) — AddressSanitizer. A diagnostic build: it stops the process at a use-after-free,
+  heap overflow or double free and prints the faulting, allocating and freeing stacks, at roughly 2x
+  run time and 2-3x memory. It sets the sanitizer flag globally rather than through `mangos_target_flags`,
+  because the MSVC standard library annotates `std::vector` and `std::string` buffers when it is on and
+  a translation unit built without the flag then reports container overflows that are not real; the
+  in-tree dependencies under `dep/` are instrumented for the same reason. On Windows the toolset's
+  `clang_rt.asan_dynamic-x86_64.dll` is installed next to the binaries — without it the executables do
+  not start. Leak detection is the Linux half of ASan only; the MSVC runtime does not ship it.
 
 Upstream CI used to build every supported client build (5875, 5464, 5302, 5086, 4878, 4695, 4544,
 4449, 4375) across Ubuntu GCC/Clang, macOS, Windows MSVC and MinGW. Those workflows are gone here,

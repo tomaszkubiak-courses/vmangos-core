@@ -79,6 +79,12 @@ else()
   message(STATUS "Cpptrace enabled      : No")
 endif()
 
+if(ENABLE_ASAN)
+  message(STATUS "AddressSanitizer      : Yes")
+else()
+  message(STATUS "AddressSanitizer      : No (default)")
+endif()
+
 if(UNIX)
   if(DEBUG_SYMBOLS)
     message(STATUS "Debug symbols         : Included")

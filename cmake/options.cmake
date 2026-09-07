@@ -8,6 +8,7 @@ option(BUILD_REALMMERGE               "Build helper tool for merging character d
 option(BUILD_PLAYERBOTS               "Build the playerbots module"                                                                    OFF)
 option(ENABLE_MAILSENDER              "Enables support for sending emails via sendgrid.com (requires libcurl)"                        OFF)
 option(ENABLE_CPPTRACE                "Enables cpptrace stack tracing; can be disabled if using other tools like GDB"                 ON)
+option(ENABLE_ASAN                    "Build with AddressSanitizer, a diagnostic build that traps memory errors at the access"         OFF)
 
 if(USE_EXTRACTORS)
   message(WARNING "USE_EXTRACTORS is deprecated, please use BUILD_EXTRACTORS instead")
@@ -83,6 +84,7 @@ message(STATUS
     SUPPORTED_CLIENT_BUILD    Client version the core will support
     MYSQL_ROOT_DIR            Windows only: path to an external MySQL client library
     ENABLE_CPPTRACE           Enables cpptrace stack tracing; can be disabled if using other tools like GDB
+    ENABLE_ASAN               Build with AddressSanitizer (diagnostic build; roughly 2x slower and 2-3x the memory)
 
 
   To set an option simply type -D<OPTION>=<VALUE> after 'cmake <srcs>'.
