@@ -225,6 +225,8 @@ if(${CMAKE_VERSION} VERSION_LESS "3.16")
   endif()
 endif()
 
+include(cmake/sanitizers.cmake)
+
 include(cmake/showoptions.cmake)
 
 set(DEFINITIONS_RELEASE ${DEFINITIONS_RELEASE} NDEBUG)
