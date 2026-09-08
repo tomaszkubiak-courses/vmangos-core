@@ -1021,7 +1021,7 @@ struct instance_blackrock_depths : ScriptedInstance
             case TYPE_VAULT:
                 return m_auiEncounter[1];
             case TYPE_ROCKNOT:
-                if (m_auiEncounter[2] == IN_PROGRESS && m_uiBarAleCount == 3)
+                if (m_auiEncounter[2] == IN_PROGRESS && m_uiBarAleCount >= ROCKNOT_ALE_TURN_INS)
                     return SPECIAL;
                 else
                     return m_auiEncounter[2];

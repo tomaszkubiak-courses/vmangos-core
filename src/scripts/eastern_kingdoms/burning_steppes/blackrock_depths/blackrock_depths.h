@@ -122,6 +122,10 @@ enum
     NPC_GRIM_PATRON            = 9545,
     NPC_HAMMERED_PATRON        = 9554,
 
+    // Rocknot smashes the ale barrel once quest 4295 has been turned in this many
+    // times. The quest takes two Dark Iron Ale Mugs each, so ten mugs in total.
+    ROCKNOT_ALE_TURN_INS       = 5,
+
     PATRON_EMOTE               = 0,
     PATRON_PISSED              = 1,
     PATRON_HOSTILE             = 2,
