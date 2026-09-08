@@ -723,7 +723,19 @@ void RandomPlayerbotFactory::CreateRandomBots()
             } while (results->NextRow());
         }
 
-        CharacterDatabase.Execute("DELETE FROM ai_playerbot_random_bots WHERE bot NOT IN (SELECT guid FROM characters)");
+        // Direct, not queued: RandomPlayerbotMgr::GetBots() reads these rows a few seconds
+        // later on the same thread to rebuild the rotation, and an async delete is not
+        // guaranteed to have run by then - the rows just orphaned by the wipe above would
+        // then be taken for live bots.
+        CharacterDatabase.DirectExecute("DELETE FROM ai_playerbot_random_bots WHERE bot NOT IN (SELECT guid FROM characters)");
+
+        // A scheduled wipe is a one-shot. The row only ever went away because the
+        // orphan cleanup above happens to match it, which holds solely while its `bot`
+        // column names no live character - write one that does and the server wipes its
+        // whole bot population on every startup from then on. Retire it explicitly.
+        if (delAccs)
+            CharacterDatabase.DirectExecute("DELETE FROM ai_playerbot_random_bots WHERE event = 'bot_delete'");
+
         sLog.outString("Random bot characters deleted");
     }
 

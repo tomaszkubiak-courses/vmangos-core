@@ -161,6 +161,10 @@ public:
         static InventoryResult CanEquipUnseenItem(Player* player, uint8 slot, uint16& dest, uint32 item);
 
         bool AddRandomBot(uint32 bot);
+        // Forget a character the login path refused: clears its rotation events and
+        // takes it out of currentBots, so the population counter frees the slot and a
+        // character that can actually log in is picked instead.
+        void DropUnloginableBot(uint32 bot);
         bool CreateRandomBot(const std::string& name, uint8 race, uint8 cls, uint32 level);
         bool DeleteRandomBot(ObjectGuid guid);
         virtual void MovePlayerBot(uint32 guid, PlayerbotHolder* newHolder) override;
