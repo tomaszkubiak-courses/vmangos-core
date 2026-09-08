@@ -17,7 +17,7 @@
 /* ScriptData
 SDName: Boss_Tomb_Of_Seven
 SD%Complete: 90
-SDComment: Learning Smelt Dark Iron if tribute quest rewarded. Basic event implemented. Correct order and timing of event is unknown.
+SDComment: Learning Smelt Dark Iron if tribute quest rewarded. The seven are called out one at a time, each on the death of the one before it.
 SDCategory: Blackrock Depths
 EndScriptData */
 
@@ -35,7 +35,10 @@ enum
     SPELL_DEMONARMOR                    = 13787,
     SPELL_SUMMON_VOIDWALKERS            = 15092,
 
-    MAX_DWARF                           = 7
+    MAX_DWARF                           = 7,
+
+    // Pause between one dwarf dying and the next one stepping up.
+    DELAY_NEXT_DWARF                    = 3000
 };
 
 struct boss_doomrelAI : public ScriptedAI
@@ -142,15 +145,27 @@ struct boss_doomrelAI : public ScriptedAI
             {
                 if (m_uiDwarfRound < MAX_DWARF)
                 {
-                    if (m_uiCallToFight_Timer < diff)
+                    // The seven step up one at a time: the next only turns hostile once
+                    // the one before it is dead, so the party never faces two at once.
+                    bool bPreviousDwarfDown = true;
+                    if (m_uiDwarfRound > 0)
                     {
-                        CallToFight(true);
-                        ++m_uiDwarfRound;
-                        m_uiCallToFight_Timer = 30000;
-                        m_uiWipeCheck_Timer = 25000;
+                        Creature* pPrevious = GetDwarfForPhase(m_uiDwarfRound - 1);
+                        bPreviousDwarfDown = !pPrevious || !pPrevious->IsAlive();
                     }
-                    else
-                        m_uiCallToFight_Timer -= diff;
+
+                    if (bPreviousDwarfDown)
+                    {
+                        if (m_uiCallToFight_Timer < diff)
+                        {
+                            CallToFight(true);
+                            ++m_uiDwarfRound;
+                            m_uiCallToFight_Timer = DELAY_NEXT_DWARF;
+                            m_uiWipeCheck_Timer = 25000;
+                        }
+                        else
+                            m_uiCallToFight_Timer -= diff;
+                    }
 
                     if (m_uiWipeCheck_Timer < diff)
                     {
