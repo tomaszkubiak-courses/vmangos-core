@@ -51,10 +51,10 @@ namespace {
     std::map<SqlQueryHolder*, PendingBotLogin> m_pendingBotLogins;
 }
 
-void PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
+bool PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
 {
     if (!sPlayerbotAIConfig.enabled)
-        return;
+        return false;
 
     ObjectGuid botGuid(HIGHGUID_PLAYER, guidLow);
 
@@ -63,7 +63,7 @@ void PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
     if (!botAccountId)
     {
         sLog.outError("[PlayerBots] AddPlayerBot: no account for guid %u", guidLow);
-        return;
+        return false;
     }
 
     // 2. If the bot character is already in world, just attach AI (idempotent).
@@ -72,7 +72,7 @@ void PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
     {
         SC_LOG("AddPlayerBot guid=%u — already in-world, attaching via OnBotLogin", guidLow);
         OnBotLogin(existing);
-        return;
+        return true;
     }
 
     // 2b. ghost-online guard.
@@ -119,14 +119,14 @@ void PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
         {
             SC_LOG("AddPlayerBot guid=%u — ghost recovered after ACK, attaching", guidLow);
             OnBotLogin(ghost);
-            return;
+            return true;
         }
         else
         {
             sLog.outError("[PlayerBots] AddPlayerBot: bot %u is in HashMapHolder but not in world and not "
                           "mid-teleport — refusing to retry login (would cause [CRASH] kick). Use `.bot remove` "
                           "or restart the server to recover.", guidLow);
-            return;
+            return false;
         }
     }
 
@@ -139,7 +139,7 @@ void PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
     {
         sLog.outError("[PlayerBots] AddPlayerBot: holder Initialize() failed for guid %u", guidLow);
         delete holder;
-        return;
+        return false;
     }
 
     m_pendingBotLogins[holder] = { botGuid, masterAccountId };
@@ -152,6 +152,7 @@ void PlayerbotHolder::AddPlayerBot(uint32 guidLow, uint32 masterAccountId)
     // _Rb_tree_rebalance_for_erase) when many bots log in at once. The engine's own player login
     // uses DelayQueryHolderUnsafe for exactly this reason (see CharacterHandler.cpp:493).
     CharacterDatabase.DelayQueryHolderUnsafe(this, &PlayerbotHolder::HandlePlayerBotLoginCallback, holder);
+    return true;
 }
 
 // Called when CharacterDatabase finishes the holder's queries. Allocates a fresh WorldSession

@@ -2235,6 +2235,30 @@ void RandomPlayerbotMgr::ScheduleChangeStrategy(uint32 bot, uint32 time)
     SetEventValue(bot, "change_strategy", 1, time);
 }
 
+// A character the login path refused is not coming back on its own: the caller
+// used to record login=1 for it anyway, and login=1 never expires, so ProcessBot
+// returned early for that guid on every later tick while no session ever existed.
+// The guid also stayed in currentBots, and AddRandomBots only tops the population
+// up to MaxRandomBots - so a handful of dead guids could hold the whole quota and
+// the server ran with no bots at all. Live 2026-09-07: a bot wipe at startup left
+// 120 stale guids in the rotation, all 120 logins failed with "no account for
+// guid", and the 9h49m run that followed had zero bots online from first tick to
+// last. Forget the character instead, in both the DB and the event cache.
+void RandomPlayerbotMgr::DropUnloginableBot(uint32 bot)
+{
+    SetEventValue(bot, "add", 0, 0);
+    SetEventValue(bot, "login", 0, 0);
+    SetEventValue(bot, "update", 0, 0);
+
+    // Not a plain clear: a deleted character is never offered again (AddRandomBots
+    // selects from `characters`), but a stuck ghost still is, and would be retried -
+    // and refused, and logged - on every pass. AddRandomBots skips a guid that has a
+    // logout event, so a timed one is a retry cooldown rather than a permanent ban.
+    SetEventValue(bot, "logout", 1, 5 * MINUTE);
+
+    currentBots.remove(bot);
+}
+
 bool RandomPlayerbotMgr::AddRandomBot(uint32 bot)
 {
     SC_LOG("AddRandomBot entry guid=%u", bot);
@@ -2277,7 +2301,12 @@ bool RandomPlayerbotMgr::AddRandomBot(uint32 bot)
     if (!loginEv)
     {
         SC_LOG("AddRandomBot guid=%u — calling AddPlayerBot", bot);
-        AddPlayerBot(bot, 0);
+        if (!AddPlayerBot(bot, 0))
+        {
+            SC_LOG("AddRandomBot guid=%u — AddPlayerBot refused, dropping from rotation", bot);
+            DropUnloginableBot(bot);
+            return false;
+        }
         SC_LOG("AddRandomBot guid=%u — AddPlayerBot returned, setting event values", bot);
         SetEventValue(bot, "add", 1, urand(sPlayerbotAIConfig.minRandomBotInWorldTime, sPlayerbotAIConfig.maxRandomBotInWorldTime));
         SetEventValue(bot, "logout", 0, 0);
@@ -2382,7 +2411,15 @@ bool RandomPlayerbotMgr::ProcessBot(uint32 bot)
         if (GetEventValue(bot, "login"))
             return true;
 
-        AddPlayerBot(bot, 0);
+        if (!AddPlayerBot(bot, 0))
+        {
+            // login=1 below never expires, so recording it for a bot that was refused
+            // would take the guid out of the rotation for the life of the process while
+            // it holds a population slot. Forget it instead and let AddRandomBots pick
+            // a character that exists.
+            DropUnloginableBot(bot);
+            return false;
+        }
 
         SetEventValue(bot, "login", 1, -1); // This will be reset to 0 on server startup. Check RandomPlayerbotMgr constructor
 
@@ -3500,8 +3537,16 @@ std::list<uint32> RandomPlayerbotMgr::GetBots()
 {
     if (!currentBots.empty()) return currentBots;
 
+    // The rotation is rebuilt from the previous run's rows, so it has to be filtered
+    // against the characters that still exist. A bot wipe (the `bot_delete` event, or
+    // DeleteRandomBotAccounts) removes the characters while these rows survive - the
+    // factory's own orphan cleanup is queued asynchronously and is not guaranteed to
+    // have run by the time the manager starts - and every dead guid taken in here
+    // occupies a slot in the MaxRandomBots quota that no live character can then use.
     auto results = CharacterDatabase.Query(
-            "SELECT bot FROM ai_playerbot_random_bots WHERE owner = 0 AND event = 'add'");
+            "SELECT r.bot FROM ai_playerbot_random_bots r "
+            "JOIN characters c ON c.guid = r.bot "
+            "WHERE r.owner = 0 AND r.event = 'add'");
 
     if (results)
     {
@@ -3512,6 +3557,10 @@ std::list<uint32> RandomPlayerbotMgr::GetBots()
             currentBots.push_back(bot);
         } while (results->NextRow());
     }
+
+    // bot = 0 is not a character: those rows are the manager's own bookkeeping
+    // (bot_count, current_time) and must survive this.
+    CharacterDatabase.Execute("DELETE FROM ai_playerbot_random_bots WHERE bot <> 0 AND bot NOT IN (SELECT guid FROM characters)");
 
     return currentBots;
 }

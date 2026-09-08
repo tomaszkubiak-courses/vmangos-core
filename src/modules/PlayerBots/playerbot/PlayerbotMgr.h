@@ -27,7 +27,11 @@ public:
     PlayerbotHolder();
     virtual ~PlayerbotHolder();
 
-    void AddPlayerBot(uint32 guid, uint32 masterAccountId);
+    // Returns false when the login could not even be queued (unknown character,
+    // stuck ghost, holder failure). Callers that record a "this bot is logging in"
+    // event must not record it on false, or the bot is marked online forever while
+    // no session exists - see RandomPlayerbotMgr::ProcessBot.
+    bool AddPlayerBot(uint32 guid, uint32 masterAccountId);
 	void HandlePlayerBotLoginCallback(std::unique_ptr<QueryResult> dummy, SqlQueryHolder * holder);
 
     void LogoutPlayerBot(uint32 guid, bool allowInstant = true, bool forDelete = false);
