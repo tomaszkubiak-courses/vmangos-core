@@ -483,7 +483,9 @@ struct instance_sunken_temple : public ScriptedInstance
                     for (entriesIt = mobsEntries.begin(); entriesIt != mobsEntries.end(); ++entriesIt)
                     {
                         std::list<Creature*> tmpMobsList;
-                        GetCreatureListWithEntryInGrid(tmpMobsList, pEranikus, (*entriesIt), 300.0f);
+                        // 400 yards: the furthest Nightmare dragonkin spawn sits 388 yards
+                        // from Eranikus, and Cell::Visit clamps the search at 533.
+                        GetCreatureListWithEntryInGrid(tmpMobsList, pEranikus, (*entriesIt), 400.0f);
                         while (!tmpMobsList.empty())
                         {
                             Creature* curr = tmpMobsList.front();
