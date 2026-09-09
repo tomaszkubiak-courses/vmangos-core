@@ -227,6 +227,23 @@ bool AddAllLootAction::AddLoot(Player* requester, ObjectGuid guid)
     return added;
 }
 
+bool AddGatheringLootAction::isUseful()
+{
+    // Everything this action can accept is gated on a gathering skill the bot must already
+    // have: AddLoot rejects SKILL_NONE outright, and LootObject::IsLootPossible rejects any
+    // skill the bot does not know. A bot with none of them can never add a single object, so
+    // inheriting AddAllLootAction's hardcoded `return true` meant the "timer" trigger ran the
+    // whole nearby-object scan - a LootObject::Refresh and a vmap line-of-sight raycast per
+    // candidate - once a second on every such bot, always to no effect.
+    //
+    // Fishing is deliberately absent: IsLootPossible rejects SKILL_FISHING unconditionally, so
+    // a fisherman is no more able to gather here than a bot with no profession at all.
+    return ai->HasSkill(SKILL_HERBALISM) ||
+           ai->HasSkill(SKILL_MINING) ||
+           ai->HasSkill(SKILL_SKINNING) ||
+           ai->HasSkill(SKILL_LOCKPICKING);
+}
+
 bool AddGatheringLootAction::AddLoot(Player* requester, ObjectGuid guid)
 {
     LootObject loot(bot, guid);
