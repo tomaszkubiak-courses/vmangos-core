@@ -85,7 +85,7 @@ bool ChooseTravelTargetAction::Execute(Event& event)
     return true;
 }
 
-bool ChooseTravelTargetAction::isUseful()
+bool ChooseTravelTargetAction::CanConsiderNewTarget()
 {
     if (!ai->AllowActivity(TRAVEL_ACTIVITY))
         return false;
@@ -94,6 +94,36 @@ bool ChooseTravelTargetAction::isUseful()
         return false;
 
     if (AI_VALUE(bool, "travel target active"))
+        return false;
+
+    return true;
+}
+
+bool ChooseTravelTargetAction::isUseful()
+{
+    if (!CanConsiderNewTarget())
+        return false;
+
+    // This action collects the result of a destination fetch that one of the request actions
+    // started; it has work to do only once that request has put the target into PREPARE. On
+    // any other status Execute bailed on its first line and the engine recorded a failure,
+    // which is how an action doing exactly what it was designed to do came to close a run
+    // with 1976 failures against 510 successes.
+    //
+    // Useless is the honest outcome here and it costs less, but note it must stay an outcome
+    // that does not end the engine tick: this action sits at the top of the travel queue at
+    // relevance 6.98, and the request actions below it are what create the PREPARE status in
+    // the first place. Both Useless and Failed fall through to them; Succeeded would not.
+    TravelTarget* travelTarget = AI_VALUE(TravelTarget*, "travel target");
+    if (travelTarget->GetStatus() != TravelStatus::TRAVEL_STATUS_PREPARE)
+        return false;
+
+    // The fetch runs on another thread. While it is still running there is nothing to collect,
+    // and every poll was recorded as a failure too. An invalid future is deliberately not
+    // filtered out - that is the one case Execute has real work for, clearing the stale
+    // PREPARE status that nothing is going to resolve.
+    FutureDestinations* futureDestinations = AI_VALUE(FutureDestinations*, "future travel destinations");
+    if (futureDestinations->valid() && futureDestinations->wait_for(std::chrono::seconds(0)) == std::future_status::timeout)
         return false;
 
     return true;
@@ -630,7 +660,7 @@ bool ChooseGroupTravelTargetAction::isUseful()
     if (!bot->GetGroup())
         return false;
 
-    if (!ChooseTravelTargetAction::isUseful())
+    if (!CanConsiderNewTarget())
         return false;
 
     if (AI_VALUE(TravelTarget*, "travel target")->GetStatus() == TravelStatus::TRAVEL_STATUS_PREPARE)
@@ -710,7 +740,7 @@ bool RefreshTravelTargetAction::isUseful()
     if (bot->InBattleGround())
         return false;
 
-    if (!ChooseTravelTargetAction::isUseful())
+    if (!CanConsiderNewTarget())
         return false;
 
     if (AI_VALUE(TravelTarget*, "travel target")->GetStatus() == TravelStatus::TRAVEL_STATUS_PREPARE)
@@ -751,7 +781,7 @@ bool ResetTargetAction::isUseful()
     if (bot->InBattleGround())
         return false;
 
-    if (!ChooseTravelTargetAction::isUseful())
+    if (!CanConsiderNewTarget())
         return false;
 
     if (AI_VALUE(TravelTarget*, "travel target")->GetStatus() == TravelStatus::TRAVEL_STATUS_PREPARE)

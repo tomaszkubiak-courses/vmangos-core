@@ -17,7 +17,13 @@ namespace ai
         virtual bool isUseful() override;
         static void ReportTravelTarget(Player* bot, Player* requester, TravelTarget* newTarget, TravelTarget* oldTarget);
     protected:
-        void setNewTarget(Player* requester, TravelTarget* newTarget, TravelTarget* oldTarget);        
+        // The part of isUseful() that every action in this family shares: the bot is allowed to
+        // travel, can move, and has no active target. The concrete actions disagree about the
+        // target status on top of that - this one needs TRAVEL_STATUS_PREPARE, the three below
+        // need anything but - so they call this rather than each other's isUseful().
+        bool CanConsiderNewTarget();
+
+        void setNewTarget(Player* requester, TravelTarget* newTarget, TravelTarget* oldTarget);
 
         bool SetBestTarget(Player* requester, TravelTarget* target, PartitionedTravelList& travelPartitions, bool onlyActive = true);
     public:
