@@ -7,7 +7,15 @@ using namespace ai;
 
 bool SecurityCheckAction::isUseful()
 {
-    return sRandomPlayerbotMgr.IsRandomBot(bot) && ai->GetMaster() && ai->GetMaster()->GetSession()->GetSecurity() < SEC_GAMEMASTER && !GetBotAI(ai->GetMaster());
+    // The master check comes first because it is a pointer read and decides the answer for
+    // every bot the random manager owns: they have no master at all. IsRandomBot behind it
+    // walks the random account list and then the event cache, which the "often" trigger was
+    // paying for 71339 times over the eight hour run of 2026-09-09, always to reach false.
+    Player* master = ai->GetMaster();
+    if (!master || GetBotAI(master))
+        return false;
+
+    return master->GetSession()->GetSecurity() < SEC_GAMEMASTER && sRandomPlayerbotMgr.IsRandomBot(bot);
 }
 
 bool SecurityCheckAction::Execute(Event& event)
