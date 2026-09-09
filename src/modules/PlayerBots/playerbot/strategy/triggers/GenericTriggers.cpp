@@ -191,19 +191,8 @@ bool BuffTrigger::IsActive()
     if (!target || !target->IsAlive())
         return false;
 
-    // A buff the bot has not learned can never be applied, so firing on the missing aura only
-    // queues an action that reports IMPOSSIBLE and is queued again on the next tick. A hunter
-    // below level 10 did that with "aspect of the hawk" for its whole session.
-    //
-    // Only spells that are real DBC names are gated this way. Several triggers are named for a
-    // family rather than a spell - "seal", "blessing", "any mage armor" - and those resolve to
-    // no spell id at all, so asking whether the bot knows them would always say no and would
-    // silence the trigger for every paladin and mage. Cooldowns and resource costs are not
-    // checked here either; they clear by themselves. HasSpell reads a cached value and is
-    // tested first because SpellIds returns its vector by value.
-    if (!ai->HasSpell(spell) && !chat->SpellIds(spell).empty())
-        return false;
-
+    // The spell-known gate that used to stand here now covers every spell trigger from
+    // SpellTrigger::Check(), which the overriding IsActive() of a BUFF_TRIGGER_A cannot skip.
 	return !ai->HasAura(spell, target, false, checkIsOwner);
 }
 
@@ -360,6 +349,43 @@ bool DebuffTrigger::HasMaxDebuffs()
 bool SpellTrigger::IsActive()
 {
 	return GetTarget();
+}
+
+// A spell the bot has not learned can never be cast, so a trigger firing on it only queues an
+// action that reports IMPOSSIBLE and is queued again on the next tick. Over the eight hour run
+// of 2026-09-09 that was 544129 impossible actions, led by "mortal strike", "sunder armor" and
+// "demoralizing shout" - warrior abilities that no bot below level 10 has.
+//
+// The gate sits in Check() rather than IsActive() because most of these triggers override
+// IsActive(): every class trigger built on BUFF_TRIGGER_A, DEBUFF_TRIGGER_A and their siblings
+// does, and an override skips a gate placed in the base IsActive(). Check() is the one entry
+// point Engine::ProcessTriggers goes through.
+//
+// Only names that resolve to a real spell are gated. Several triggers are named for a family
+// rather than a spell - "seal", "blessing", "any mage armor" - and those resolve to no spell id
+// at all, so asking whether the bot knows them would always say no and would silence the trigger
+// for every paladin and mage. Cooldowns and resource costs are not checked here either; they
+// clear by themselves.
+Event SpellTrigger::Check()
+{
+	// An externally forced event is delivered whatever the spellbook says.
+	if (!IsAlreadyTriggered() && !BotKnowsSpell())
+		return Event();
+
+	return Trigger::Check();
+}
+
+bool SpellTrigger::BotKnowsSpell()
+{
+	// HasSpell reads a cached value and is tested first because SpellIds returns its vector
+	// by value.
+	if (ai->HasSpell(spell))
+		return true;
+
+	if (spellNameIsReal < 0)
+		spellNameIsReal = chat->SpellIds(spell).empty() ? 0 : 1;
+
+	return spellNameIsReal == 0;
 }
 
 bool SpellCanBeCastedTrigger::IsActive()

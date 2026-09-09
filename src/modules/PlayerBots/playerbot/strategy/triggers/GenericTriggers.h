@@ -112,9 +112,18 @@ namespace ai
 		virtual std::string GetTargetName() override { return "current target"; }
 		virtual std::string getName() override { return spell; }
 		virtual bool IsActive() override;
+		virtual Event Check() override;
 
 	protected:
+		// False only when the trigger names a real spell that the bot has not learned.
+		bool BotKnowsSpell();
+
 		std::string spell;
+
+	private:
+		// -1 until resolved, then 0 or 1. Whether a name is a spell name at all cannot
+		// change while the process runs, so it is asked once per trigger.
+		int8 spellNameIsReal = -1;
 	};
 
 	class SpellCanBeCastedTrigger : public SpellTrigger
