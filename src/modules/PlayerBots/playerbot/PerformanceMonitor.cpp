@@ -4,6 +4,7 @@
 
 #include "Database/DatabaseEnv.h"
 #include "PlayerbotAI.h"
+#include "PlayerbotHooks.h"
 
 namespace bot_perf {
 
@@ -339,9 +340,10 @@ void PerformanceMonitorOperation::finish()
         stack->erase(std::remove(stack->begin(), stack->end(), name), stack->end());
 }
 
-// The donor's core declared this on ChatHandler as a GM command. This tree's command table
-// is ChatHandler::getCommandTable() and the module does not extend it yet, so the handler
-// stands on its own until the bot command set is wired up - see doc/PLAYERBOT_PORT_SCOPE.md.
+// Reached from the core as `.playerbot perf [tick] [stack] [map] | reset | toggle`; the
+// command is declared in src/game/Chat/Chat.cpp and calls this through
+// Playerbot_PrintPerformanceStats below. The output goes to the log, not to the caller:
+// a full tally is hundreds of lines.
 bool HandlePerfMonCommand(char* args)
 {
     if (!strcmp(args, "reset"))
@@ -383,4 +385,15 @@ bool HandlePerfMonCommand(char* args)
 
     sPerformanceMonitor.PrintStats(tick, stack, map);
     return true;
+}
+
+bool Playerbot_PrintPerformanceStats(char const* args)
+{
+    // Nothing is collected while the monitor is off, so an empty tally would be reported
+    // as a working command that printed nothing.
+    if (!sPlayerbotAIConfig.perfMonEnabled)
+        return false;
+
+    std::string arguments = args ? args : "";
+    return HandlePerfMonCommand(&arguments[0]);
 }

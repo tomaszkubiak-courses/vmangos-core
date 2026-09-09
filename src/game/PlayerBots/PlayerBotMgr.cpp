@@ -7,6 +7,7 @@
 #include "AccountMgr.h"
 #include "Config/Config.h"
 #include "Chat.h"
+#include "PlayerbotHooks.h"
 #include "Player.h"
 #include "Group.h"
 #include "PlayerBotAI.h"
@@ -773,6 +774,23 @@ bool ChatHandler::HandleBotInfoCommand(char * args)
 bool ChatHandler::HandleBotStartCommand(char * args)
 {
     sPlayerBotMgr.Start();
+    return true;
+}
+
+// The playerbots module, not the bot system above it: this prints that module's own
+// performance tally - time spent per trigger, value and action, per bot tick - which is
+// collected only while AiPlayerbot.PerfMonEnabled is on. The tally goes to the log rather
+// than to the caller because it runs to hundreds of lines.
+bool ChatHandler::HandlePlayerbotPerfCommand(char * args)
+{
+    if (!Playerbot_PrintPerformanceStats(args ? args : ""))
+    {
+        SendSysMessage("Playerbots performance monitor is off or the module is not built.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
+    SendSysMessage("Playerbots performance stats written to the server log.");
     return true;
 }
 
