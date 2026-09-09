@@ -14,14 +14,21 @@ using namespace ai;
 using namespace MaNGOS;
 
 bool TravelAction::Execute(Event& event)
-{    
+{
     TravelTarget * target = AI_VALUE(TravelTarget *, "travel target");
-    
-    target->CheckStatus();     
+
+    // CheckStatus is a state machine step: every branch that does something ends in a
+    // SetStatus (or a SetNullTravelTarget, which is a SetStatus to NONE) to a status other
+    // than the one that let it in, so comparing before with after detects a change exactly.
+    // MoveToTravelTargetAction, which drives the same call while the bot is walking, reports
+    // success on the same test.
+    TravelStatus const statusBefore = target->GetStatus();
+
+    target->CheckStatus();
 
     SET_AI_VALUE2(time_t, "manual time", "next travel check", time(0) + 5);
 
-    return false;
+    return target->GetStatus() != statusBefore;
 }
 
 bool TravelAction::isUseful()
