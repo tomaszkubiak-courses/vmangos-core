@@ -84,4 +84,9 @@ bool Playerbot_IsAIControlled(Player const* player);
 // Does this player command any bots?
 bool Playerbot_HasBots(Player const* player);
 
+// Print the module's performance tally - time per trigger, value and action - to the
+// log. Arguments are the module's own ("tick", "stack", "map", "reset", "toggle").
+// Returns false when the module is not built or its monitor is switched off.
+bool Playerbot_PrintPerformanceStats(char const* args);
+
 #endif

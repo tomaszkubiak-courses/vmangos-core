@@ -30,6 +30,11 @@ void Playerbot_OnReleaseToClient(Player* /*player*/)                            
 void Playerbot_OnPlayerUpdate(Player* /*player*/, uint32 /*diff*/)                       {}
 void Playerbot_OnPacketHandled(WorldSession* /*session*/, ClientPacket const& /*packet*/) {}
 
+bool Playerbot_PrintPerformanceStats(char const* /*args*/)
+{
+    return false;
+}
+
 bool Playerbot_OnSessionSendPacket(WorldSession* /*session*/, WorldPacket const& /*packet*/)
 {
     return false;
