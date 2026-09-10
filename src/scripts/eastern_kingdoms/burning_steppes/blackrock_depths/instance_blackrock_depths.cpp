@@ -85,7 +85,6 @@ struct instance_blackrock_depths : ScriptedInstance
     uint64 m_uiNagmaraGUID;
 
     //uint64 m_uiPanzorGUID;
-    uint64 m_uiGolemLordArgelmachGUID;
     uint64 m_uiPluggerSpazzringGUID;
 
     uint64 m_uiSpectralChaliceGUID;
@@ -98,7 +97,6 @@ struct instance_blackrock_depths : ScriptedInstance
 
     std::vector<uint64> m_lRibblySCronyMobGUIDList;
     std::vector<uint64> m_lArenaSpectatorMobGUIDList;
-    std::vector<uint64> m_lArgelmachProtectorsMobGUIDList;
     std::vector<uint64> m_sBarPatronNpcGuids;
     std::vector<uint64> m_sBarPatrolGuids;
 
@@ -192,7 +190,6 @@ struct instance_blackrock_depths : ScriptedInstance
         m_uiGoJailSupplyCrateGUID = 0;
 
         //m_uiPanzorGUID = 0;
-        m_uiGolemLordArgelmachGUID = 0;
 
         m_uiSpectralChaliceGUID = 0;
         m_uiSevensChestGUID = 0;
@@ -302,13 +299,6 @@ struct instance_blackrock_depths : ScriptedInstance
                         break;
                 }
                 break;*/
-            case NPC_WRATH_HAMMER_CONSTRUCT:
-            case NPC_GOLEM_RAVAGE:
-                m_lArgelmachProtectorsMobGUIDList.push_back(pCreature->GetGUID());
-                break;
-            case NPC_GOLEM_LORD_ARGELMACH:
-                m_uiGolemLordArgelmachGUID = pCreature->GetGUID();
-                break;
             case NPC_PLUGGER_SPAZZRING:
                 m_uiPluggerSpazzringGUID = pCreature->GetGUID();
                 break;
@@ -874,15 +864,6 @@ struct instance_blackrock_depths : ScriptedInstance
                 m_auiEncounter[TYPE_RIBBLY] = uiData;
                 break;
             case DATA_ARGELMACH_AGGRO:
-                if (uiData == IN_PROGRESS)
-                {
-                    if (Creature* argelmach = instance->GetCreature(m_uiGolemLordArgelmachGUID))
-                        if (Unit* pVictim = argelmach->GetVictim())
-                            for (const auto& guid : m_lArgelmachProtectorsMobGUIDList)
-                                if (Creature* protector = instance->GetCreature(guid))
-                                    if (protector->IsAlive() && protector->AI() && protector->IsWithinDist(argelmach, 80.0f))
-                                        protector->AI()->AttackStart(pVictim);
-                }
                 m_auiEncounter[DATA_ARGELMACH_AGGRO] = uiData;
                 break;
             case TYPE_PATROL:

@@ -1363,9 +1363,35 @@ CreatureAI* GetAI_npc_watchman_doomgrip(Creature* pCreature)
 ## npc_golem_lord_argelmach
 ######*/
 
-#define SPELL_BOUCLIER_DE_FOUDRE    15507
-#define SPELL_CHAINE_D_ECLAIRES    15305
-#define SPELL_HORION    15605
+enum
+{
+    SPELL_LIGHTNING_SHIELD  = 15507,
+    SPELL_CHAIN_LIGHTNING   = 15305,
+    SPELL_SHOCK             = 15605,
+
+    SAY_ARGELMACH_AGGRO     = 5297,
+
+    POINT_ID_CALL_GOLEMS    = 1,
+
+    // He waits at the point long enough for the shout to land before he turns
+    // back to whoever pulled him.
+    DELAY_ARGELMACH_RESUME  = 3000,
+
+    // If he never reaches the point - blocked, dragged around, pulled from
+    // somewhere the path does not work out - he shouts and fights anyway rather
+    // than standing there for the rest of the encounter.
+    TIMEOUT_ARGELMACH_CALL  = 15000,
+};
+
+// Out of the alcove he stands in and onto the manufactory floor, where the rest
+// of the golems can hear him.
+static float const aArgelmachCallPosition[3] = { 809.133f, 22.008f, -53.658f };
+
+// Everything he can call is inside this radius of either end of the run.
+static float const fArgelmachGolemSearchRadius = 100.0f;
+
+// Golems standing this close are already on top of him and join the pull itself.
+static float const fArgelmachNearGolemRange = 10.0f;
 
 struct npc_golem_lord_argelmachAI : public ScriptedAI
 {
@@ -1377,18 +1403,97 @@ struct npc_golem_lord_argelmachAI : public ScriptedAI
 
     ScriptedInstance* m_pInstance;
 
-    uint32 BouclierDeFoudre_Timer;
-    uint32 ChaineDEclaires_Timer;
-    uint32 Horion_Timer;
+    uint32 m_uiLightningShieldTimer;
+    uint32 m_uiChainLightningTimer;
+    uint32 m_uiShockTimer;
+    uint32 m_uiResumeAttackTimer;
+    bool m_bCallingGolems;
+    bool m_bGolemsCalled;
+
+    void Reset() override
+    {
+        m_uiLightningShieldTimer = 0;
+        m_uiChainLightningTimer = 5000;
+        m_uiShockTimer = 2000;
+        m_uiResumeAttackTimer = 0;
+        m_bCallingGolems = false;
+        m_bGolemsCalled = false;
+
+        SetCombatMovement(true);
+    }
+
+    void GetGolems(std::list<Creature*>& lGolems)
+    {
+        static std::vector<uint32> const vGolemEntries = { NPC_WRATH_HAMMER_CONSTRUCT, NPC_GOLEM_RAVAGE };
+        GetCreatureListWithEntryInGrid(lGolems, m_creature, vGolemEntries, fArgelmachGolemSearchRadius);
+    }
 
     void Aggro(Unit* pWho) override
     {
-        m_creature->GetMotionMaster()->MovePoint(0, 846.801025f, 16.280600f, -53.639500f);
-        //m_creature->MonsterYell("Golems, votre Seigneur a besoin de vous!", 0, pWho);
-        //m_creature->MonsterYell(NOST_TEXT(155), 0, pWho); // seems to be custom
-
         if (m_pInstance)
             m_pInstance->SetData(DATA_ARGELMACH_AGGRO, IN_PROGRESS);
+
+        std::list<Creature*> lGolems;
+        GetGolems(lGolems);
+
+        bool bAnyOutOfEarshot = false;
+        for (const auto& pGolem : lGolems)
+        {
+            if (!pGolem->IsAlive())
+                continue;
+
+            // His own constructs answer at once, and so does anything already
+            // standing beside him. The golems spread over the floor behind him
+            // only come once he has run out there and shouted for them.
+            if (pGolem->GetEntry() == NPC_WRATH_HAMMER_CONSTRUCT || pGolem->GetDistance2d(m_creature) < fArgelmachNearGolemRange)
+                pGolem->AI()->AttackStart(pWho);
+            else
+                bAnyOutOfEarshot = true;
+        }
+
+        if (!bAnyOutOfEarshot)
+            return;
+
+        DoScriptText(SAY_ARGELMACH_AGGRO, m_creature);
+
+        m_bCallingGolems = true;
+        m_uiResumeAttackTimer = TIMEOUT_ARGELMACH_CALL;
+
+        // Combat movement has to be switched off before the point movement is
+        // queued. Aggro runs from inside CreatureAI::AttackStart, which issues a
+        // MoveChase the moment it returns - that chase would bury the run and he
+        // would simply stand and fight where he was pulled.
+        SetCombatMovement(false);
+        m_creature->GetMotionMaster()->MovePoint(POINT_ID_CALL_GOLEMS, aArgelmachCallPosition[0], aArgelmachCallPosition[1], aArgelmachCallPosition[2]);
+    }
+
+    void CallDistantGolems()
+    {
+        if (m_bGolemsCalled)
+            return;
+
+        m_bGolemsCalled = true;
+        m_creature->HandleEmoteCommand(EMOTE_ONESHOT_SHOUT);
+
+        Unit* pVictim = m_creature->GetVictim();
+        if (!pVictim)
+            return;
+
+        std::list<Creature*> lGolems;
+        GetGolems(lGolems);
+
+        for (const auto& pGolem : lGolems)
+            if (pGolem->IsAlive() && !pGolem->IsInCombat())
+                pGolem->AI()->AttackStart(pVictim);
+    }
+
+    void MovementInform(uint32 uiType, uint32 uiPointId) override
+    {
+        if (!m_bCallingGolems || uiType != POINT_MOTION_TYPE || uiPointId != POINT_ID_CALL_GOLEMS)
+            return;
+
+        CallDistantGolems();
+        m_uiResumeAttackTimer = DELAY_ARGELMACH_RESUME;
     }
 
     void JustDied(Unit* pKiller) override
@@ -1397,42 +1502,52 @@ struct npc_golem_lord_argelmachAI : public ScriptedAI
             m_pInstance->SetData(DATA_ARGELMACH_AGGRO, DONE);
     }
 
-    void Reset() override
-    {
-        BouclierDeFoudre_Timer = 0;
-        ChaineDEclaires_Timer = 5000;
-        Horion_Timer = 2000;
-    }
-
-    void UpdateAI(uint32 const diff) override
+    void UpdateAI(uint32 const uiDiff) override
     {
         if (!m_creature->SelectHostileTarget() || !m_creature->GetVictim())
             return;
 
-        //BouclierDeFoudre_Timer
-        if (BouclierDeFoudre_Timer < diff)
+        // Neither swinging nor casting while he is fetching his golems.
+        if (m_bCallingGolems)
         {
-            if (!m_creature->HasAura(SPELL_BOUCLIER_DE_FOUDRE))
-                if (DoCastSpellIfCan(m_creature, SPELL_BOUCLIER_DE_FOUDRE) == CAST_OK)
-                    BouclierDeFoudre_Timer = 15000;
-        }
-        else BouclierDeFoudre_Timer -= diff;
+            if (m_uiResumeAttackTimer <= uiDiff)
+            {
+                CallDistantGolems();
 
-        //ChaineDEclaires_Timer
-        if (ChaineDEclaires_Timer < diff)
-        {
-            if (DoCastSpellIfCan(m_creature->GetVictim(), SPELL_CHAINE_D_ECLAIRES) == CAST_OK)
-                ChaineDEclaires_Timer = 14000;
-        }
-        else ChaineDEclaires_Timer -= diff;
+                m_uiResumeAttackTimer = 0;
+                m_bCallingGolems = false;
 
-        //Horion_Timer
-        if (Horion_Timer < diff)
-        {
-            if (DoCastSpellIfCan(m_creature->GetVictim(), SPELL_HORION) == CAST_OK)
-                Horion_Timer = 6000;
+                SetCombatMovement(true);
+                m_creature->GetMotionMaster()->MoveChase(m_creature->GetVictim());
+            }
+            else
+            {
+                m_uiResumeAttackTimer -= uiDiff;
+                return;
+            }
         }
-        else Horion_Timer -= diff;
+
+        if (m_uiLightningShieldTimer < uiDiff)
+        {
+            if (!m_creature->HasAura(SPELL_LIGHTNING_SHIELD))
+                if (DoCastSpellIfCan(m_creature, SPELL_LIGHTNING_SHIELD) == CAST_OK)
+                    m_uiLightningShieldTimer = 15000;
+        }
+        else m_uiLightningShieldTimer -= uiDiff;
+
+        if (m_uiChainLightningTimer < uiDiff)
+        {
+            if (DoCastSpellIfCan(m_creature->GetVictim(), SPELL_CHAIN_LIGHTNING) == CAST_OK)
+                m_uiChainLightningTimer = 14000;
+        }
+        else m_uiChainLightningTimer -= uiDiff;
+
+        if (m_uiShockTimer < uiDiff)
+        {
+            if (DoCastSpellIfCan(m_creature->GetVictim(), SPELL_SHOCK) == CAST_OK)
+                m_uiShockTimer = 6000;
+        }
+        else m_uiShockTimer -= uiDiff;
 
         DoMeleeAttackIfReady();
     }
