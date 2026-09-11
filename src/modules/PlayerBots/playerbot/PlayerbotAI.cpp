@@ -5025,8 +5025,13 @@ bool PlayerbotAI::CastSpell(std::string name, Unit* target, Item* itemTarget, bo
 
 bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool waitForSpell, uint32* outSpellDuration)
 {
+    lastCastFailReason = "";
+
     if (!spellId)
+    {
+        lastCastFailReason = "no spell id";
         return false;
+    }
 
     if (!target)
         target = bot;
@@ -5042,6 +5047,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
         if (fallbackSpellInfo && CheckSpellTargetAlignment(fallbackSpellInfo, bot) != SPELL_CAST_OK)
         {
             sLog.outDetail("PlayerbotAI::CastSpell: %s target resolved to self for harmful spell %u - refusing to self-cast", bot->GetName(), spellId);
+            lastCastFailReason = "harmful spell aimed at self";
             return false;
         }
     }
@@ -5058,7 +5064,10 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
     MotionMaster &mm = *bot->GetMotionMaster();
 
     if (bot->IsFlying() || bot->IsTaxiFlying())
+    {
+        lastCastFailReason = "flying";
         return false;
+    }
 
 	//bot->ClearUnitState(UNIT_STATE_CHASE);
 	//bot->ClearUnitState(UNIT_STATE_FOLLOW);
@@ -5068,6 +5077,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
     {
         bot->SetStandState(UNIT_STAND_STATE_STAND);
         failWithDelay = true;
+        lastCastFailReason = "standing up";
     }
 
 	ObjectGuid oldSel = bot->GetTargetGuid();
@@ -5085,7 +5095,10 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
         // wildlife, etc.) meant the target had already drifted again by the retry, so the bot
         // never actually caught up and stayed stuck failing to cast indefinitely.
         if (!HasRealPlayerMaster() && !bot->IsStopped())
+        {
             failWithDelay = true;
+            lastCastFailReason = "turning to face target while moving";
+        }
     }
 
     if (failWithDelay)
@@ -5182,6 +5195,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
         // always fail when jumping
         if (IsJumping() || bot->IsFalling())
         {
+            lastCastFailReason = "jumping or falling with a cast time";
             spell->cancel();
             delete spell;
             return false;
@@ -5197,6 +5211,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
                 SetAIInternalUpdateDelay(sPlayerbotAIConfig.globalCoolDown);
             }
 
+            lastCastFailReason = "moving with a cast time";
             spell->cancel();
             delete spell;
             return false;
@@ -5248,6 +5263,7 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
             LootObject loot = *aiObjectContext->GetValue<LootObject>("loot target");
             if (!loot.IsLootPossible(bot))
             {
+                lastCastFailReason = "loot target no longer lootable";
                 spell->cancel();
                 //delete spell;
                 return false;
@@ -5256,7 +5272,10 @@ bool PlayerbotAI::CastSpell(uint32 spellId, Unit* target, Item* itemTarget, bool
     }
 
     if (spellSuccess != SPELL_CAST_OK)
+    {
+        lastCastFailReason = GetSpellCastResultString(spellSuccess);
         return false;
+    }
 
     PlayAttackEmote(6);
 

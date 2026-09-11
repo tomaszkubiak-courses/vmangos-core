@@ -1631,6 +1631,7 @@ void TravelMgr::LoadQuestTravelTable()
     sPlayerbotAIConfig.openLog("bot_events.csv", "w");
     sPlayerbotAIConfig.openLog("travel_map.csv", "w");
     sPlayerbotAIConfig.openLog("bot_action_outcomes.csv", "w");
+    sPlayerbotAIConfig.openLog("bot_cast_blocks.csv", "w");
     sPlayerbotAIConfig.openLog("quest_map.csv", "w");
     sPlayerbotAIConfig.openLog("activity_pid.csv", "w");
     sPlayerbotAIConfig.openLog("deaths.csv", "w");
@@ -1645,6 +1646,15 @@ void TravelMgr::LoadQuestTravelTable()
         //rate over any interval is the difference between two blocks.
         sPlayerbotAIConfig.log("bot_action_outcomes.csv",
             "Timestamp,action,succeeded,failed,impossible,useless,total,success_rate");
+    }
+
+    if (sPlayerbotAIConfig.hasLog("bot_cast_blocks.csv"))
+    {
+        //Cumulative like the outcome tally, and read the same way. `phase` is
+        //"possible" for a cast CanCastSpell refused and "execute" for one
+        //PlayerbotAI::CastSpell dropped before Spell::prepare.
+        sPlayerbotAIConfig.log("bot_cast_blocks.csv",
+            "Timestamp,spell,phase,reason,count");
     }
 
     if (sPlayerbotAIConfig.hasLog("activity_pid.csv"))

@@ -526,6 +526,13 @@ public:
     bool CastSpell(uint32 spellId, GameObject* goTarget, Item* itemTarget = nullptr, bool waitForSpell = true, uint32* outSpellDuration = nullptr);
     bool CastSpell(uint32 spellId, float x, float y, float z, Item* itemTarget = nullptr, bool waitForSpell = true, uint32* outSpellDuration = nullptr);
     bool CastPetSpell(uint32 spellId, Unit* target);
+
+    // Why the last CastSpell returned false. CastSpell walks out at a dozen places
+    // before the core ever sees a Spell, so the caller has no SpellCastResult to
+    // report and, until this existed, no way to tell a bot that will never cast
+    // from one that is simply mid-stride. Set on every refusing path, valid only
+    // immediately after the call that set it.
+    char const* GetLastCastFailReason() const { return lastCastFailReason; }
     bool CastVehicleSpell(uint32 spellId, Unit* target, float projectileSpeed, bool needTurn);
     bool CastVehicleSpell(uint32 spellId, float x, float y, float z);
 
@@ -824,6 +831,8 @@ protected:
 	Player* master;
 	uint8 m_forcedRole = 0;
 	bool m_suppressAreaTriggerRelay = false;
+	//String literals only - never freed, never copied. See GetLastCastFailReason.
+	char const* lastCastFailReason = "";
 	// GUID-shadow of `master` so we can verify the pointer is still
 	// alive each tick without dereferencing it. Set in SetMaster().
 	// Used by RevalidateMasterPointer() at the top of UpdateAI.

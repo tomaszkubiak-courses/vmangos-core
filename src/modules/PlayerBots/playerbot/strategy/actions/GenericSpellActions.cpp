@@ -72,6 +72,8 @@ bool CastSpellAction::Execute(Event& event)
         }
 
         executed = ai->CastSpell(spellName, target, nullptr, false, &spellDuration);
+        if (!executed)
+            sPlayerbotAIConfig.logCastBlock(spellName, "execute", ai->GetLastCastFailReason());
     }
 
     if (executed)
@@ -102,7 +104,10 @@ bool CastSpellAction::isPossible()
 
     Unit* spellTarget = GetTarget();
     if (!spellTarget)
+    {
+        sPlayerbotAIConfig.logCastBlock(spellName, "possible", "no target");
         return false;
+    }
 
     bool canReach = false;
     if (spellTarget == bot)
@@ -120,7 +125,10 @@ bool CastSpellAction::isPossible()
         {
             canReach = dist <= (range + sPlayerbotAIConfig.contactDistance);
             if (!spellId)
+            {
+                sPlayerbotAIConfig.logCastBlock(spellName, "possible", "spell not known");
                 return false;
+            }
 
             const SpellEntry* pSpellInfo = sServerFacade.LookupSpellInfo(spellId);
             if (!pSpellInfo)
@@ -139,11 +147,17 @@ bool CastSpellAction::isPossible()
 
     if(!canReach)
     {
+        sPlayerbotAIConfig.logCastBlock(spellName, "possible", "out of range");
         return false;
     }
-    
+
     // Check if the spell can be casted
-	return ai->CanCastSpell(spellName, spellTarget, 0, nullptr, true);
+    SpellCastResult checkResult = SPELL_CAST_OK;
+    if (ai->CanCastSpell(spellName, spellTarget, 0, nullptr, true, false, false, &checkResult))
+        return true;
+
+    sPlayerbotAIConfig.logCastBlock(spellName, "possible", GetSpellCastResultString(checkResult));
+    return false;
 }
 
 bool CastSpellAction::isUseful()
