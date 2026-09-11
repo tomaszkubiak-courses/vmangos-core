@@ -176,6 +176,30 @@ namespace ai
 			return sServerFacade.IsDistanceGreaterThan(AI_VALUE2(float, "distance", "current target"), (distance + sPlayerbotAIConfig.contactDistance));
 		}
 
+        virtual bool isPossible() override
+        {
+            // A gap closer is its own movement: unlike every other cast, nothing runs in
+            // front of it that could walk the bot into line of sight first, so a blocked
+            // line is final until something else moves the bot.
+            //
+            // It has to be asked here because CastSpellAction::isPossible calls
+            // CanCastSpell with ignoreRange, and that flag answers true for
+            // SPELL_FAILED_LINE_OF_SIGHT as well as SPELL_FAILED_OUT_OF_RANGE - correct for
+            // a spell whose reach action will close the gap, wrong for the reach itself.
+            // Charge therefore passed isPossible and died in Spell::prepare on every tick:
+            // 1171 failed executions against 2 successes in twenty minutes, and
+            // bot_cast_blocks.csv named "Target not in line of sight" for 1215 of them.
+            // Refusing here lets the alternative - walking there - have the turn instead.
+            Unit* const target = GetTarget();
+            if (target && !sServerFacade.IsWithinLOSInMap(bot, target))
+            {
+                sPlayerbotAIConfig.logCastBlock(getName(), "possible", "no line of sight for a gap closer");
+                return false;
+            }
+
+            return CastSpellAction::isPossible();
+        }
+
     protected:
         float distance;
     };
