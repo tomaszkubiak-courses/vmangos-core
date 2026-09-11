@@ -233,6 +233,7 @@ private:
     std::vector<InvasionZone> invasionPoints;
     std::vector<CityAttack> attackPoints;
     int previousRemainingCounts[6];
+    int previousVictories;
 };
 
 enum WarEffortEventStage
