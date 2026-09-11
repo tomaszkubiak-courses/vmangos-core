@@ -1585,7 +1585,10 @@ bool AreaTrigger_at_shadowforge_bridge(Player* pPlayer, AreaTriggerEntry const* 
         if (Creature* pMasterGuard = pPlayer->SummonCreature(NPC_ANVILRAGE_GUARDMAN, aGuardSpawnPositions[0][0], aGuardSpawnPositions[0][1], aGuardSpawnPositions[0][2], aGuardSpawnPositions[0][3], TEMPSUMMON_DEAD_DESPAWN, 0))
         {
             pMasterGuard->SetWalk(false);
-            pMasterGuard->GetMotionMaster()->MoveWaypoint();
+            // No MoveWaypoint here. Entry 8891 has no creature_movement_template and a
+            // temporary summon can have no per-guid path either, so the call only ever
+            // reached WaypointMovementGenerator::LoadPath to fail and write a DB error;
+            // the MovePoint two lines down is what actually sends the guard at the player.
             DoScriptText(SAY_GUARD_AGGRO, pMasterGuard);
             float fX, fY, fZ;
             pPlayer->GetContactPoint(pMasterGuard, fX, fY, fZ);
