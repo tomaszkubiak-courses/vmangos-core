@@ -508,8 +508,23 @@ public:
     // on the hottest path in the module, four times per action considered.
     bool logActionOutcomes = false;
 
+    // Why a cast never happened. bot_action_outcomes.csv says an action came out
+    // impossible or failed; it does not say what refused it, and the two ends of a
+    // cast refuse for different reasons. isPossible() ends at CanCastSpell, whose
+    // verdict is a SpellCastResult; a failed Execute is CastSpell walking out
+    // before Spell::prepare ever runs, over bot state the core never sees. Counted
+    // per spell and reason rather than logged per occurrence - impossible alone ran
+    // to half a million evaluations in a nine hour run - and dumped on the same
+    // five minute cadence as the outcome tally.
+    void logCastBlock(std::string const& spellName, char const* phase, char const* reason);
+
+    // Same reason as logActionOutcomes: checked on the cast path, several times a
+    // tick per bot.
+    bool logCastBlocks = false;
+
 private:
     void DumpActionOutcomes();
+    void DumpCastBlocks();
 
     void LoadTalentSpecs();
     void LoadLLMDefaultPrompts(const std::string& fileName);
@@ -517,6 +532,11 @@ private:
     std::mutex actionOutcomeMtx;
     std::unordered_map<std::string, std::array<uint32, (uint8)ActionOutcome::Max>> actionOutcomes;
     time_t actionOutcomeLastDump = 0;
+
+    std::mutex castBlockMtx;
+    //Keyed spell name, phase and reason, joined - one counter per distinct triple.
+    std::unordered_map<std::string, uint32> castBlocks;
+    time_t castBlockLastDump = 0;
 
     Config config;
 };

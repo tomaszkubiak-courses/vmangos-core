@@ -34,9 +34,30 @@ namespace ai
     protected:
 		float range;
 
+    protected:
+        // The spell id is resolved once, when the action object is built, and the
+        // context caches action objects for the life of the bot AI. Every random bot
+        // here starts at level 1, so an action built then snapshotted a 0 for every
+        // spell the bot had yet to learn, and isPossible() refuses outright on a zero
+        // id - the bot then never cast that spell again, whatever it learned later.
+        // Re-ask the context when the snapshot is empty; SpellIdValue is a
+        // CalculatedValue on a ten second interval, so this is a map lookup almost
+        // every time.
+        void RefreshSpellId();
+
+        // False only when the name resolves to a real spell the bot has not learned.
+        // Mirrors SpellTrigger::BotKnowsSpell - the same gate on the trigger side -
+        // and exists so an unlearned spell costs one lookup instead of a full
+        // CanCastSpell with a throwaway Spell object behind it.
+        bool BotKnowsSpell();
+
     private:
         std::string spellName;
         uint32 spellId;
+
+        // -1 until resolved, then 0 or 1. Whether a name is a spell name at all
+        // cannot change while the process runs, so it is asked once per action.
+        int8 spellNameIsReal = -1;
     };
 
     class CastPetSpellAction : public CastSpellAction

@@ -361,7 +361,17 @@ bool AutoLootRollAction::Execute(Event& event)
     return RollWithEtiquette(currentRoll->first, currentRoll->second);
 }
 
+bool AutoLootRollAction::isUseful()
+{
+    // There is nothing to roll on outside a group, and nothing to roll on inside one
+    // until a roll is running. Both are one lookup, and asking them here rather than in
+    // isPossible is what tells the outcome tally apart: a solo bot with no rolls open is
+    // an action correctly declining to run, not one that tried and could not. It read as
+    // the latter 19326 times in a nine hour run, at the top of the impossible list.
+    return bot->GetGroup() && !AI_VALUE(LootRollMap, "active rolls").empty();
+}
+
 bool AutoLootRollAction::isPossible()
 {
-    return bot->GetGroup() && !AI_VALUE(LootRollMap, "active rolls").empty() && AI_VALUE(uint8, "bag space") < 100;
+    return AI_VALUE(uint8, "bag space") < 100;
 }

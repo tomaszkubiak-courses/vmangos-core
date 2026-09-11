@@ -72,6 +72,8 @@ bool CastSpellAction::Execute(Event& event)
         }
 
         executed = ai->CastSpell(spellName, target, nullptr, false, &spellDuration);
+        if (!executed)
+            sPlayerbotAIConfig.logCastBlock(spellName, "execute", ai->GetLastCastFailReason());
     }
 
     if (executed)
@@ -87,6 +89,10 @@ bool CastSpellAction::Execute(Event& event)
 
 bool CastSpellAction::isPossible()
 {
+    // isUseful() already did this on the engine path, but DoSpecificAction and the
+    // reaction engine reach isPossible() directly.
+    RefreshSpellId();
+
     if (spellName == "mount")
     {
         if (!bot->IsMounted() && !bot->IsInCombat())
@@ -102,7 +108,10 @@ bool CastSpellAction::isPossible()
 
     Unit* spellTarget = GetTarget();
     if (!spellTarget)
+    {
+        sPlayerbotAIConfig.logCastBlock(spellName, "possible", "no target");
         return false;
+    }
 
     bool canReach = false;
     if (spellTarget == bot)
@@ -120,7 +129,10 @@ bool CastSpellAction::isPossible()
         {
             canReach = dist <= (range + sPlayerbotAIConfig.contactDistance);
             if (!spellId)
+            {
+                sPlayerbotAIConfig.logCastBlock(spellName, "possible", "spell not known");
                 return false;
+            }
 
             const SpellEntry* pSpellInfo = sServerFacade.LookupSpellInfo(spellId);
             if (!pSpellInfo)
@@ -139,16 +151,60 @@ bool CastSpellAction::isPossible()
 
     if(!canReach)
     {
+        sPlayerbotAIConfig.logCastBlock(spellName, "possible", "out of range");
         return false;
     }
-    
+
     // Check if the spell can be casted
-	return ai->CanCastSpell(spellName, spellTarget, 0, nullptr, true);
+    SpellCastResult checkResult = SPELL_CAST_OK;
+    if (ai->CanCastSpell(spellName, spellTarget, 0, nullptr, true, false, false, &checkResult))
+        return true;
+
+    sPlayerbotAIConfig.logCastBlock(spellName, "possible", GetSpellCastResultString(checkResult));
+    return false;
+}
+
+void CastSpellAction::RefreshSpellId()
+{
+    if (spellId)
+        return;
+
+    const uint32 currentId = ai->GetAiObjectContext()->GetValue<uint32>("spell id", spellName)->Get();
+    if (!currentId)
+        return;
+
+    spellId = currentId;
+
+    float spellRange;
+    if (ai->GetSpellRange(spellName, &spellRange))
+    {
+        range = spellRange;
+    }
+}
+
+bool CastSpellAction::BotKnowsSpell()
+{
+    // HasSpell reads a cached value and is tested first because SpellIds returns
+    // its vector by value.
+    if (spellId || ai->HasSpell(spellName))
+        return true;
+
+    if (spellNameIsReal < 0)
+        spellNameIsReal = ChatHelper::SpellIds(spellName).empty() ? 0 : 1;
+
+    return spellNameIsReal == 0;
 }
 
 bool CastSpellAction::isUseful()
 {
     if (ai->IsInVehicle() && !ai->IsInVehicle(false, false, true))
+        return false;
+
+    RefreshSpellId();
+
+    // "mount" is not cast by name here - isPossible has its own branch for it, with
+    // a side effect (dismounting in combat) that must keep running.
+    if (spellName != "mount" && !BotKnowsSpell())
         return false;
 
     if(!AI_VALUE2(bool, "spell cast useful", spellName))

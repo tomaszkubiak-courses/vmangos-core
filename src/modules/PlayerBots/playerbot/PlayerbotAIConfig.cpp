@@ -532,6 +532,7 @@ bool PlayerbotAIConfig::Initialize()
     LoadListString<std::list<std::string>>(config.GetStringDefault("AiPlayerbot.DebugFilter", "add gathering loot,check values,emote,check mount state,jump"), debugFilter);
 
     logActionOutcomes = hasLog("bot_action_outcomes.csv");
+    logCastBlocks = hasLog("bot_cast_blocks.csv");
 
     worldBuffs.clear();
 
@@ -1279,6 +1280,79 @@ void PlayerbotAIConfig::DumpActionOutcomes()
         out << std::fixed << std::setprecision(4) << (float)succeeded / (float)total;
 
         log("bot_action_outcomes.csv", out.str().c_str());
+    }
+}
+
+void PlayerbotAIConfig::logCastBlock(std::string const& spellName, char const* phase, char const* reason)
+{
+    if (!logCastBlocks)
+        return;
+
+    if (!reason)
+        reason = "unknown";
+
+    std::string key = spellName;
+    key += '\x1f';
+    key += phase;
+    key += '\x1f';
+    key += reason;
+
+    std::lock_guard<std::mutex> guard(castBlockMtx);
+
+    castBlocks[key]++;
+
+    time_t now = time(0);
+
+    if (!castBlockLastDump)
+    {
+        castBlockLastDump = now;
+        return;
+    }
+
+    if (now - castBlockLastDump < 5 * MINUTE)
+        return;
+
+    castBlockLastDump = now;
+    DumpCastBlocks();
+}
+
+//Caller holds castBlockMtx.
+void PlayerbotAIConfig::DumpCastBlocks()
+{
+    std::string timestamp = GetTimestampStr() + "+00";
+
+    for (auto& [key, count] : castBlocks)
+    {
+        if (!count)
+            continue;
+
+        std::string spellName = key;
+        std::string phase;
+        std::string reason;
+
+        size_t first = key.find('\x1f');
+        if (first != std::string::npos)
+        {
+            spellName = key.substr(0, first);
+            size_t second = key.find('\x1f', first + 1);
+            if (second != std::string::npos)
+            {
+                phase = key.substr(first + 1, second - first - 1);
+                reason = key.substr(second + 1);
+            }
+        }
+
+        //The client messages behind a SpellCastResult carry commas of their own.
+        std::replace(reason.begin(), reason.end(), '"', '\'');
+
+        std::ostringstream out;
+        out << timestamp << ",";
+        out << "\"" << spellName << "\",";
+        out << "\"" << phase << "\",";
+        out << "\"" << reason << "\",";
+        out << count;
+
+        log("bot_cast_blocks.csv", out.str().c_str());
     }
 }
 
