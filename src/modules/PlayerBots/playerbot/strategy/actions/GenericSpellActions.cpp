@@ -89,6 +89,10 @@ bool CastSpellAction::Execute(Event& event)
 
 bool CastSpellAction::isPossible()
 {
+    // isUseful() already did this on the engine path, but DoSpecificAction and the
+    // reaction engine reach isPossible() directly.
+    RefreshSpellId();
+
     if (spellName == "mount")
     {
         if (!bot->IsMounted() && !bot->IsInCombat())
@@ -160,9 +164,47 @@ bool CastSpellAction::isPossible()
     return false;
 }
 
+void CastSpellAction::RefreshSpellId()
+{
+    if (spellId)
+        return;
+
+    const uint32 currentId = ai->GetAiObjectContext()->GetValue<uint32>("spell id", spellName)->Get();
+    if (!currentId)
+        return;
+
+    spellId = currentId;
+
+    float spellRange;
+    if (ai->GetSpellRange(spellName, &spellRange))
+    {
+        range = spellRange;
+    }
+}
+
+bool CastSpellAction::BotKnowsSpell()
+{
+    // HasSpell reads a cached value and is tested first because SpellIds returns
+    // its vector by value.
+    if (spellId || ai->HasSpell(spellName))
+        return true;
+
+    if (spellNameIsReal < 0)
+        spellNameIsReal = ChatHelper::SpellIds(spellName).empty() ? 0 : 1;
+
+    return spellNameIsReal == 0;
+}
+
 bool CastSpellAction::isUseful()
 {
     if (ai->IsInVehicle() && !ai->IsInVehicle(false, false, true))
+        return false;
+
+    RefreshSpellId();
+
+    // "mount" is not cast by name here - isPossible has its own branch for it, with
+    // a side effect (dismounting in combat) that must keep running.
+    if (spellName != "mount" && !BotKnowsSpell())
         return false;
 
     if(!AI_VALUE2(bool, "spell cast useful", spellName))
