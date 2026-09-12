@@ -1479,6 +1479,29 @@ void PlayerbotAI::HandleTeleportAck()
 	}
 	else if (bot->IsBeingTeleportedFar())
 	{
+        // A battleground map only exists while its instance does. If the bot was queued into a
+        // battleground that has since ended, the worldport ack would ask MapManager to create an
+        // instance that no longer has a BattleGround behind it, which asserts. Abort the teleport
+        // instead and let the bot carry on where it stands.
+        WorldLocation const& loc = bot->GetTeleportDest();
+        MapEntry const* mapEntry = sMapStore.LookupEntry(loc.mapId);
+        if (mapEntry && mapEntry->IsBattleGround())
+        {
+            uint32 bgInstanceId = bot->GetBattleGroundId();
+            if (!bgInstanceId || !sMapMgr.FindMap(loc.mapId, bgInstanceId))
+            {
+                sLog.outError("PlayerbotAI::HandleTeleportAck: bot %s aborted teleport to battleground map %u, instance %u no longer exists",
+                    bot->GetName(), loc.mapId, bgInstanceId);
+                bot->SetSemaphoreTeleportFar(false);
+
+                if (IsRealPlayer())
+                    bot->SendHeartBeat();
+
+                Reset();
+                return;
+            }
+        }
+
         bot->GetSession()->BotHandleMoveWorldportAckOpcode(BotEmptyPacket(MSG_MOVE_WORLDPORT_ACK));
 
         // add delay to simulate teleport delay
@@ -6004,27 +6027,58 @@ bool PlayerbotAI::RemoveAura(const std::string& name)
     return false;
 }
 
-bool PlayerbotAI::IsInterruptableSpellCasting(Unit* target, std::string spell, uint8 effectMask)
+// Whether the spell the unit is currently casting can be interrupted at all. Mirrors the
+// conditions Spell::EffectInterruptCast applies before it will touch a cast: a cast that is
+// not silenceable, or an instant one, is immune to a kick no matter what is thrown at it.
+static bool IsCurrentCastInterruptible(Unit* target)
+{
+    for (uint32 i = CURRENT_FIRST_NON_MELEE_SPELL; i < CURRENT_MAX_SPELL; ++i)
+    {
+        Spell* spell = target->GetCurrentSpell(CurrentSpellTypes(i));
+        if (!spell)
+            continue;
+
+        if (i != CURRENT_CHANNELED_SPELL && !spell->GetCastTime())
+            continue;
+
+        SpellEntry const* curSpellInfo = spell->m_spellInfo;
+        if ((spell->getState() == SPELL_STATE_CASTING
+            || (spell->getState() == SPELL_STATE_PREPARING && spell->GetCastTime() > 0.0f))
+            && curSpellInfo->PreventionType == SPELL_PREVENTION_TYPE_SILENCE
+            && ((i == CURRENT_GENERIC_SPELL && curSpellInfo->HasSpellInterruptFlag(SPELL_INTERRUPT_FLAG_DAMAGE_PUSHBACK))
+                || (i == CURRENT_CHANNELED_SPELL && curSpellInfo->HasChannelInterruptFlag(AURA_INTERRUPT_ACTION_CANCELS))))
+            return true;
+    }
+
+    return false;
+}
+
+bool PlayerbotAI::IsInterruptableSpellCasting(Unit* target, std::string spell)
 {
 	uint32 spellid = aiObjectContext->GetValue<uint32>("spell id", spell)->Get();
-	if (!spellid || !target->IsNonMeleeSpellCasted(true))
+	if (!spellid || !target->IsNonMeleeSpellCasted(true) || !IsCurrentCastInterruptible(target))
 		return false;
 
 	SpellEntry const *spellInfo = sServerFacade.LookupSpellInfo(spellid);
 	if (!spellInfo)
 		return false;
 
+	// Immunity is checked over the whole spell first: one immune effect makes the cast pointless,
+	// so a later interrupting effect must not vote the spell back in.
 	for (int32 i = EFFECT_INDEX_0; i <= EFFECT_INDEX_2; i++)
 	{
-		if ((spellInfo->InterruptFlags & SPELL_INTERRUPT_FLAG_COMBAT) && spellInfo->PreventionType == SPELL_PREVENTION_TYPE_SILENCE)
+		if (target->IsImmuneToSpellEffect(spellInfo, (SpellEffectIndex)i, false))
+			return false;
+	}
+
+	for (int32 i = EFFECT_INDEX_0; i <= EFFECT_INDEX_2; i++)
+	{
+		if (spellInfo->Effect[i] == SPELL_EFFECT_INTERRUPT_CAST)
 			return true;
 
-		if ((spellInfo->Effect[i] == SPELL_EFFECT_INTERRUPT_CAST) &&
-			!target->IsImmuneToSpellEffect(spellInfo, (SpellEffectIndex)i, true))
+		if ((spellInfo->Effect[i] == SPELL_EFFECT_APPLY_AURA) &&
+			(spellInfo->EffectApplyAuraName[i] == SPELL_AURA_MOD_SILENCE || spellInfo->EffectApplyAuraName[i] == SPELL_AURA_MOD_STUN))
 			return true;
-
-        if ((spellInfo->Effect[i] == SPELL_EFFECT_APPLY_AURA) && spellInfo->EffectApplyAuraName[i] == SPELL_AURA_MOD_SILENCE)
-            return true;
 	}
 
 	return false;
