@@ -106,6 +106,9 @@ bool CastSpellAction::isPossible()
         }
     }
 
+    if (!CanCastNow("possible"))
+        return false;
+
     Unit* spellTarget = GetTarget();
     if (!spellTarget)
     {
@@ -195,6 +198,52 @@ bool CastSpellAction::BotKnowsSpell()
     return spellNameIsReal == 0;
 }
 
+bool CastSpellAction::CanCastNow(const char* phase)
+{
+    // "mount" is not cast by name here - isPossible has its own branch for it, with a
+    // side effect (dismounting in combat) that must keep running.
+    if (spellName == "mount")
+        return true;
+
+    if (!BotKnowsSpell())
+    {
+        sPlayerbotAIConfig.logCastBlock(spellName, phase, "spell not known");
+        return false;
+    }
+
+    // A name that is not a spell at all - a pseudo action riding on the cast machinery
+    // - has nothing further to check here.
+    if (!spellId)
+        return true;
+
+    const SpellEntry* spellInfo = sServerFacade.LookupSpellInfo(spellId);
+    if (!spellInfo)
+        return true;
+
+    if (!bot->IsSpellReady(spellInfo))
+    {
+        sPlayerbotAIConfig.logCastBlock(spellName, phase, "Spell is not ready yet.");
+        return false;
+    }
+
+    // A next melee swing spell stays queued until the swing lands. Casting the same one
+    // again while it is pending replaces nothing - the core refuses it outright - so the
+    // bot was paying for a full CanCastSpell every tick of every swing timer. Over an 18
+    // hour run Raptor Strike alone was refused 43956 times for this and 48769 more for
+    // the cooldown behind it, against 4757 casts that went through.
+    if (spellInfo->IsNextMeleeSwingSpell())
+    {
+        Spell* queuedSwingSpell = bot->GetCurrentSpell(CURRENT_MELEE_SPELL);
+        if (queuedSwingSpell && queuedSwingSpell->m_spellInfo->Id == spellInfo->Id)
+        {
+            sPlayerbotAIConfig.logCastBlock(spellName, phase, "Another action is in progress");
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool CastSpellAction::isUseful()
 {
     if (ai->IsInVehicle() && !ai->IsInVehicle(false, false, true))
@@ -202,9 +251,7 @@ bool CastSpellAction::isUseful()
 
     RefreshSpellId();
 
-    // "mount" is not cast by name here - isPossible has its own branch for it, with
-    // a side effect (dismounting in combat) that must keep running.
-    if (spellName != "mount" && !BotKnowsSpell())
+    if (!CanCastNow("useful"))
         return false;
 
     if(!AI_VALUE2(bool, "spell cast useful", spellName))

@@ -51,6 +51,17 @@ namespace ai
         // CanCastSpell with a throwaway Spell object behind it.
         bool BotKnowsSpell();
 
+        // The three reasons a cast is refused that depend on nothing but the bot and
+        // the spell: not learned, still on cooldown, and a next melee swing spell that
+        // is already queued for the coming swing. None of them involve a target, so
+        // they are worth settling before the engine pays for one.
+        //
+        // Deliberately not virtual, and called from both isUseful and isPossible.
+        // Dozens of class actions override isUseful without chaining to the base one,
+        // which is how unlearned spells kept reaching the cast path; isPossible is the
+        // one point every override still passes through.
+        bool CanCastNow(const char* phase);
+
     private:
         std::string spellName;
         uint32 spellId;
