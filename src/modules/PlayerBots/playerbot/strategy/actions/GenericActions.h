@@ -172,6 +172,13 @@ namespace ai
         InitializePetAction(PlayerbotAI* ai) : Action(ai, "initialize pet") {}
         bool Execute(Event& event) override;
         bool isUseful() override;
+
+    private:
+        // -1 until asked, then 0 or 1. Whether a hunter has a pet waiting in the stable is
+        // a character database query, and the action object lives as long as the bot AI, so
+        // asking it once is enough: the only thing that turns a 0 into a 1 is this action
+        // giving the bot a pet, and from then on bot->GetPet() answers first.
+        int8 hasStabledPet = -1;
     };
 
     class SetPetAction : public Action
