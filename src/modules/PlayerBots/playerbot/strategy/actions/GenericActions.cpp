@@ -121,8 +121,14 @@ bool InitializePetAction::isUseful()
         if (bot->GetClass() == CLASS_HUNTER)
         {
             bool hasTamedPet = bot->GetPet();
-            if (!hasTamedPet)
+
+            // This query ran on the world update thread, synchronously, every time the
+            // "often" trigger reached the action - 5599 times in an 18 hour run, always
+            // with the same answer. Ask once and keep it.
+            if (!hasTamedPet && hasStabledPet < 0)
             {
+                hasStabledPet = 0;
+
                 std::unique_ptr<QueryResult> queryResult(CharacterDatabase.PQuery("SELECT id, entry, owner_guid "
                                                                                     "FROM character_pet WHERE owner_guid = '%u' AND (slot = '%u' OR slot > '%u') ",
                                                                                     bot->GetGUIDLow(), PET_SAVE_AS_CURRENT, PET_SAVE_LAST_STABLE_SLOT));
@@ -131,9 +137,12 @@ bool InitializePetAction::isUseful()
                 {
                     Field* fields = queryResult->Fetch();
                     const uint32 entry = fields[1].GetUInt32();
-                    hasTamedPet = sObjectMgr.GetCreatureTemplate(entry);
+                    hasStabledPet = sObjectMgr.GetCreatureTemplate(entry) ? 1 : 0;
                 }
             }
+
+            if (!hasTamedPet)
+                hasTamedPet = hasStabledPet == 1;
 
             return !hasTamedPet;
         }
@@ -145,174 +154,183 @@ bool InitializePetAction::isUseful()
             Pet* pet = bot->GetPet();
             if (pet)
             {
-                constexpr uint32 PET_IMP = 416;
-                constexpr uint32 PET_FELHUNTER = 417;
-                constexpr uint32 PET_VOIDWALKER = 1860;
-                constexpr uint32 PET_SUCCUBUS = 1863;
-                constexpr uint32 PET_FELGUARD = 17252;
-
+                // Built once. This is a table of literals that cannot change while the
+                // process runs, and isUseful is reached on every "often" tick of every
+                // warlock that has a pet out - rebuilding a hundred and twenty map entries
+                // each time to read one of them was the whole cost of the check.
                 //      pet type                    pet level  pet spell id
-                std::map<uint32, std::vector<std::pair<uint32, uint32>>> spellList;
-
-                // Imp spells
+                static const std::map<uint32, std::vector<std::pair<uint32, uint32>>> spellList = []()
                 {
-                    // Blood Pact
-                    spellList[PET_IMP].push_back(std::pair(4, 6307));
-                    spellList[PET_IMP].push_back(std::pair(14, 7804));
-                    spellList[PET_IMP].push_back(std::pair(26, 7805));
-                    spellList[PET_IMP].push_back(std::pair(38, 11766));
-                    spellList[PET_IMP].push_back(std::pair(50, 11767));
-                    spellList[PET_IMP].push_back(std::pair(62, 27268));
-                    spellList[PET_IMP].push_back(std::pair(74, 47982));
+                    constexpr uint32 PET_IMP = 416;
+                    constexpr uint32 PET_FELHUNTER = 417;
+                    constexpr uint32 PET_VOIDWALKER = 1860;
+                    constexpr uint32 PET_SUCCUBUS = 1863;
+                    constexpr uint32 PET_FELGUARD = 17252;
 
-                    // Fire Shield
-                    spellList[PET_IMP].push_back(std::pair(14, 2947));
-                    spellList[PET_IMP].push_back(std::pair(24, 8316));
-                    spellList[PET_IMP].push_back(std::pair(34, 8317));
-                    spellList[PET_IMP].push_back(std::pair(44, 11770));
-                    spellList[PET_IMP].push_back(std::pair(54, 11771));
-                    spellList[PET_IMP].push_back(std::pair(64, 27269));
-                    spellList[PET_IMP].push_back(std::pair(76, 47983));
+                    std::map<uint32, std::vector<std::pair<uint32, uint32>>> spellList;
 
-                    // Firebolt
-                    spellList[PET_IMP].push_back(std::pair(1, 3110));
-                    spellList[PET_IMP].push_back(std::pair(8, 7799));
-                    spellList[PET_IMP].push_back(std::pair(18, 7800));
-                    spellList[PET_IMP].push_back(std::pair(28, 7801));
-                    spellList[PET_IMP].push_back(std::pair(38, 7802));
-                    spellList[PET_IMP].push_back(std::pair(48, 11762));
-                    spellList[PET_IMP].push_back(std::pair(58, 11763));
-                    spellList[PET_IMP].push_back(std::pair(68, 27267));
-                    spellList[PET_IMP].push_back(std::pair(78, 47964));
+                    // Imp spells
+                    {
+                        // Blood Pact
+                        spellList[PET_IMP].push_back(std::pair(4, 6307));
+                        spellList[PET_IMP].push_back(std::pair(14, 7804));
+                        spellList[PET_IMP].push_back(std::pair(26, 7805));
+                        spellList[PET_IMP].push_back(std::pair(38, 11766));
+                        spellList[PET_IMP].push_back(std::pair(50, 11767));
+                        spellList[PET_IMP].push_back(std::pair(62, 27268));
+                        spellList[PET_IMP].push_back(std::pair(74, 47982));
 
-                    // Phase Shift
-                    spellList[PET_IMP].push_back(std::pair(12, 4511));
-                }
+                        // Fire Shield
+                        spellList[PET_IMP].push_back(std::pair(14, 2947));
+                        spellList[PET_IMP].push_back(std::pair(24, 8316));
+                        spellList[PET_IMP].push_back(std::pair(34, 8317));
+                        spellList[PET_IMP].push_back(std::pair(44, 11770));
+                        spellList[PET_IMP].push_back(std::pair(54, 11771));
+                        spellList[PET_IMP].push_back(std::pair(64, 27269));
+                        spellList[PET_IMP].push_back(std::pair(76, 47983));
 
-                // Felhunter spells
-                {
-                    // Devour Magic
-                    spellList[PET_FELHUNTER].push_back(std::pair(30, 19505));
-                    spellList[PET_FELHUNTER].push_back(std::pair(38, 19731));
-                    spellList[PET_FELHUNTER].push_back(std::pair(46, 19734));
-                    spellList[PET_FELHUNTER].push_back(std::pair(54, 19736));
-                    spellList[PET_FELHUNTER].push_back(std::pair(62, 27276));
-                    spellList[PET_FELHUNTER].push_back(std::pair(70, 27277));
-                    spellList[PET_FELHUNTER].push_back(std::pair(77, 48011));
+                        // Firebolt
+                        spellList[PET_IMP].push_back(std::pair(1, 3110));
+                        spellList[PET_IMP].push_back(std::pair(8, 7799));
+                        spellList[PET_IMP].push_back(std::pair(18, 7800));
+                        spellList[PET_IMP].push_back(std::pair(28, 7801));
+                        spellList[PET_IMP].push_back(std::pair(38, 7802));
+                        spellList[PET_IMP].push_back(std::pair(48, 11762));
+                        spellList[PET_IMP].push_back(std::pair(58, 11763));
+                        spellList[PET_IMP].push_back(std::pair(68, 27267));
+                        spellList[PET_IMP].push_back(std::pair(78, 47964));
 
-                    // Paranoia
-                    spellList[PET_FELHUNTER].push_back(std::pair(42, 19480));
+                        // Phase Shift
+                        spellList[PET_IMP].push_back(std::pair(12, 4511));
+                    }
 
-                    // Spell Lock
-                    spellList[PET_FELHUNTER].push_back(std::pair(36, 19244));
-                    spellList[PET_FELHUNTER].push_back(std::pair(52, 19647));
+                    // Felhunter spells
+                    {
+                        // Devour Magic
+                        spellList[PET_FELHUNTER].push_back(std::pair(30, 19505));
+                        spellList[PET_FELHUNTER].push_back(std::pair(38, 19731));
+                        spellList[PET_FELHUNTER].push_back(std::pair(46, 19734));
+                        spellList[PET_FELHUNTER].push_back(std::pair(54, 19736));
+                        spellList[PET_FELHUNTER].push_back(std::pair(62, 27276));
+                        spellList[PET_FELHUNTER].push_back(std::pair(70, 27277));
+                        spellList[PET_FELHUNTER].push_back(std::pair(77, 48011));
 
-                    // Tainted Blood
-                    spellList[PET_FELHUNTER].push_back(std::pair(32, 19478));
-                    spellList[PET_FELHUNTER].push_back(std::pair(40, 19655));
-                    spellList[PET_FELHUNTER].push_back(std::pair(48, 19656));
-                    spellList[PET_FELHUNTER].push_back(std::pair(56, 19660));
-                    spellList[PET_FELHUNTER].push_back(std::pair(64, 27280));
-                }
+                        // Paranoia
+                        spellList[PET_FELHUNTER].push_back(std::pair(42, 19480));
 
-                // Voidwalker spells
-                {
-                    // Consume Shadows
-                    spellList[PET_VOIDWALKER].push_back(std::pair(18, 17767));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(26, 17850));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(34, 17851));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(42, 17852));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(50, 17853));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(58, 17854));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(66, 27272));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(73, 47987));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(78, 47988));
+                        // Spell Lock
+                        spellList[PET_FELHUNTER].push_back(std::pair(36, 19244));
+                        spellList[PET_FELHUNTER].push_back(std::pair(52, 19647));
 
-                    // Sacrifice
-                    spellList[PET_VOIDWALKER].push_back(std::pair(16, 7812));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(24, 19438));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(32, 19440));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(40, 19441));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(48, 19442));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(56, 19443));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(64, 27273));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(72, 47985));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(79, 47986));
+                        // Tainted Blood
+                        spellList[PET_FELHUNTER].push_back(std::pair(32, 19478));
+                        spellList[PET_FELHUNTER].push_back(std::pair(40, 19655));
+                        spellList[PET_FELHUNTER].push_back(std::pair(48, 19656));
+                        spellList[PET_FELHUNTER].push_back(std::pair(56, 19660));
+                        spellList[PET_FELHUNTER].push_back(std::pair(64, 27280));
+                    }
 
-                    // Suffering
-                    spellList[PET_VOIDWALKER].push_back(std::pair(24, 17735));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(36, 17750));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(48, 17751));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(60, 17752));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(63, 27271));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(69, 33701));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(75, 47989));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(80, 47990));
+                    // Voidwalker spells
+                    {
+                        // Consume Shadows
+                        spellList[PET_VOIDWALKER].push_back(std::pair(18, 17767));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(26, 17850));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(34, 17851));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(42, 17852));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(50, 17853));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(58, 17854));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(66, 27272));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(73, 47987));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(78, 47988));
 
-                    // Torment
-                    spellList[PET_VOIDWALKER].push_back(std::pair(10, 3716));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(20, 7809));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(30, 7810));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(40, 7811));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(50, 11774));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(60, 11775));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(70, 27270));
-                    spellList[PET_VOIDWALKER].push_back(std::pair(80, 47984));
-                }
+                        // Sacrifice
+                        spellList[PET_VOIDWALKER].push_back(std::pair(16, 7812));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(24, 19438));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(32, 19440));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(40, 19441));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(48, 19442));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(56, 19443));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(64, 27273));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(72, 47985));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(79, 47986));
 
-                // Succubus spells
-                {
-                    // Lash of Pain
-                    spellList[PET_SUCCUBUS].push_back(std::pair(20, 7814));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(28, 7815));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(36, 7816));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(44, 11778));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(52, 11779));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(60, 11780));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(68, 27274));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(74, 47991));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(80, 47992));
+                        // Suffering
+                        spellList[PET_VOIDWALKER].push_back(std::pair(24, 17735));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(36, 17750));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(48, 17751));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(60, 17752));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(63, 27271));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(69, 33701));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(75, 47989));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(80, 47990));
 
-                    // Lesser Invisibility
-                    spellList[PET_SUCCUBUS].push_back(std::pair(32, 7870));
+                        // Torment
+                        spellList[PET_VOIDWALKER].push_back(std::pair(10, 3716));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(20, 7809));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(30, 7810));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(40, 7811));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(50, 11774));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(60, 11775));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(70, 27270));
+                        spellList[PET_VOIDWALKER].push_back(std::pair(80, 47984));
+                    }
 
-                    // Seduction
-                    spellList[PET_SUCCUBUS].push_back(std::pair(26, 6358));
+                    // Succubus spells
+                    {
+                        // Lash of Pain
+                        spellList[PET_SUCCUBUS].push_back(std::pair(20, 7814));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(28, 7815));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(36, 7816));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(44, 11778));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(52, 11779));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(60, 11780));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(68, 27274));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(74, 47991));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(80, 47992));
 
-                    // Soothing Kiss
-                    spellList[PET_SUCCUBUS].push_back(std::pair(22, 6360));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(34, 7813));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(46, 11784));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(58, 11785));
-                    spellList[PET_SUCCUBUS].push_back(std::pair(70, 27275));
-                }
+                        // Lesser Invisibility
+                        spellList[PET_SUCCUBUS].push_back(std::pair(32, 7870));
 
-                // Felguard spells
-                {
-                    // Anguish
-                    spellList[PET_FELGUARD].push_back(std::pair(50, 33698));
-                    spellList[PET_FELGUARD].push_back(std::pair(60, 33699));
-                    spellList[PET_FELGUARD].push_back(std::pair(69, 33700));
-                    spellList[PET_FELGUARD].push_back(std::pair(78, 47993));
+                        // Seduction
+                        spellList[PET_SUCCUBUS].push_back(std::pair(26, 6358));
 
-                    // Avoidance
-                    spellList[PET_FELGUARD].push_back(std::pair(60, 32233));
+                        // Soothing Kiss
+                        spellList[PET_SUCCUBUS].push_back(std::pair(22, 6360));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(34, 7813));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(46, 11784));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(58, 11785));
+                        spellList[PET_SUCCUBUS].push_back(std::pair(70, 27275));
+                    }
 
-                    // Cleave
-                    spellList[PET_FELGUARD].push_back(std::pair(50, 30213));
-                    spellList[PET_FELGUARD].push_back(std::pair(60, 30219));
-                    spellList[PET_FELGUARD].push_back(std::pair(68, 30223));
-                    spellList[PET_FELGUARD].push_back(std::pair(76, 47994));
+                    // Felguard spells
+                    {
+                        // Anguish
+                        spellList[PET_FELGUARD].push_back(std::pair(50, 33698));
+                        spellList[PET_FELGUARD].push_back(std::pair(60, 33699));
+                        spellList[PET_FELGUARD].push_back(std::pair(69, 33700));
+                        spellList[PET_FELGUARD].push_back(std::pair(78, 47993));
 
-                    // Demonic Frenzy
-                    spellList[PET_FELGUARD].push_back(std::pair(56, 32850));
+                        // Avoidance
+                        spellList[PET_FELGUARD].push_back(std::pair(60, 32233));
 
-                    // Intercept
-                    spellList[PET_FELGUARD].push_back(std::pair(52, 30151));
-                    spellList[PET_FELGUARD].push_back(std::pair(61, 30194));
-                    spellList[PET_FELGUARD].push_back(std::pair(69, 30198));
-                    spellList[PET_FELGUARD].push_back(std::pair(79, 47996));
-                }
+                        // Cleave
+                        spellList[PET_FELGUARD].push_back(std::pair(50, 30213));
+                        spellList[PET_FELGUARD].push_back(std::pair(60, 30219));
+                        spellList[PET_FELGUARD].push_back(std::pair(68, 30223));
+                        spellList[PET_FELGUARD].push_back(std::pair(76, 47994));
+
+                        // Demonic Frenzy
+                        spellList[PET_FELGUARD].push_back(std::pair(56, 32850));
+
+                        // Intercept
+                        spellList[PET_FELGUARD].push_back(std::pair(52, 30151));
+                        spellList[PET_FELGUARD].push_back(std::pair(61, 30194));
+                        spellList[PET_FELGUARD].push_back(std::pair(69, 30198));
+                        spellList[PET_FELGUARD].push_back(std::pair(79, 47996));
+                    }
+
+                    return spellList;
+                }();
 
                 // Get the appropriate spell list by level and type
                 const auto& petSpellListItr = spellList.find(pet->GetEntry());
