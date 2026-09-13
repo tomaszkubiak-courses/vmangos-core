@@ -162,7 +162,14 @@ namespace ai
 
             SET_AI_VALUE(uint32, "death count", 0);
 
-            if (bot->IsDead())
+            // Recorded below. A repop is not the same thing as a death and most of them are
+            // not one: the action is also how an unstuck measure evacuates a live bot, and
+            // how a dead one gets out of a fall or a graveyard it cannot leave. With nothing
+            // but a bare row in bot_events.csv the two are indistinguishable, and 1047
+            // repops in an 18 hour run read as deaths beside the 314 that deaths.csv held.
+            const bool wasDead = bot->IsDead();
+
+            if (wasDead)
             {
                 bot->ResurrectPlayer(1.0f, false);
                 bot->SpawnCorpseBones();
@@ -216,7 +223,7 @@ namespace ai
                 bot->SendHeartBeat();
             }
 
-            sPlayerbotAIConfig.logEvent(ai, "RepopAction");
+            sPlayerbotAIConfig.logEvent(ai, "RepopAction", wasDead ? "dead" : "alive", event.getSource());
 
             return true;
         }
