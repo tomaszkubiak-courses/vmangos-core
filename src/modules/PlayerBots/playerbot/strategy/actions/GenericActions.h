@@ -106,14 +106,39 @@ namespace ai
     {
         struct StrategyToUpdate
         {
+            // A required strategy may be written as a "/"-separated list of synonyms, any one of
+            // which satisfies it. The split happens here, once, rather than in isUseful: that runs
+            // for every bot on every tick and almost never has anything to change, so re-parsing
+            // the same literals through a stringstream each time was the cost of the action.
             StrategyToUpdate(BotState inState, std::string inStrategy, std::vector<std::string> inStrategiesRequired = {})
             : state(inState)
             , name(inStrategy)
-            , strategiesRequired(inStrategiesRequired) {}
+            {
+                for (const std::string& strategyRequired : inStrategiesRequired)
+                {
+                    std::vector<std::string> aliases;
+                    for (size_t start = 0; start <= strategyRequired.size(); )
+                    {
+                        const size_t separator = strategyRequired.find('/', start);
+                        const size_t end = separator == std::string::npos ? strategyRequired.size() : separator;
+                        if (end > start)
+                            aliases.push_back(strategyRequired.substr(start, end - start));
+
+                        if (separator == std::string::npos)
+                            break;
+
+                        start = separator + 1;
+                    }
+
+                    if (!aliases.empty())
+                        strategiesRequired.push_back(aliases);
+                }
+            }
 
             BotState state;
             std::string name;
-            std::vector<std::string> strategiesRequired;
+            // One entry per required strategy, holding the synonyms that satisfy it.
+            std::vector<std::vector<std::string>> strategiesRequired;
         };
 
      public:
