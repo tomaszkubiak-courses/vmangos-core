@@ -237,7 +237,17 @@ bool NoAttackersTrigger::IsActive()
 
 bool InvalidTargetTrigger::IsActive()
 {
-    return AI_VALUE2(bool, "invalid target", "current target");
+    // "invalid target" answers true for no target at all, which is what the action behind
+    // this trigger leaves behind: SelectNewTargetAction clears the current target, so from
+    // the next tick on the trigger fired again on the emptiness it had just created and the
+    // action ran with nothing left to do. It executed 114061 times in an 18 hour run and
+    // reported 80430 of them as failures, which is what an action with no work looks like
+    // from the engine.
+    //
+    // A bot that has no target at all is the "no target" trigger's business - that is what
+    // GrindingStrategy hangs "attack anything" on, and NoTargetTrigger spells the null case
+    // out deliberately. This one only has to catch a target that went bad while held.
+    return AI_VALUE(Unit*, "current target") && AI_VALUE2(bool, "invalid target", "current target");
 }
 
 bool NoTargetTrigger::IsActive()
