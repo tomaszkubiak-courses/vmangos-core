@@ -1285,6 +1285,24 @@ bool UseHearthStoneAction::Execute(Event& event)
         sPlayerbotAIConfig.logEvent(ai, "UseHearthStoneAction", event.getParam(), event.getSource());
         RESET_AI_VALUE(bool, "combat::self target");
         RESET_AI_VALUE(WorldPosition, "current position");
+
+        // The bot is about to be somewhere else entirely, and almost every hearthstone
+        // here is an unstuck measure rather than a plan - 1105 of 1106 uses in an 18
+        // hour run came from the stuck triggers. Keeping the destination it was working
+        // on turns a short trip into a journey across the continent, which is how one
+        // level 6 warlock came to spend a night walking 8266 yards back to Northshire,
+        // dying 79 times on the way and never arriving. Drop it and let the bot choose
+        // again from where it lands.
+        //
+        // Done here rather than through the "reset travel target" action, which refuses
+        // an active target - the exact case this has to clear. Putting the target into
+        // cooldown closes the trip the usual way, so it is still counted as abandoned in
+        // travel_map.csv and still tells the bot the place was not reachable.
+        if (TravelTarget* travelTarget = AI_VALUE(TravelTarget*, "travel target"))
+        {
+            travelTarget->SetStatus(TravelStatus::TRAVEL_STATUS_COOLDOWN);
+            travelTarget->SetExpireIn(60000);
+        }
     }
 
     return used;

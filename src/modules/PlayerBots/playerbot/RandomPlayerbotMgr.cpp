@@ -3261,7 +3261,15 @@ void RandomPlayerbotMgr::RandomTeleportForLevel(Player* bot, bool activeOnly)
     for (auto& [innGuid, innPosition] : innCacheLevel[bot->GetRace()][bot->GetLevel()])
     {
         float distance = botPos.sqDistance(innPosition);
-        if (minDistance > 0 || distance >= minDistance)
+
+        // This read "minDistance > 0 || distance >= minDistance". With minDistance
+        // starting at -1 the second half is true for every candidate - a distance is
+        // never below -1 - so the first inn was skipped, and so was every one after it.
+        // The loop could not select anything, and the bind below never ran: a bot kept
+        // whatever home it was created with, however far that had drifted from the
+        // levels it was now playing. That is where the stranding starts, because the
+        // hearthstone is what an unstuck bot reaches for.
+        if (minDistance >= 0.0f && distance >= minDistance)
             continue;
 
         minDistance = distance;
