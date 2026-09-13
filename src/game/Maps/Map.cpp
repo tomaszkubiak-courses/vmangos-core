@@ -2627,14 +2627,52 @@ bool Map::FindScriptFinalTargets(WorldObject*& source, WorldObject*& target, Scr
         SpellEntry const* pSpellInfo = (script.command == SCRIPT_COMMAND_CAST_SPELL) ? sSpellMgr.GetSpellEntry(script.castSpell.spellId) : nullptr;
         if (!(target = GetTargetByType(source, target, this, script.target_type, script.target_param1, script.target_param2, pSpellInfo)))
         {
-            // A miss on one of the threat-list target types is a runtime
-            // condition, not bad data: SelectAttackingTarget filters the list
-            // by the spell's range, line of sight and immunities, so a mob
-            // whose only attacker is kiting it out of range legitimately has
-            // nothing to pick. Every other target type names something that
-            // is supposed to exist, and a miss there is worth an error.
-            bool const runtimeMiss = script.target_type >= TARGET_T_HOSTILE &&
-                                     script.target_type <= TARGET_T_HOSTILE_FARTHEST;
+            // A miss is only worth an error when the target type names something that
+            // is supposed to be there: a database guid, a creature held in instance
+            // data, the source or target of a map event. The rest search an area and
+            // may legitimately come up empty.
+            //
+            // The threat-list types were the first case of this: SelectAttackingTarget
+            // filters the list by the spell's range, line of sight and immunities, so a
+            // mob whose only attacker is kiting it out of range has nothing to pick.
+            //
+            // The radius searches are the same. They ask for the nearest or a random
+            // creature, gameobject, player or friendly unit within a distance, and
+            // whether one is standing there is a property of the moment. Almost all of
+            // them belong to paired walking NPCs, where a waypoint script has one of the
+            // pair say a line to the other - William to Donna in Stormwind, Raider Jhash
+            // to Raider Kerr in Durotar, Janey Anship to Suzanne. Both NPCs exist and are
+            // spawned; the partner was simply dead, in combat elsewhere or out of range
+            // when the waypoint came round, which on a populated realm is routine.
+            bool runtimeMiss;
+            switch (script.target_type)
+            {
+                case TARGET_T_HOSTILE:
+                case TARGET_T_HOSTILE_SECOND_AGGRO:
+                case TARGET_T_HOSTILE_LAST_AGGRO:
+                case TARGET_T_HOSTILE_RANDOM:
+                case TARGET_T_HOSTILE_RANDOM_NOT_TOP:
+                case TARGET_T_HOSTILE_NEAREST:
+                case TARGET_T_HOSTILE_FARTHEST:
+                case TARGET_T_NEAREST_CREATURE_WITH_ENTRY:
+                case TARGET_T_NEAREST_GAMEOBJECT_WITH_ENTRY:
+                case TARGET_T_FRIENDLY:
+                case TARGET_T_FRIENDLY_INJURED:
+                case TARGET_T_FRIENDLY_INJURED_EXCEPT:
+                case TARGET_T_FRIENDLY_MISSING_BUFF:
+                case TARGET_T_FRIENDLY_MISSING_BUFF_EXCEPT:
+                case TARGET_T_FRIENDLY_CC:
+                case TARGET_T_NEAREST_PLAYER:
+                case TARGET_T_NEAREST_HOSTILE_PLAYER:
+                case TARGET_T_NEAREST_FRIENDLY_PLAYER:
+                case TARGET_T_RANDOM_CREATURE_WITH_ENTRY:
+                case TARGET_T_RANDOM_GAMEOBJECT_WITH_ENTRY:
+                    runtimeMiss = true;
+                    break;
+                default:
+                    runtimeMiss = false;
+                    break;
+            }
             if (!(script.raw.data[4] & SF_GENERAL_SKIP_MISSING_TARGETS))
                 sLog.Out(LOG_BASIC, runtimeMiss ? LOG_LVL_DEBUG : LOG_LVL_ERROR, "FindScriptTargets: Failed to find target for script with id %u (target_param1: %u), (target_param2: %u), (target_type: %u).", script.id, script.target_param1, script.target_param2, script.target_type);
             return false;
