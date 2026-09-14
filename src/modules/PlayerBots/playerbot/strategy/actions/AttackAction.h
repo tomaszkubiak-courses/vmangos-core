@@ -12,7 +12,29 @@ namespace ai
 
     public:
         virtual bool Execute(Event& event) override;
-        virtual bool isPossible() override { return !bot->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_CLIENT_CONTROL_LOST); }; //Override movement stay.
+
+        // Execute bails on its first line when the target is gone, so an action asked to
+        // attack nothing was not impossible, it was simply run and recorded as a failure.
+        // "melee" is the default action of every melee combat strategy - it runs on any tick
+        // no trigger claims - and MeleeAction::isUseful() answers true unconditionally, so it
+        // was selected whether or not the bot had a target: 986990 of its 1191696 executions
+        // in a 29 hour run failed, against 1184 marked impossible. A failed action does not
+        // settle the engine, so each one sent the bot through its whole action set again on
+        // that same tick. The same action driven by a trigger, which only fires when there is
+        // an enemy, succeeded 99.97% of the time.
+        //
+        // This is the shared seam rather than isUseful() because subclasses override isUseful()
+        // without chaining to it, and a gate they can drop is not a gate. The three subclasses
+        // below leave GetTargetName() at "self target" and drive their own Execute, so for them
+        // this stays what it was.
+        virtual bool isPossible() override //Override movement stay.
+        {
+            if (bot->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_CLIENT_CONTROL_LOST))
+                return false;
+
+            Unit* target = GetTarget();
+            return target && target->IsInWorld() && target->GetMapId() == bot->GetMapId();
+        }
 
     protected:
         bool Attack(Player* requester, Unit* target);

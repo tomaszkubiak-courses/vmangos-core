@@ -49,11 +49,6 @@ bool AttackAnythingAction::isUseful()
     return true;
 }
 
-bool ai::AttackAnythingAction::isPossible()
-{
-    return AttackAction::isPossible() && GetTarget();
-}
-
 bool ai::AttackAnythingAction::Execute(Event& event)
 {
     bool result = AttackAction::Execute(event);

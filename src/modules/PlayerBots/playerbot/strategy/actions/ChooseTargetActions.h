@@ -39,7 +39,6 @@ namespace ai
         std::string GetTargetName() override { return "grind target"; }
 
         bool isUseful() override;
-        bool isPossible() override;
         bool Execute(Event& event) override;
     };
 
