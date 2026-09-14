@@ -11,7 +11,6 @@
 #include "PlayerbotAI.h"
 #include "BotTests.h"
 #include "ObjectAccessor.h"
-#include "Errors.h" // TEMPORARY PROBE - PrintStacktrace, remove with the probe in SetTarget
 
 using namespace ai;
 using namespace MaNGOS;
@@ -876,27 +875,6 @@ TravelTarget::TravelTarget(PlayerbotAI* ai) : AiObject(ai)
 }
 
 void TravelTarget::SetTarget(TravelDestination* tDestination1, WorldPosition* wPosition1) {
-    // TEMPORARY PROBE - remove once the caller is named.
-    // 16245 of the 33794 trips started in a 29 hour run were logged "replaced": chosen, left
-    // sitting in READY, and swapped before anything promoted them to TRAVEL. 75% of those
-    // happened with the bot within five yards of where it did the choosing and 54% re-picked
-    // the identical destination, so it is neither a teleport nor a death. EndTrip only writes
-    // that row from here, with the status still READY, and the normal choose path cannot be
-    // the caller - ChooseTravelTargetAction::Execute sets NONE before it gets this far. The
-    // stack is the cheapest way to find who else calls this. Capped so it cannot flood
-    // Server.log at the ~560 an hour the run measured.
-    if (tDestination1 != tDestination && m_status == TravelStatus::TRAVEL_STATUS_READY)
-    {
-        static uint32 probeCount = 0;
-        if (probeCount < 20)
-        {
-            ++probeCount;
-            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[TRAVELPROBE] %u: READY target replaced for bot %s",
-                     probeCount, bot ? bot->GetName() : "(null)");
-            MaNGOS::Errors::PrintStacktrace(1, 24);
-        }
-    }
-
     //A trip being replaced mid-walk ends here rather than in SetStatus, which
     //only sees the destination that has already overwritten it.
     if (tDestination1 != tDestination)
