@@ -948,6 +948,24 @@ void RandomPlayerbotFactory::CreateRandomBots()
         sPlayerbotAIConfig.randomBotAccounts.push_back(accountId);
 
         int count = sAccountMgr.GetCharactersCount(accountId);
+
+        // Characters already on the account satisfy their own class/race quota. Without this
+        // the quota map keeps the full configured counts even on a server whose bots all
+        // exist, so every combination is reported as uncreated below and the accounts that
+        // do have a free slot fill it with a duplicate of a combination already covered.
+        if (sPlayerbotAIConfig.useFixedClassRaceCounts && count)
+        {
+            if (auto existing = CharacterDatabase.PQuery("SELECT class, race FROM characters WHERE account = %u", accountId))
+            {
+                do
+                {
+                    Field* charFields = existing->Fetch();
+                    auto itr = remaining.find(std::make_pair(charFields[0].GetUInt8(), charFields[1].GetUInt8()));
+                    if (itr != remaining.end() && --itr->second == 0)
+                        remaining.erase(itr);
+                } while (existing->NextRow());
+            }
+        }
 #ifdef MANGOSBOT_TWO
         if (count >= 10)
 #else
