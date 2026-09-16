@@ -734,27 +734,38 @@ bool PossibleAddsTrigger::IsActive()
 bool NotDpsTargetActiveTrigger::IsActive()
 {
     Unit* target = AI_VALUE(Unit*, "current target");
-    if (target)
+
+    // Holding no target at all used to answer false here, which left the combat engine
+    // with nothing that could pick one: "select new target" only ever clears the target,
+    // and "dps assist" behind this trigger is the one action that sets it. A bot whose
+    // target died or was cleared therefore stood still and took hits until the stuck
+    // trigger reset it five minutes later - 12 of the 40 bots sampled during the
+    // 2026-09-14 freeze were in exactly that state, the core reporting a live fight and a
+    // live attacker while the bot held neither target nor victim, and "dps assist" ran
+    // 258 times in 22 hours against 119819 runs of "select new target". TankAssistTrigger
+    // has always answered true for the empty case; the dps side never did, and almost
+    // every bot is dps.
+    if (!target)
+        return AI_VALUE(Unit*, "dps target") != nullptr;
+
+    if (target->IsPlayer())
     {
-        if (target->IsPlayer())
+        return false;
+    }
+
+    if (sServerFacade.IsAlive(target))
+    {
+        // do not switch if enemy target
+        Unit* enemy = AI_VALUE(Unit*, "enemy player target");
+        if (enemy)
         {
-            return false;
+            return target != enemy;
         }
 
-        if(sServerFacade.IsAlive(target))
+        Unit* dps = AI_VALUE(Unit*, "dps target");
+        if (dps)
         {
-            // do not switch if enemy target
-            Unit* enemy = AI_VALUE(Unit*, "enemy player target");
-            if (enemy)
-            {
-                return target != enemy;
-            }
-
-            Unit* dps = AI_VALUE(Unit*, "dps target");
-            if (dps)
-            {
-                return target != dps;
-            }
+            return target != dps;
         }
     }
 
