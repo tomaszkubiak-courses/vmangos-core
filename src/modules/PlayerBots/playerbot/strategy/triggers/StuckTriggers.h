@@ -147,12 +147,25 @@ namespace ai
         }
     };
 
-    class CombatStuckTrigger : public Trigger
+    // Both combat stuck triggers below measure how long the core's own combat flag has
+    // held the same value, and that clock is deliberately not restarted when the unstuck
+    // action resets the bot - the fifteen minute escalation needs to keep counting
+    // through the five minute reset, so restarting it there would make the long trigger
+    // unreachable. The consequence is that once the threshold is passed the condition
+    // stays true for the whole rest of the episode, and at a five second check interval
+    // that fired 209584 times in a single 22 hour run: the same futile reset over and
+    // over, each one wiping the current target and the loot target it was about to use.
+    // Report each episode once instead. The clock's own start time names the episode, so
+    // remember which one was reported and wait for the clock to actually move on.
+    class CombatStuckTriggerBase : public Trigger
     {
     public:
-        CombatStuckTrigger(PlayerbotAI* ai) : Trigger(ai, "combat stuck", 5) {}
+        CombatStuckTriggerBase(PlayerbotAI* ai, std::string name) : Trigger(ai, name, 5) {}
 
-        virtual bool IsActive() override
+    protected:
+        // The gates both triggers share, so a bot that is not fighting on its own behalf
+        // is never reported as stuck in combat.
+        bool IsUnsupervisedBotInCombat()
         {
             if (ai->GetState() != BotState::BOT_STATE_COMBAT)
                 return false;
@@ -163,23 +176,62 @@ namespace ai
             if (ai->GetGroupMaster() && !GetBotAI(ai->GetGroupMaster()))
                 return false;
 
-            if (!ai->AllowActivity(ALL_ACTIVITY))
+            return ai->AllowActivity(ALL_ACTIVITY);
+        }
+
+        bool FireOnceForEpisode(uint32 timeSinceCombatChange)
+        {
+            // The delay was measured against a clock read inside the value and this one
+            // is read after it, so the derived start time can come out a second early
+            // when a second boundary falls between the two reads. A second of tolerance
+            // covers that; a genuinely new episode is minutes away from the last one.
+            time_t const episode = time(0) - timeSinceCombatChange;
+            if (episode >= firedForEpisode - 1 && episode <= firedForEpisode + 1)
                 return false;
 
-            WorldPosition botPos(bot);
+            firedForEpisode = episode;
+            return true;
+        }
+
+        // The bot has been dueling for longer than any duel it is going to win. Written
+        // as now minus the start: the operands used to be the other way round, which for
+        // a start time already in the past is always negative, so this never once fired.
+        bool IsInEndlessDuel() const
+        {
+            return bot->m_duel && (time(0) - bot->m_duel->startTime) > 15 * MINUTE;
+        }
+
+        std::string DuelLengthText() const
+        {
+            return std::to_string(time(0) - bot->m_duel->startTime);
+        }
+
+    private:
+        time_t firedForEpisode = 0;
+    };
+
+    class CombatStuckTrigger : public CombatStuckTriggerBase
+    {
+    public:
+        CombatStuckTrigger(PlayerbotAI* ai) : CombatStuckTriggerBase(ai, "combat stuck") {}
+
+        virtual bool IsActive() override
+        {
+            if (!IsUnsupervisedBotInCombat())
+                return false;
 
             uint32 timeSinceCombatChange = AI_VALUE2(uint32, "time since last change", "combat::self target");
            
-            if (timeSinceCombatChange > 5 * MINUTE)
+            if (timeSinceCombatChange > 5 * MINUTE && FireOnceForEpisode(timeSinceCombatChange))
             {
                 ai->TellDebug(ai->GetMaster(), "Stuck: Combat did not change for " + std::to_string(timeSinceCombatChange) + " seconds.", "debug stuck");
 
                 return true;
             }
 
-            if (bot->m_duel && bot->m_duel->startTime - time(0) > 15 * MINUTE)
+            if (IsInEndlessDuel())
             {
-                ai->TellDebug(ai->GetMaster(), "Stuck: In Duel for " + std::to_string(bot->m_duel->startTime - time(0)) + " seconds.", "debug stuck");
+                ai->TellDebug(ai->GetMaster(), "Stuck: In Duel for " + DuelLengthText() + " seconds.", "debug stuck");
 
                 return true;
             }
@@ -188,39 +240,28 @@ namespace ai
         }
     };
 
-    class CombatLongStuckTrigger : public Trigger
+    class CombatLongStuckTrigger : public CombatStuckTriggerBase
     {
     public:
-        CombatLongStuckTrigger(PlayerbotAI* ai) : Trigger(ai, "combat long stuck", 5) {}
+        CombatLongStuckTrigger(PlayerbotAI* ai) : CombatStuckTriggerBase(ai, "combat long stuck") {}
 
         virtual bool IsActive() override
         {
-            if (ai->GetState() != BotState::BOT_STATE_COMBAT)
+            if (!IsUnsupervisedBotInCombat())
                 return false;
-
-            if (ai->HasActivePlayerMaster())
-                return false;
-
-            if (ai->GetGroupMaster() && !GetBotAI(ai->GetGroupMaster()))
-                return false;
-
-            if (!ai->AllowActivity(ALL_ACTIVITY))
-                return false;
-
-            WorldPosition botPos(bot);
 
             uint32 timeSinceCombatChange = AI_VALUE2(uint32, "time since last change", "combat::self target");
 
-            if (timeSinceCombatChange > 15 * MINUTE)
+            if (timeSinceCombatChange > 15 * MINUTE && FireOnceForEpisode(timeSinceCombatChange))
             {
                 ai->TellDebug(ai->GetMaster(), "Stuck: Combat did not change for " + std::to_string(timeSinceCombatChange) + " seconds.", "debug stuck");
 
                 return true;
             }
 
-            if (bot->m_duel && bot->m_duel->startTime - time(0) > 15 * MINUTE)
+            if (IsInEndlessDuel())
             {
-                ai->TellDebug(ai->GetMaster(), "Stuck: In Duel for " + std::to_string(bot->m_duel->startTime - time(0)) + " seconds.", "debug stuck");
+                ai->TellDebug(ai->GetMaster(), "Stuck: In Duel for " + DuelLengthText() + " seconds.", "debug stuck");
 
                 return true;
             }

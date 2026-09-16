@@ -1185,6 +1185,11 @@ void PlayerbotAI::OnCombatEnded()
         // Reset the combat start timestamp
         aiObjectContext->GetValue<time_t>("combat start time")->Set(0);
 
+        // And the target the bot was fighting. This used to survive the end of combat,
+        // so the next AttackersValue pass could read it back as a live attacker and put
+        // the bot straight back into the combat engine it had just left.
+        aiObjectContext->GetValue<ObjectGuid>("attack target")->Reset();
+
         // Stop following on combat end
         if ((HasStrategy("follow", BotState::BOT_STATE_COMBAT) || HasStrategy("wander", BotState::BOT_STATE_COMBAT)) &&
             !(HasStrategy("follow", BotState::BOT_STATE_NON_COMBAT) || HasStrategy("wander", BotState::BOT_STATE_NON_COMBAT)))

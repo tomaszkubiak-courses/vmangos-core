@@ -46,6 +46,7 @@ namespace ai
         static float GetRange() { return sPlayerbotAIConfig.sightDistance; }
 
         static bool InCombat(Unit* target, Player* player, bool checkPullTargets = true);
+        static bool IsAttackDecisionFresh(Player* player);
 
         // Re-resolves a raw unit pointer through the object accessor, so an entry
         // left behind by a freed unit is dropped instead of dereferenced.

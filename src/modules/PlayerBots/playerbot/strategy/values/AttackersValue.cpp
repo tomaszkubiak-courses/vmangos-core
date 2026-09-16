@@ -3,6 +3,8 @@
 #include "AttackersValue.h"
 #include "PossibleTargetsValue.h"
 #include "EnemyPlayerValue.h"
+#include "TargetValue.h"
+#include "playerbot/strategy/generic/PullStrategy.h"
 
 #ifdef _WIN32
 #include <excpt.h>
@@ -425,6 +427,26 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
     }
 }
 
+// True while the bot's standing decision to attack something is recent enough to still
+// mean anything. The guid comparison in the caller has already confirmed this is the
+// decision being asked about, so this resolves the value at most once per bot per check.
+bool AttackersValue::IsAttackDecisionFresh(Player* player)
+{
+    PlayerbotAI* botAi = GetBotAI(player);
+    if (!botAi)
+        return false;
+
+    AttackTargetValue* attackTarget = dynamic_cast<AttackTargetValue*>(
+        botAi->GetAiObjectContext()->GetUntypedValue("attack target"));
+
+    // Nothing to age the decision against, so fall back on the old unconditional answer
+    // rather than silently dropping a target the bot is genuinely about to engage.
+    if (!attackTarget)
+        return true;
+
+    return (time(0) - attackTarget->DecidedOn()) <= PullStrategy::GetMaxPullTime();
+}
+
 bool AttackersValue::InCombat(Unit* target, Player* player, bool checkPullTargets)
 {
     // Answer for a target already out of the world before anything reads its
@@ -448,10 +470,21 @@ bool AttackersValue::InCombat(Unit* target, Player* player, bool checkPullTarget
         }
     }
 
+    // A target the bot has merely decided to attack is not fighting it yet, and saying
+    // otherwise without a time limit is what let one stale decision hold a bot in combat
+    // state for hours. AttackAnythingAction sets "attack target" the moment it starts a
+    // grind and nothing clears it while the mob stays in range, so a mob the bot never
+    // reached kept this true, which kept "has attackers" true, which kept the bot in the
+    // combat engine with nothing to fight - 28 of the 40 bots sampled during the
+    // 2026-09-14 freeze were in exactly that state, the core reporting no combat, no
+    // attackers and full health. Honour the decision only while it is still fresh, the
+    // same window a pull gets, and let it lapse after that.
     if(!inCombat && checkPullTargets && GetBotAI(player))
     {
-        inCombat = (PAI_VALUE(ObjectGuid, "attack target") == target->GetObjectGuid()) ||
-                   (PAI_VALUE(Unit*, "pull target") == target);
+        if (PAI_VALUE(ObjectGuid, "attack target") == target->GetObjectGuid())
+            inCombat = IsAttackDecisionFresh(player);
+        else
+            inCombat = (PAI_VALUE(Unit*, "pull target") == target);
     }
 
     return inCombat;
