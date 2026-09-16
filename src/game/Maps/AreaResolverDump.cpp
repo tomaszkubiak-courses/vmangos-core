@@ -28,11 +28,15 @@ void ResolveAreasFromFile(std::string const& inPath, std::string const& outPath)
     }
 
     char line[512];
+    uint32 totalLines = 0;
     uint32 resolved = 0;
     uint32 skipped = 0;
+    uint32 malformed = 0;
 
     while (fgets(line, sizeof(line), in))
     {
+        ++totalLines;
+
         char src[64];
         char kind[32];
         uint32 id;
@@ -40,18 +44,18 @@ void ResolveAreasFromFile(std::string const& inPath, std::string const& outPath)
         float x, y, z;
 
         if (sscanf(line, "%63[^,],%31[^,],%u,%u,%f,%f,%f", src, kind, &id, &mapId, &x, &y, &z) != 7)
-            continue;
-
-        // A map with no extracted terrain has nothing to say about this
-        // coordinate. That is the expected outcome for post-vanilla maps in
-        // the AzerothCore data, so it is counted rather than warned about.
-        TerrainInfo const* terrain = sTerrainMgr.LoadTerrain(mapId);
-        if (!terrain)
         {
-            ++skipped;
+            ++malformed;
             continue;
         }
 
+        // GetZoneAndAreaId loads the map's TerrainInfo on demand (it is
+        // never null - TerrainManager::LoadTerrain constructs one for any
+        // map id rather than failing) and looks the resulting area flag up
+        // against the world DB's area_template/map_template tables. Both
+        // "map has no extracted terrain" and "coordinate has no matching
+        // area_template row" come back as zone 0 and area 0, so that is
+        // what "skipped" counts below - it cannot tell the two apart.
         uint32 zoneId = 0;
         uint32 areaId = 0;
         sTerrainMgr.GetZoneAndAreaId(zoneId, areaId, mapId, x, y, z);
@@ -69,5 +73,6 @@ void ResolveAreasFromFile(std::string const& inPath, std::string const& outPath)
     fclose(in);
     fclose(out);
 
-    sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[ContentAudit] resolved %u rows, skipped %u", resolved, skipped);
+    sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[ContentAudit] %u input lines, resolved %u, skipped %u, malformed %u",
+             totalLines, resolved, skipped, malformed);
 }
