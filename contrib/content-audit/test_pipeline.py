@@ -148,11 +148,30 @@ def test_resolver_assigns_known_zones():
     print("PASS test_resolver_assigns_known_zones")
 
 
+def test_areas_table_populated_and_named():
+    """cmp.areas has rows for every source and joins to the DBC area names."""
+    rows = corpus_sql("SELECT src, COUNT(*) FROM cmp.areas GROUP BY src")
+    counts = {r[0]: int(r[1]) for r in rows}
+    for src in ("v", "mz", "tw", "ac"):
+        assert counts.get(src, 0) > 1000, "%s has %d resolved spawns" % (
+            src,
+            counts.get(src, 0),
+        )
+
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.areas a "
+        "JOIN dbc.area_table t ON t.id = a.zone WHERE a.src = 'v'"
+    )
+    assert int(rows[0][0]) > 1000, "cmp.areas zones do not join to dbc.area_table"
+    print("PASS test_areas_table_populated_and_named")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
     test_realm_schemas_present,
     test_resolver_assigns_known_zones,
+    test_areas_table_populated_and_named,
 ]
 
 if __name__ == "__main__":
