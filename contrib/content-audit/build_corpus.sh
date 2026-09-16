@@ -47,16 +47,25 @@ fresh() { corpus --execute="DROP DATABASE IF EXISTS \`$1\`; CREATE DATABASE \`$1
 snapshot() {
     src_db=$1
     dst_db=$2
+    tmp="$LOGS/$dst_db.dump.sql"
     echo "snapshotting $dst_db"
     fresh "$dst_db"
     # --set-gtid-purged=OFF skips mysqldump's internal "FLUSH TABLES" step for
     # the GTID position, which otherwise requires the RELOAD privilege the
     # live user does not have and aborts the dump before any table is read.
+    #
+    # Dump to a file first rather than piping into corpus(): POSIX sh has no
+    # pipefail, so "mysqldump | corpus" reports corpus's exit status, and an
+    # empty dump imports as an empty schema with exit 0 - set -eu never sees
+    # the failure. Writing to a file puts mysqldump's own exit status on its
+    # own line, where set -eu aborts the script on it.
     "$MYSQLDUMP" --host="$LIVE_HOST" --port="$LIVE_PORT" \
         -u"$LIVE_USER" -p"$LIVE_PASS" \
         --single-transaction --skip-lock-tables --routines \
         --set-gtid-purged=OFF \
-        "$src_db" | corpus "$dst_db"
+        "$src_db" > "$tmp"
+    corpus "$dst_db" < "$tmp"
+    rm -f "$tmp"
 }
 
 snapshot "$LIVE_WORLD_DB"      v
@@ -104,6 +113,13 @@ done
 : > "$LOGS/ac_updates.err"
 for f in $(ls "$SRC_AC/data/sql/updates/db_world"/*.sql | sort); do
     corpus --force ac < "$f" 2>> "$LOGS/ac_updates.err"
+done
+
+echo
+echo "schema table counts (0 means an empty/failed import):"
+for s in v characters realmd logs dbc mz tw ac; do
+    n=$(corpus --batch --skip-column-names --execute="SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$s'")
+    echo "  $s: $n"
 done
 
 echo

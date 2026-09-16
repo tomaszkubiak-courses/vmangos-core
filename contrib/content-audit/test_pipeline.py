@@ -81,7 +81,29 @@ def test_dbc_schema_present():
     print("PASS test_dbc_schema_present")
 
 
-TESTS = [test_corpus_schemas_present, test_dbc_schema_present]
+def test_realm_schemas_present():
+    """characters/realmd/logs exist with real tables (so a scratch core can boot
+    against the corpus). They went through the same snapshot() path as v/dbc and
+    were the ones that actually imported empty the first time this broke, so this
+    checks them directly rather than trusting a general "did snapshot() work" test."""
+    # Floors are a sanity guard, not a spec value: actual counts observed on a
+    # correct import were characters=69, realmd=13, logs=10.
+    expected = {"characters": 5, "realmd": 5, "logs": 5}
+    for schema, floor in expected.items():
+        rows = corpus_sql(
+            "SELECT COUNT(*) FROM information_schema.tables "
+            "WHERE table_schema='%s'" % schema
+        )
+        count = int(rows[0][0])
+        assert count > floor, "%s has only %d tables, expected > %d" % (
+            schema,
+            count,
+            floor,
+        )
+    print("PASS test_realm_schemas_present")
+
+
+TESTS = [test_corpus_schemas_present, test_dbc_schema_present, test_realm_schemas_present]
 
 if __name__ == "__main__":
     failures = 0
