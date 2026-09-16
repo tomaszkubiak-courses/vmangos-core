@@ -6,9 +6,12 @@
 --
 --   v:  creature_classlevelstats.health * creature_template.health_multiplier
 --   tw: absolute creature_template.health_min / health_max
---   ac: creature_classlevelstats.basehp0 * creature_template.HealthModifier
---   mz: creature_template_classlevelstats.BaseHealthExp0 * HealthMultiplier,
---       falling back to the absolute MinLevelHealth/MaxLevelHealth columns
+--   ac: creature_classlevelstats.basehp{exp} * creature_template.HealthModifier,
+--       where {exp} (0/1/2 = classic/TBC/WotLK) picks the tier column
+--   mz: creature_template_classlevelstats.BaseHealthExp0 * HealthMultiplier when
+--       creature_template.ArmorMultiplier > 0 and a stats row exists (the core's
+--       actual gate), falling back to the absolute MinLevelHealth/MaxLevelHealth
+--       columns otherwise
 --
 -- Two corrections to the plan this was written from, both verified against
 -- the corpus and, for mz, against the mangoszero-server source rather than
@@ -37,11 +40,22 @@
 -- a matching stats row exists - true for 9100/9113 template rows in this
 -- corpus, and BaseHealthExp0 is nonzero on every one of the 189 stat rows.
 -- MinLevelHealth/MaxLevelHealth are the fallback, used only for the ~13
--- rows where ArmorMultiplier is 0 (a linear interpolation between the two
+-- rows where ArmorMultiplier <= 0 (a linear interpolation between the two
 -- by relative level, which collapses to picking the smaller of the two
 -- values when MinLevel == MaxLevel). This is the reverse of the priority
 -- the plan's COALESCE gave; the plan's own fallback note said to prefer
 -- whichever the source actually reads, so this view does.
+--
+-- Fix round 1 found that an earlier version of this view implemented only
+-- half of that gate: it fell back to the absolute columns when no
+-- classlevelstats row matched, but never checked ArmorMultiplier at all. On
+-- this corpus a classlevelstats row matches for every one of the 13
+-- ArmorMultiplier <= 0 rows, so all 13 were silently taking the
+-- classlevelstats path - up to 119x off from the value the core actually
+-- computes. The mz branch below tests ArmorMultiplier explicitly, mirroring
+-- Creature::SelectLevel's `cinfo->ArmorMultiplier > 0 && cCLS` condition
+-- (cCLS itself requires BaseHealthExp0 != 0 and BaseDamageExp0 > 0.01, both
+-- checked here too, though no row in this corpus currently fails either).
 --
 -- Both tw and mz store two absolute values (min/max) rather than one row
 -- per level, and 288 tw rows / 68 mz rows have level_min == level_max with
@@ -50,11 +64,23 @@
 -- hp, breaking the one-row-per-key contract. Both branches below instead
 -- start from the *distinct* set of levels per entry (a plain UNION, not
 -- UNION ALL, collapses level_min == level_max to one row before the health
--- lookup), and break the tie deterministically when it still occurs: mz
--- keeps MinLevelHealth (matching the core's own min() when the interpolation
--- fallback path is hit at a single level), tw keeps health_max. Both are
--- documented simplifications of a sub-1% edge case, not a claim that the two
--- values are equal.
+-- lookup), independently of which formula ends up producing the value for
+-- that row.
+--
+-- Where mz's fallback path (the 13 ArmorMultiplier <= 0 rows, none of which
+-- currently have MinLevelHealth != MaxLevelHealth) has to pick one of the
+-- two stored values for a single collapsed level, it uses LEAST()/GREATEST()
+-- rather than "MinLevelHealth at MinLevel, MaxLevelHealth at MaxLevel" -
+-- this is exact, not an approximation: it reproduces
+-- Creature::SelectLevel's own std::min/std::max of the two columns for any
+-- row that reaches this branch, including a future one where
+-- MinLevelHealth is the larger of the two. All 68 of the mz rows with
+-- level_min == level_max and differing stored health currently have a valid
+-- classlevelstats row and ArmorMultiplier > 0, so none of them reach this
+-- branch on this corpus today - the LEAST()/GREATEST() choice is proven
+-- correct by construction, not by a live example. tw has no equivalent
+-- engine source to check against, so its tie (health_max on collapse) stays
+-- a documented arbitrary choice, not a claimed match to anything.
 --
 -- The rank multiplier (CONFIG_FLOAT_RATE_CREATURE_*_HP in VMaNGOS) is
 -- excluded on purpose: it is server tuning, not content, and a rank
@@ -80,18 +106,21 @@ FROM (
 ) l
 JOIN tw.creature_template ct ON ct.entry = l.entry
 UNION ALL
-SELECT 'ac', ct.entry, cls.level, cls.basehp0 * ct.HealthModifier
+SELECT 'ac', ct.entry, cls.level,
+       (CASE ct.exp WHEN 1 THEN cls.basehp1 WHEN 2 THEN cls.basehp2 ELSE cls.basehp0 END)
+       * ct.HealthModifier
 FROM ac.creature_template ct
 JOIN ac.creature_classlevelstats cls
   ON cls.class = ct.unit_class AND cls.level IN (ct.minlevel, ct.maxlevel)
 UNION ALL
 SELECT 'mz', l.Entry, l.lvl,
-       COALESCE(
-           cls.BaseHealthExp0 * ct.HealthMultiplier,
-           CASE WHEN l.lvl = ct.MinLevel
-                THEN NULLIF(ct.MinLevelHealth, 0)
-                ELSE NULLIF(ct.MaxLevelHealth, 0)
-           END)
+       CASE
+           WHEN ct.ArmorMultiplier > 0 AND cls.BaseHealthExp0 IS NOT NULL
+                AND cls.BaseHealthExp0 <> 0 AND cls.BaseDamageExp0 > 0.01
+               THEN cls.BaseHealthExp0 * ct.HealthMultiplier
+           WHEN l.lvl = ct.MinLevel THEN LEAST(ct.MinLevelHealth, ct.MaxLevelHealth)
+           ELSE GREATEST(ct.MinLevelHealth, ct.MaxLevelHealth)
+       END
 FROM (
     SELECT Entry, MinLevel AS lvl FROM mz.creature_template
     UNION

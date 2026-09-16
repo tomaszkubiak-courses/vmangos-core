@@ -265,6 +265,60 @@ def test_effective_health_resolves_for_every_source():
     print("PASS test_effective_health_resolves_for_every_source")
 
 
+def test_effective_health_respects_mz_armor_multiplier_gate():
+    """mz must use the absolute health columns when ArmorMultiplier <= 0.
+
+    Fix round 1: an earlier version of the mz branch fell back to the
+    absolute MinLevelHealth/MaxLevelHealth columns only when no
+    classlevelstats row matched - it never checked ArmorMultiplier at all.
+    On this corpus a classlevelstats row matches for every one of the 13
+    ArmorMultiplier <= 0 rows, so the view was silently taking the
+    classlevelstats path for all of them (up to 119x off). Every other test
+    in this file passed while that was true, because none of them targeted
+    an ArmorMultiplier <= 0 creature. This one does: entry 15729 has
+    ArmorMultiplier -1 and stored MinLevelHealth = MaxLevelHealth = 5000,
+    and a classlevelstats row that, if wrongly preferred, would have
+    returned something else entirely.
+    """
+    entry = 15729
+    rows = corpus_sql(
+        "SELECT lvl, hp FROM cmp.n_creature_hp WHERE src='mz' AND entry=%d" % entry
+    )
+    assert rows, "no mz health row for entry %d" % entry
+    for _lvl, hp in rows:
+        assert float(hp) == 5000.0, (
+            "entry %d (ArmorMultiplier <= 0) should read the absolute "
+            "MinLevelHealth/MaxLevelHealth column (5000), got %s - "
+            "the ArmorMultiplier gate is not being checked" % (entry, hp)
+        )
+    print("PASS test_effective_health_respects_mz_armor_multiplier_gate")
+
+
+def test_effective_health_ac_uses_expansion_tier():
+    """ac must select basehp0/1/2 by creature_template.exp, not always basehp0.
+
+    Fix round 1: the ac branch hardcoded basehp0 (the classic tier), so the
+    13883/29947 ac creatures with exp=1 or exp=2 (TBC/WotLK) silently got
+    classic-tier base health. Entry 89 is exp=2 at level 70; its basehp0/
+    basehp1/basehp2 are 4050/6986/8982 - if the view read the wrong tier,
+    this assertion would catch it directly instead of only noticing a
+    disagreement against another source.
+    """
+    rows = corpus_sql(
+        "SELECT exp FROM ac.creature_template WHERE entry=89"
+    )
+    assert rows and rows[0][0] == "2", "fixture creature 89 is no longer exp=2"
+    hp_rows = corpus_sql(
+        "SELECT lvl, hp FROM cmp.n_creature_hp WHERE src='ac' AND entry=89 AND lvl=70"
+    )
+    assert hp_rows, "no ac level-70 health row for entry 89"
+    hp = float(hp_rows[0][1])
+    # basehp0 (classic) * HealthModifier would give a much smaller figure;
+    # basehp2 (WotLK) * HealthModifier is what SelectLevel actually reads.
+    assert hp > 10000, "entry 89 at level 70 gives hp %.1f - looks like the classic-tier basehp0 was used instead of exp=2's basehp2" % hp
+    print("PASS test_effective_health_ac_uses_expansion_tier")
+
+
 def test_effective_health_has_no_duplicate_rows():
     """cmp.n_creature_hp promises one row per (src, entry, lvl).
 
@@ -294,6 +348,8 @@ TESTS = [
     test_normalised_views_exist_and_agree_on_shape,
     test_known_westfall_quest_matches_across_vanilla_sources,
     test_effective_health_resolves_for_every_source,
+    test_effective_health_respects_mz_armor_multiplier_gate,
+    test_effective_health_ac_uses_expansion_tier,
     test_effective_health_has_no_duplicate_rows,
 ]
 
