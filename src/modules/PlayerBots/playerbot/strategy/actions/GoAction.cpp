@@ -252,10 +252,12 @@ inline bool TellStuck(PlayerbotAI* ai, Player* requester)
             return true;
         }
 
-        if (bot->m_duel && bot->m_duel->startTime - time(0) > 5 * MINUTE)
+        // Now minus the start. The operands used to be the other way round, which for a
+        // start time already in the past is always negative, so this never once reported.
+        if (bot->m_duel && (time(0) - bot->m_duel->startTime) > 5 * MINUTE)
         {
-            out << "Stuck in a dual for ";
-            out << uint32((bot->m_duel->startTime - time(0)) / MINUTE);
+            out << "Stuck in a duel for ";
+            out << uint32((time(0) - bot->m_duel->startTime) / MINUTE);
             out << " minutes";
             ai->TellPlayerNoFacing(requester, out, PlayerbotSecurityLevel::PLAYERBOT_SECURITY_TALK, false);
 
