@@ -495,6 +495,74 @@ def test_effective_drop_chance():
     print("PASS test_effective_drop_chance")
 
 
+def test_consensus_strength_rule():
+    """The strength rule, against the spec's own worked cases."""
+    cases = [
+        # (v, mz, ac, expected)
+        ("1", "2", "2", "strong"),   # both peers agree against v
+        ("1", "2", "1", "weak"),     # only mz disagrees
+        ("1", "1", "2", "weak"),     # only ac disagrees
+        ("1", "2", "3", "weak"),     # peers disagree with each other
+        ("1", "1", "1", ""),         # nobody disagrees
+        ("1", None, "2", "weak"),    # an abstaining peer cannot make it strong
+        ("1", None, None, ""),       # no peers, no finding
+    ]
+    for v, mz, ac, expected in cases:
+        def lit(x):
+            return "NULL" if x is None else "'%s'" % x
+
+        rows = corpus_sql(
+            "SELECT cmp.strength(%s, %s, %s)" % (lit(v), lit(mz), lit(ac))
+        )
+        got = rows[0][0]
+        got = "" if got == "NULL" else got
+        assert got == expected, "v=%s mz=%s ac=%s gave %r, expected %r" % (
+            v,
+            mz,
+            ac,
+            got,
+            expected,
+        )
+    print("PASS test_consensus_strength_rule")
+
+
+def test_consensus_strength_never_strong_with_an_abstaining_peer():
+    """No input with mz or ac NULL can ever return 'strong', exhaustively.
+
+    This is the property the audit depends on most: an abstention (a peer
+    that cannot express the field at all) must never manufacture a defect.
+    Rather than trust the worked cases above to cover it, this sweeps v and
+    the non-abstaining peer over a small value set with the other peer NULL
+    on both sides.
+    """
+    values = ["NULL", "'1'", "'2'", "'3'"]
+    for v in values:
+        for other in values:
+            for strength_sql in (
+                "cmp.strength(%s, NULL, %s)" % (v, other),
+                "cmp.strength(%s, %s, NULL)" % (v, other),
+            ):
+                rows = corpus_sql("SELECT %s" % strength_sql)
+                got = rows[0][0]
+                assert got != "strong", "%s gave 'strong' with an abstaining peer" % strength_sql
+    print("PASS test_consensus_strength_never_strong_with_an_abstaining_peer")
+
+
+def test_consensus_strength_missing_from_v_is_strong_when_peers_agree():
+    """v itself NULL (entity absent from the audited realm) must not vanish.
+
+    When both independent peers exist and agree with each other, a missing
+    v is the strongest possible signal of a missing entity - it must reach
+    'strong', not disappear because v itself supplied no value.
+    """
+    rows = corpus_sql("SELECT cmp.strength(NULL, '2', '2')")
+    assert rows[0][0] == "strong", "missing v with agreeing peers gave %r" % rows[0][0]
+
+    rows = corpus_sql("SELECT cmp.strength(NULL, '2', NULL)")
+    assert rows[0][0] != "strong", "missing v with one abstaining peer gave 'strong'"
+    print("PASS test_consensus_strength_missing_from_v_is_strong_when_peers_agree")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -511,6 +579,9 @@ TESTS = [
     test_quest_xp_no_duplicate_rows,
     test_vmangos_stored_xp_agrees_with_its_own_inputs,
     test_effective_drop_chance,
+    test_consensus_strength_rule,
+    test_consensus_strength_never_strong_with_an_abstaining_peer,
+    test_consensus_strength_missing_from_v_is_strong_when_peers_agree,
 ]
 
 if __name__ == "__main__":
