@@ -13,6 +13,22 @@ for src in v mz tw ac; do
         < "$HERE/views/$src.sql"
 done
 
+echo "views: loot_eff"
+"$MYSQL" --host="$CORPUS_HOST" --port="$CORPUS_PORT" -uroot \
+    -e "CREATE DATABASE IF NOT EXISTS cmp DEFAULT CHARACTER SET utf8mb4;"
+for src in v mz tw ac; do
+    {
+        echo "CREATE OR REPLACE VIEW cmp.n_loot_eff_$src AS"
+        sed "s/__SRC__/$src/g" "$HERE/views/loot_eff_body.sql"
+    } | "$MYSQL" --host="$CORPUS_HOST" --port="$CORPUS_PORT" -uroot
+done
+"$MYSQL" --host="$CORPUS_HOST" --port="$CORPUS_PORT" -uroot -e "
+CREATE OR REPLACE VIEW cmp.n_loot_eff AS
+SELECT * FROM cmp.n_loot_eff_v
+UNION ALL SELECT * FROM cmp.n_loot_eff_mz
+UNION ALL SELECT * FROM cmp.n_loot_eff_tw
+UNION ALL SELECT * FROM cmp.n_loot_eff_ac;"
+
 echo "views: derived"
 "$MYSQL" --host="$CORPUS_HOST" --port="$CORPUS_PORT" -uroot \
     < "$HERE/views/derived.sql"

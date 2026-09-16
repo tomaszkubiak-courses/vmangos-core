@@ -445,6 +445,56 @@ def test_vmangos_stored_xp_agrees_with_its_own_inputs():
     print("PASS test_vmangos_stored_xp_agrees_with_its_own_inputs")
 
 
+LOOT_FIXTURE = """
+DROP DATABASE IF EXISTS cmp_test;
+CREATE DATABASE cmp_test DEFAULT CHARACTER SET utf8mb4;
+CREATE TABLE cmp_test.n_loot (
+    tbl VARCHAR(16), entry INT, item INT, chance DOUBLE,
+    grp INT, ref INT, quest_only INT, cmin INT, cmax INT
+);
+INSERT INTO cmp_test.n_loot VALUES
+    -- 1: an ungrouped row at 25%
+    ('creature', 1, 101, 25, 0, 0, 0, 1, 1),
+    -- 2: a group of one explicit 30% row and two equal-chance rows
+    ('creature', 2, 201, 30, 1, 0, 0, 1, 1),
+    ('creature', 2, 202,  0, 1, 0, 0, 1, 1),
+    ('creature', 2, 203,  0, 1, 0, 0, 1, 1),
+    -- 3: a row referencing a sub-table at 50%, the sub-table dropping at 40%
+    ('creature',  3, 0,   50, 0, 9, 0, 1, 1),
+    ('reference', 9, 301, 40, 0, 0, 0, 1, 1),
+    -- 4: a table that references itself, which must terminate
+    ('creature',  4, 0,  100, 0, 8, 0, 1, 1),
+    ('reference', 8, 401, 10, 0, 8, 0, 1, 1);
+"""
+
+
+def test_effective_drop_chance():
+    """Group competition, reference expansion and cycle termination."""
+    subprocess.run(
+        [
+            os.path.join(CFG["MYSQL_BIN_DIR"], "mysql"),
+            "--host=" + CFG["CORPUS_HOST"],
+            "--port=" + CFG["CORPUS_PORT"],
+            "-uroot",
+            "--execute=" + LOOT_FIXTURE,
+        ],
+        check=True,
+    )
+    sql_path = os.path.join(HERE, "views", "loot_eff_body.sql")
+    with open(sql_path, encoding="utf-8") as handle:
+        body = handle.read().replace("__SRC__", "cmp_test")
+    rows = corpus_sql(body)
+    got = {(r[1], int(r[2])): round(float(r[4]), 4) for r in rows}
+
+    assert got[("1", 101)] == 0.25, "ungrouped 25%% gave %s" % got[("1", 101)]
+    assert got[("2", 201)] == 0.30, "explicit group member gave %s" % got[("2", 201)]
+    assert got[("2", 202)] == 0.35, "equal group member gave %s" % got[("2", 202)]
+    assert got[("2", 203)] == 0.35, "equal group member gave %s" % got[("2", 203)]
+    assert got[("3", 301)] == 0.20, "0.50 x 0.40 gave %s" % got[("3", 301)]
+    assert ("4", 401) in got, "self-referencing table produced nothing"
+    print("PASS test_effective_drop_chance")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -460,6 +510,7 @@ TESTS = [
     test_quest_xp_formula_matches_known_inputs,
     test_quest_xp_no_duplicate_rows,
     test_vmangos_stored_xp_agrees_with_its_own_inputs,
+    test_effective_drop_chance,
 ]
 
 if __name__ == "__main__":

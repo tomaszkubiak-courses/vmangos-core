@@ -204,3 +204,10 @@ UNION ALL
 SELECT 'ac', ID, CAST(NULL AS DOUBLE),
        CASE WHEN RewardXPDifficulty > 0 THEN 1 ELSE 0 END
 FROM ac.quest_template;
+
+-- Effective drop probability per source. The body lives in loot_eff_body.sql
+-- so that the checks can run it against a fixture schema. build_views.sh
+-- generates cmp.n_loot_eff_v/_mz/_tw/_ac from that body (one WITH RECURSIVE
+-- view per source - a recursive CTE cannot be repeated inside a UNION ALL)
+-- and then defines cmp.n_loot_eff as a plain UNION ALL over those four,
+-- immediately before it sources this file.
