@@ -101,10 +101,37 @@ namespace ai
         TalkTargetValue(PlayerbotAI* ai, std::string name = "talk target") : ManualSetValue<ObjectGuid>(ai, ObjectGuid(), name) {}
     };
 
+    // What the bot has decided to attack, which is not the same thing as what is
+    // fighting the bot. AttackersValue::InCombat honours the decision for a short while,
+    // so that a mob which has not noticed the bot yet still counts as an attacker and the
+    // bot does not fall out of combat state between the swing and the reaction. Past that
+    // the decision has to lapse, so record when it was taken. Setting the same target
+    // again does not refresh it: AttackAnythingAction re-sets its grind target on every
+    // successful execute, and treating that as a fresh decision would make the window
+    // unbounded again, which is the whole defect this timestamp exists to close.
     class AttackTargetValue : public ManualSetValue<ObjectGuid>
     {
     public:
         AttackTargetValue(PlayerbotAI* ai, std::string name = "attack target") : ManualSetValue<ObjectGuid>(ai, ObjectGuid(), name) {}
+
+        void Set(ObjectGuid value) override
+        {
+            if (value != this->value)
+                decidedOn = value ? time(0) : 0;
+
+            ManualSetValue<ObjectGuid>::Set(value);
+        }
+
+        void Reset() override
+        {
+            ManualSetValue<ObjectGuid>::Reset();
+            decidedOn = 0;
+        }
+
+        time_t DecidedOn() const { return decidedOn; }
+
+    private:
+        time_t decidedOn = 0;
     };
 
     class PullTargetValue : public UnitManualSetValue
