@@ -339,6 +339,62 @@ def test_effective_health_has_no_duplicate_rows():
     print("PASS test_effective_health_has_no_duplicate_rows")
 
 
+def test_quest_xp_formula_matches_known_inputs():
+    """The SQL divisor ladder reproduces Quest::XPValue for sampled levels.
+
+    (quest level, RewMoneyMaxLevel, expected xp) - one per divisor branch,
+    computed by hand from Quest::XPValue (mangoszero-server's
+    src/game/WorldHandlers/QuestDef.cpp, lines 242-304), not reverse-engineered
+    from cmp.vanilla_quest_xp itself. The 65/64/63/62 cases are the brief's;
+    61 and 60 were added here because the ladder's sub-61 branch (divide by
+    0.6) is the one every quest in this audit's pilot zones actually
+    exercises - the brief's own four cases never reach it.
+    """
+    cases = [
+        (65, 1200, 200.0),  # 1200 / 6.0
+        (64, 1200, 250.0),  # 1200 / 4.8
+        (63, 1200, 333.0),  # 1200 / 3.6 = 333.33...
+        (62, 1200, 500.0),  # 1200 / 2.4
+        (61, 1200, 1000.0),  # 1200 / 1.2
+        (60, 1200, 2000.0),  # 1200 / 0.6, the sub-61 (ELSE) branch
+        (1, 600, 1000.0),  # 600 / 0.6, low end of the same branch
+    ]
+    for lvl, money, expected in cases:
+        rows = corpus_sql(
+            "SELECT ROUND(cmp.vanilla_quest_xp(%d, %d))" % (lvl, money)
+        )
+        got = float(rows[0][0])
+        assert abs(got - expected) <= 1, "level %d: got %s, expected %s" % (
+            lvl,
+            got,
+            expected,
+        )
+    print("PASS test_quest_xp_formula_matches_known_inputs")
+
+
+def test_quest_xp_no_duplicate_rows():
+    """cmp.n_quest_xp promises one row per (src, quest)."""
+    rows = corpus_sql(
+        "SELECT src, quest, COUNT(*) FROM cmp.n_quest_xp "
+        "GROUP BY src, quest HAVING COUNT(*) > 1 LIMIT 5"
+    )
+    assert not rows, "duplicate (src, quest) rows in cmp.n_quest_xp: %s" % rows
+    print("PASS test_quest_xp_no_duplicate_rows")
+
+
+def test_vmangos_stored_xp_agrees_with_its_own_inputs():
+    """Report, do not assert: quests whose RewXP contradicts the formula."""
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.n_quest_xp x "
+        "JOIN v.n_quest q ON q.entry = x.quest "
+        "WHERE x.src='v' AND q.rew_xp > 0 AND q.rew_money_max_level > 0 "
+        "AND ABS(q.rew_xp - cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level)) > 1"
+    )
+    print("NOTE %s quests have a stored RewXP the vanilla formula disagrees with"
+          % rows[0][0])
+    print("PASS test_vmangos_stored_xp_agrees_with_its_own_inputs")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -351,6 +407,9 @@ TESTS = [
     test_effective_health_respects_mz_armor_multiplier_gate,
     test_effective_health_ac_uses_expansion_tier,
     test_effective_health_has_no_duplicate_rows,
+    test_quest_xp_formula_matches_known_inputs,
+    test_quest_xp_no_duplicate_rows,
+    test_vmangos_stored_xp_agrees_with_its_own_inputs,
 ]
 
 if __name__ == "__main__":

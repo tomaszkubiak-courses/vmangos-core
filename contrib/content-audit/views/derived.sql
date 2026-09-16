@@ -129,3 +129,78 @@ FROM (
 JOIN mz.creature_template ct ON ct.Entry = l.Entry
 LEFT JOIN mz.creature_template_classlevelstats cls
   ON cls.Class = ct.UnitClass AND cls.Level = l.lvl;
+
+-- The vanilla quest experience formula, transcribed from Quest::XPValue
+-- (mangoszero-server's src/game/WorldHandlers/QuestDef.cpp, lines 242-304).
+-- MaNGOS Zero computes this at runtime; VMaNGOS stores the result as RewXP.
+-- Both carry the inputs (RewMoneyMaxLevel, QuestLevel), so the comparison is
+-- exact rather than approximate.
+--
+-- The full function also scales the result by how far the receiving
+-- player's level is above the quest's (100% up to +5, stepping down to 10%
+-- at +9 or more) and applies ceilf() to the result. This view implements
+-- only the full-value case - player level equal to quest level, which keeps
+-- the player inside the "no discount" band and is what this comparison
+-- assumes throughout, per the brief - and does not apply ceilf(), matching
+-- the brief's own stub function (step 4) and its ROUND()-with-tolerance
+-- test. Every branch below was read from the source, not guessed:
+--
+--   qLevel >= 65            money_max_level / 6.0
+--   qLevel == 64             money_max_level / 4.8
+--   qLevel == 63             money_max_level / 3.6
+--   qLevel == 62             money_max_level / 2.4
+--   qLevel == 61             money_max_level / 1.2
+--   0 < qLevel <= 60         money_max_level / 0.6   (the ELSE branch the
+--                            brief flagged as a placeholder - every quest in
+--                            the pilot zones is below level 61, so this is
+--                            the only branch most rows in this corpus reach)
+--   qLevel <= 0              0 (fullxp is never assigned; QuestDef.cpp's own
+--                            "uint32 qLevel = QuestLevel > 0 ? ... : 0"
+--                            clamp means no branch's condition can match)
+--
+-- money_max_level <= 0 also yields 0: XPValue's own outer
+-- "if (RewMoneyMaxLevel > 0)" gate means fullxp is never computed at all
+-- otherwise, and the function returns 0.
+
+DROP FUNCTION IF EXISTS cmp.vanilla_quest_xp;
+CREATE FUNCTION cmp.vanilla_quest_xp(quest_level INT, money_max_level INT)
+RETURNS DOUBLE DETERMINISTIC
+RETURN CASE
+    WHEN money_max_level <= 0 THEN 0
+    WHEN quest_level >= 65 THEN money_max_level / 6.0
+    WHEN quest_level  = 64 THEN money_max_level / 4.8
+    WHEN quest_level  = 63 THEN money_max_level / 3.6
+    WHEN quest_level  = 62 THEN money_max_level / 2.4
+    WHEN quest_level  = 61 THEN money_max_level / 1.2
+    WHEN quest_level  > 0 AND quest_level <= 60 THEN money_max_level / 0.6
+    ELSE 0
+END;
+
+-- cmp.n_quest_xp(src, quest, xp, awards_xp). xp is NULL for ac, which
+-- cannot supply a vanilla figure (see below); awards_xp is the boolean
+-- every source can vote on.
+--
+-- ac's n_quest.rew_money_max_level is mapped from RewardMoney (the actual
+-- money reward), not from a RewMoneyMaxLevel-equivalent formula input -
+-- feeding it to vanilla_quest_xp would silently compute a meaningless
+-- figure, not merely an inaccurate one, so ac abstains on xp entirely and
+-- votes only on whether the quest awards experience at all.
+CREATE OR REPLACE VIEW cmp.n_quest_xp AS
+SELECT 'v' AS src, entry AS quest, CAST(rew_xp AS DOUBLE) AS xp,
+       CASE WHEN rew_xp > 0 THEN 1 ELSE 0 END AS awards_xp
+FROM v.n_quest
+UNION ALL
+SELECT 'tw', entry, CAST(rew_xp AS DOUBLE),
+       CASE WHEN rew_xp > 0 THEN 1 ELSE 0 END
+FROM tw.n_quest
+UNION ALL
+SELECT 'mz', entry, cmp.vanilla_quest_xp(lvl, rew_money_max_level),
+       CASE WHEN rew_money_max_level > 0 THEN 1 ELSE 0 END
+FROM mz.n_quest
+UNION ALL
+-- AzerothCore cannot supply a vanilla figure: RewardXPDifficulty indexes
+-- QuestXP.dbc, which is not available here, and WotLK rebalanced quest
+-- experience regardless. It votes on the boolean only.
+SELECT 'ac', ID, CAST(NULL AS DOUBLE),
+       CASE WHEN RewardXPDifficulty > 0 THEN 1 ELSE 0 END
+FROM ac.quest_template;
