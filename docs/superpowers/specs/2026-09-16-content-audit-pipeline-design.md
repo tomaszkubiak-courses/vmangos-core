@@ -57,7 +57,8 @@ exactly the kind of gap this exercise exists to find.
 
 ## Topics
 
-1. **Creatures** — template presence, level range, faction, rank, type, NPC flags.
+1. **Creatures** — template presence, level range, faction, rank, type, NPC flags, and
+   effective health at the minimum and maximum level of the range.
 2. **Connected creatures** — four relationship families, all in scope:
    - linked pulls, groups and spawn pools;
    - quest relations (which NPC starts and ends which quest);
@@ -65,8 +66,11 @@ exactly the kind of gap this exercise exists to find.
    - summons and spawn-on-death / spawn-on-event adds.
 3. **Quests** — presence, level, minimum level, race and class gating, prerequisite and
    follow-up chain links, exclusive groups, objectives.
-4. **Quest rewards** — reward and choice items, money, reputation, spell rewards.
-5. **Quest item drop rates** — loot chance for items a quest objective requires.
+4. **Quest rewards** — reward and choice items, money, reputation, spell rewards, and
+   experience.
+5. **Quest item drop rates** — the effective probability that an item a quest objective
+   requires drops from a given loot table, with loot groups resolved and reference tables
+   expanded.
 6. **Spawn rates** — per (area, entry) spawn count, minimum and maximum respawn time,
    wander distance; the same for gameobject spawns.
 
@@ -170,7 +174,7 @@ n_quest     (entry, title, lvl, min_lvl, zone_or_sort, prev, next, excl_group,
              req_race, req_class)
 n_quest_obj (quest, kind, target, count)        -- npc | item | go | rep
 n_quest_rew (quest, kind, id, count)            -- item | choice | money | rep | spell
-n_loot      (tbl, entry, item, chance, grp, cmin, cmax)
+n_loot      (tbl, entry, item, chance, grp, ref, quest_only, cmin, cmax)
 n_rel       (kind, npc, target)                 -- questgiver | questender | vendor |
                                                 -- trainer | link | summon
 ```
@@ -178,6 +182,54 @@ n_rel       (kind, npc, target)                 -- questgiver | questender | ven
 Diff queries touch `n_*` and nothing else. This is the boundary that matters: adding a
 fifth source later is one more view set and zero changes to any diff query, and it is what
 keeps SP2 from becoming a rewrite.
+
+Three further shapes sit on top of those seven. They cannot be produced by renaming
+columns, because each source computes the value through its own pipeline and the view has
+to reproduce that pipeline before the numbers mean the same thing. They are where most of
+the risk in this component lives.
+
+#### Effective health — `n_creature_hp (entry, lvl, hp)`
+
+| Source | Pipeline |
+|---|---|
+| `v`, `tw` | `creature_classlevelstats` by (level, `unit_class`) → `base_health` × `creature_template.health_multiplier` |
+| `ac` | `creature_classlevelstats` by (level, class) → `basehp0` × `creature_template.HealthModifier` |
+| `mz` | `creature_template.MinLevelHealth` / `MaxLevelHealth`, already absolute |
+
+Evaluated at both ends of the level range. AzerothCore's vote here is **advisory only**:
+WotLK inflated creature health systematically, so an AC disagreement is evidence about
+nothing unless `mz` agrees with it.
+
+#### Quest experience — `n_quest_xp (quest, xp, awards_xp)`
+
+VMaNGOS stores `quest_template.RewXP` outright. MaNGOS Zero has no such column —
+`Quest::XPValue` derives the figure from `RewMoneyMaxLevel` and `QuestLevel` through a
+piecewise divisor, at full value when the player's level matches the quest's. Both sources
+carry those two inputs, so the vanilla formula reproduces as a `CASE` expression over
+`QuestLevel` and the comparison is exact.
+
+This yields a second check for free. Running the same formula against **VMaNGOS's own**
+`RewMoneyMaxLevel` and `QuestLevel` and comparing it to its stored `RewXP` finds quests
+whose reward disagrees with the vanilla formula — a defect that needs no second source to
+confirm, and one the consensus rule would otherwise never surface.
+
+AzerothCore cannot vote on the number. `RewardXPDifficulty` is an index into `QuestXP.dbc`,
+which is not available here, and WotLK rebalanced quest experience regardless — the figure
+would be wrong even with the file. AC votes only on `awards_xp`, the boolean.
+
+#### Effective drop chance — `n_loot_eff (tbl, entry, item, p_drop, quest_only)`
+
+The lineages disagree about where meaning lives. AzerothCore splits it into columns —
+`Reference`, `QuestRequired`, `Chance`, `GroupId`. VMaNGOS and MaNGOS Zero overload signs:
+a negative `ChanceOrQuestChance` means quest-only, a negative `mincountOrRef` means a
+reference into `reference_loot_template`. Unpacking the signs is mechanical.
+
+What is not mechanical is that a raw chance column is not a drop probability. Rows in a
+group with `groupid > 0` compete for one roll, explicit chances are absolute within that
+roll, and members with chance 0 divide the remainder. References have to be expanded — a
+recursive CTE, since depth is rarely more than two. Only after all of that does comparing
+a number across sources mean anything, which is why topic 5 depends on this view rather
+than on `n_loot` directly.
 
 ### Component 4 — the diff engine
 
@@ -197,21 +249,29 @@ window — never a per-GUID diff.
 
 Exact equality on numbers would make the report entirely noise.
 
-- Drop chance: flag at a ratio of 2x or more, or an absolute gap of 5 points or more.
+- Effective drop chance: flag at a ratio of 2x or more, or an absolute gap of 5 points
+  or more.
 - Respawn time: flag at a ratio of 2x or more.
 - Spawn count per (zone, entry): flag at a difference of 50% or more, or 5 spawns or more.
+- Effective health: flag at 20% or more. Tighter than the others because health is a
+  resolved number rather than a designer's round figure, so a real disagreement shows up
+  small.
+- Quest experience: flag at any difference. Both vanilla sources compute it from the same
+  formula over the same inputs, so there is no legitimate spread to absorb.
 
-#### Known gaps, deliberately out of SP1
+#### Comparability limits
 
-- **Creature health.** VMaNGOS and AzerothCore both store multipliers resolved against
-  per-source class/level stat tables; mangoszero stores absolute values. Comparing it
-  means resolving three different stat pipelines first.
-- **Quest experience.** Vanilla derives the reward from quest level; AzerothCore stores a
-  `RewardXPDifficulty` index. The inputs are comparable, the numbers are not.
-- **Loot group semantics.** `groupid` and negative-chance reference conventions differ
-  enough between lineages to need a dedicated pass.
+Two sources are deliberately not given a full vote on two topics:
 
-Each is listed in the report as a known gap rather than silently omitted.
+- **AzerothCore does not vote on quest experience numbers**, only on whether a quest
+  awards experience at all. The figure is unavailable and would be WotLK-rebalanced if it
+  were.
+- **AzerothCore's health vote is advisory**, counting only when MaNGOS Zero agrees with
+  it, because WotLK inflated creature health as a matter of policy rather than per
+  creature.
+
+Both limits are stated in each report so a reader knows why a health or experience finding
+carries fewer votes than the strength rule would otherwise suggest.
 
 ### Component 5 — the report generator
 
@@ -229,8 +289,13 @@ Summary                       finding counts by strength
 Appendix A                    AzerothCore-only entities (probable post-vanilla)
 Appendix B                    tortoise-only entities (probable classic-plus custom)
 Appendix C                    spawns whose coordinates resolved to no area
-Known gaps                    health, quest XP, loot group semantics
+Comparability notes           where AzerothCore's vote is reduced, and why
 ```
+
+Section 4 carries one extra block: quests whose stored `RewXP` disagrees with the vanilla
+formula applied to their own `RewMoneyMaxLevel` and `QuestLevel`. These are
+single-source findings and are listed separately from the consensus ones, because no
+amount of cross-source agreement is relevant to them.
 
 Each finding is one table row: entity, field, the four values, strength, one-line note.
 
@@ -243,16 +308,24 @@ That keeps forty zones of generated Markdown out of the core repository's histor
 
 ## Verification
 
-`test_pipeline.py`, three assertions, no framework:
+`test_pipeline.py`, five assertions, no framework:
 
 1. **Resolver** — Hogger resolves to Elwynn Forest and Edwin VanCleef to The Deadmines.
 2. **Normalization** — every source's `n_quest` view is non-empty, and one known Westfall
    quest has the same objective shape in `v` and `mz`.
 3. **Consensus rule** — against a synthetic fixture, `v=1, mz=2, ac=2` yields *strong*
    and `v=1, mz=2, ac=1` yields nothing.
+4. **Effective drop chance** — against a hand-built loot table: an ungrouped 25% row
+   yields 0.25; a group of one explicit 30% row and two chance-0 rows yields 0.30 and
+   0.35 each; a row referencing a sub-table yields the sub-table's own resolved
+   probability. Reference expansion terminates on a table that references itself.
+5. **Quest experience formula** — a quest with a known `RewMoneyMaxLevel` and
+   `QuestLevel` produces the figure MaNGOS Zero's `Quest::XPValue` produces for the same
+   inputs, checked at a level in each branch of the piecewise divisor.
 
-The third is the one that matters. The consensus rule is the only real logic in the
-pipeline; everything else is transport.
+Three and four are the ones that matter. The consensus rule and the loot probability
+resolution are the only real logic in the pipeline; everything else is transport, and a
+wrong probability is worse than no probability because it looks authoritative.
 
 ## Out of scope
 
@@ -260,13 +333,23 @@ No user interface. No SQL fix generation. No locale, spell or talent comparison.
 scheduling and no incremental refresh — regenerating a zone is cheap enough that caching
 would cost more than it saves.
 
+Nothing is excluded from the six topics themselves. Creature health, quest experience and
+loot group resolution were each considered for deferral and each kept, because all three
+fall inside topics 1, 4 and 5 respectively and dropping them would have quietly shrunk
+the brief.
+
 ## Risks
 
 - **AzerothCore import failures.** 854 update files applied with `--force`. Mitigated by
   treating the failure log as a reviewed output.
-- **Normalizing views are where the effort actually is.** Seven shapes across four sources
-  is twenty-eight view definitions, each needing its own column archaeology. The pilot
+- **Normalizing views are where the effort actually is.** Ten shapes across four sources
+  is forty view definitions, each needing its own column archaeology, and three of the
+  ten reproduce a source's internal computation rather than reading a column. The pilot
   exists mostly to find out how bad this is before committing to SP2.
+- **Effective drop chance is the one piece that can be confidently wrong.** Group and
+  reference resolution produces a plausible-looking number whatever the bug, and topic 5
+  is built entirely on it. Assertion 4 exists for this and should be written before the
+  view is.
 - **Expansion drift.** The `exp = 0` filter catches post-vanilla creatures cleanly but has
   no equivalent for quests, whose revamps between 1.12 and 3.3.5 are invisible in the
   schema. Expect the quest topic to carry the most false positives, and expect the pilot
