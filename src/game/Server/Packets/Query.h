@@ -73,6 +73,7 @@ namespace WorldPackets { namespace Query
         uint32 time = 0;
 
         explicit QueryTimeResponse() : ServerPacket(SMSG_QUERY_TIME_RESPONSE) {}
+        size_t EstimateFinalSize() const override;
         void AppendBodyTo(ByteBuffer& buffer) const override;
     };
 
@@ -89,6 +90,7 @@ namespace WorldPackets { namespace Query
         uint32 class_ = 0;
 
         explicit NameQueryResponse() : ServerPacket(SMSG_NAME_QUERY_RESPONSE) {}
+        size_t EstimateFinalSize() const override;
         void AppendBodyTo(ByteBuffer& buffer) const override;
     };
 
@@ -100,6 +102,7 @@ namespace WorldPackets { namespace Query
         uint32 nextPageId = 0;
 
         explicit PageTextQueryResponse() : ServerPacket(SMSG_PAGE_TEXT_QUERY_RESPONSE) {}
+        size_t EstimateFinalSize() const override;
         void AppendBodyTo(ByteBuffer& buffer) const override;
     };
 
@@ -110,6 +113,7 @@ namespace WorldPackets { namespace Query
         nonstd::expected<CreatureInfo const*, uint32> maybeCreatureInfo = nonstd::make_unexpected(uint32(0)); // creature info OR if not found, the queried entry id
 
         CreatureQueryResponse() : ServerPacket(SMSG_CREATURE_QUERY_RESPONSE) {}
+        size_t EstimateFinalSize() const override;
         void AppendBodyTo(ByteBuffer& buffer) const override;
     };
 
@@ -123,6 +127,7 @@ namespace WorldPackets { namespace Query
         nonstd::expected<GameObjectInfo const*, uint32> maybeGameObjectInfo = nonstd::make_unexpected(uint32(0)); // gameobject info OR if not found, the queried entry id
 
         GameObjectQueryResponse() : ServerPacket(SMSG_GAMEOBJECT_QUERY_RESPONSE) {}
+        size_t EstimateFinalSize() const override;
         void AppendBodyTo(ByteBuffer& buffer) const override;
     };
 
@@ -147,6 +152,7 @@ namespace WorldPackets { namespace Query
         NpcTextOption options[8];
 
         NpcTextUpdate() : ServerPacket(SMSG_NPC_TEXT_UPDATE) {}
+        size_t EstimateFinalSize() const override;
         void AppendBodyTo(ByteBuffer& buffer) const override;
     };
 
