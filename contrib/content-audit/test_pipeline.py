@@ -166,12 +166,68 @@ def test_areas_table_populated_and_named():
     print("PASS test_areas_table_populated_and_named")
 
 
+NORMALISED_VIEWS = [
+    "n_creature",
+    "n_spawn",
+    "n_quest",
+    "n_quest_obj",
+    "n_quest_rew",
+    "n_loot",
+    "n_rel",
+]
+
+
+def test_normalised_views_exist_and_agree_on_shape():
+    """Every source exposes every view, with the same columns, non-empty."""
+    shapes = {}
+    for view in NORMALISED_VIEWS:
+        for src in ("v", "mz", "tw", "ac"):
+            cols = corpus_sql(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema='%s' AND table_name='%s' "
+                "ORDER BY ordinal_position" % (src, view)
+            )
+            names = tuple(c[0] for c in cols)
+            assert names, "%s.%s does not exist" % (src, view)
+            shapes.setdefault(view, {})[src] = names
+
+            rows = corpus_sql("SELECT COUNT(*) FROM %s.%s" % (src, view))
+            assert int(rows[0][0]) > 0, "%s.%s is empty" % (src, view)
+
+        distinct = set(shapes[view].values())
+        assert len(distinct) == 1, "%s has differing shapes: %s" % (view, shapes[view])
+    print("PASS test_normalised_views_exist_and_agree_on_shape")
+
+
+def test_known_westfall_quest_matches_across_vanilla_sources():
+    """Quest 5-1 'Red Linen Goods' has the same objective shape in v and mz.
+
+    The brief warned this fixture might disagree once patch/id-pool were
+    fixed and said to swap in another Westfall quest if so - it does not:
+    once n_quest_obj reads the patch-picked quest row (see v.sql), quest 9
+    agrees between v and mz (npc 114 x20 in both). Kept as the fixture.
+    """
+    quest = 9  # Westfall: Red Linen Goods
+    shape = {}
+    for src in ("v", "mz"):
+        rows = corpus_sql(
+            "SELECT kind, target, cnt FROM %s.n_quest_obj "
+            "WHERE quest=%d ORDER BY kind, target" % (src, quest)
+        )
+        shape[src] = [tuple(r) for r in rows]
+    assert shape["v"], "quest %d has no objectives in v" % quest
+    assert shape["v"] == shape["mz"], "quest %d differs: %s" % (quest, shape)
+    print("PASS test_known_westfall_quest_matches_across_vanilla_sources")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
     test_realm_schemas_present,
     test_resolver_assigns_known_zones,
     test_areas_table_populated_and_named,
+    test_normalised_views_exist_and_agree_on_shape,
+    test_known_westfall_quest_matches_across_vanilla_sources,
 ]
 
 if __name__ == "__main__":
