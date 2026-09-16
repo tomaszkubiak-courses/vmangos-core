@@ -240,6 +240,51 @@ def test_known_westfall_quest_matches_across_vanilla_sources():
     print("PASS test_known_westfall_quest_matches_across_vanilla_sources")
 
 
+def test_effective_health_resolves_for_every_source():
+    """Each source produces a positive health figure for a known creature."""
+    hogger = 448
+    rows = corpus_sql(
+        "SELECT src, lvl, hp FROM cmp.n_creature_hp WHERE entry=%d ORDER BY src, lvl"
+        % hogger
+    )
+    got = {}
+    for src, lvl, hp in rows:
+        got.setdefault(src, []).append((int(lvl), float(hp)))
+    for src in ("v", "mz", "tw", "ac"):
+        assert src in got, "no health rows for %s" % src
+        for lvl, hp in got[src]:
+            assert hp > 0, "%s level %d gives hp %s" % (src, lvl, hp)
+    # Hogger is level 11 in vanilla; a source disagreeing by 10x means the
+    # stat table join is wrong, not that the creature differs.
+    v_hp = max(hp for _lvl, hp in got["v"])
+    mz_hp = max(hp for _lvl, hp in got["mz"])
+    assert 0.1 < v_hp / mz_hp < 10, "v %.0f vs mz %.0f - check the stat join" % (
+        v_hp,
+        mz_hp,
+    )
+    print("PASS test_effective_health_resolves_for_every_source")
+
+
+def test_effective_health_has_no_duplicate_rows():
+    """cmp.n_creature_hp promises one row per (src, entry, lvl).
+
+    tw and mz store two absolute health values per creature (min/max level)
+    rather than one row per level; 288 tw rows and 68 mz rows have
+    level_min == level_max with the two values genuinely different, which
+    would emit two conflicting rows for the same key if the view unioned one
+    branch per endpoint. The view instead starts from the distinct set of
+    levels per entry, so the collapse happens before the health lookup - this
+    checks that held across the whole corpus, not just the sampled rows
+    above.
+    """
+    rows = corpus_sql(
+        "SELECT src, entry, lvl, COUNT(*) FROM cmp.n_creature_hp "
+        "GROUP BY src, entry, lvl HAVING COUNT(*) > 1 LIMIT 5"
+    )
+    assert not rows, "duplicate (src, entry, lvl) rows in cmp.n_creature_hp: %s" % rows
+    print("PASS test_effective_health_has_no_duplicate_rows")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -248,6 +293,8 @@ TESTS = [
     test_areas_table_populated_and_named,
     test_normalised_views_exist_and_agree_on_shape,
     test_known_westfall_quest_matches_across_vanilla_sources,
+    test_effective_health_resolves_for_every_source,
+    test_effective_health_has_no_duplicate_rows,
 ]
 
 if __name__ == "__main__":
