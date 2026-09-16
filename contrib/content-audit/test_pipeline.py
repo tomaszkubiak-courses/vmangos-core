@@ -103,7 +103,57 @@ def test_realm_schemas_present():
     print("PASS test_realm_schemas_present")
 
 
-TESTS = [test_corpus_schemas_present, test_dbc_schema_present, test_realm_schemas_present]
+# Known-good fixtures: (map, x, y, z, expected_zone_id, label)
+# Hogger's coordinate was corrected 2026-09-16: the brief's original value
+# (0, -10496.0, 1036.0, 32.0) is Gryan Stoutmantle's real spawn in Sentinel
+# Hill (creature.id=234 in the corpus v schema), not Hogger's - it resolved
+# to zone 40 (Westfall) instead of 12. Replaced with Hogger's own real spawn
+# (creature.id=448), verified against `SELECT map, position_x, position_y,
+# position_z FROM creature WHERE id=448` on the corpus. The other two
+# fixtures were checked the same way and left as given: both resolve to
+# their expected zones.
+RESOLVER_FIXTURES = [
+    (0, -9946.0, 604.266, 38.2862, 12, "Hogger spawn, Elwynn Forest"),
+    (36, -15.4, -383.0, 61.0, 1581, "Edwin VanCleef, The Deadmines"),
+    (0, -10643.0, 1035.0, 33.0, 40, "Sentinel Hill area, Westfall"),
+]
+
+
+def test_resolver_assigns_known_zones():
+    """The core's terrain lookup puts known spawns in known zones."""
+    in_path = os.path.join(HERE, "logs", "resolver_fixture_in.csv")
+    out_path = os.path.join(HERE, "logs", "resolver_fixture_out.csv")
+    os.makedirs(os.path.join(HERE, "logs"), exist_ok=True)
+    with open(in_path, "w", encoding="utf-8") as handle:
+        for i, (m, x, y, z, _zone, _label) in enumerate(RESOLVER_FIXTURES):
+            handle.write("fx,creature,%d,%d,%s,%s,%s\n" % (i, m, x, y, z))
+
+    subprocess.run(
+        ["sh", os.path.join(HERE, "run_resolver.sh"), in_path, out_path],
+        check=True,
+    )
+
+    got = {}
+    with open(out_path, encoding="utf-8") as handle:
+        for line in handle:
+            parts = line.strip().split(",")
+            got[int(parts[2])] = int(parts[7])
+
+    for i, (_m, _x, _y, _z, zone, label) in enumerate(RESOLVER_FIXTURES):
+        assert got.get(i) == zone, "%s: got zone %s, expected %d" % (
+            label,
+            got.get(i),
+            zone,
+        )
+    print("PASS test_resolver_assigns_known_zones")
+
+
+TESTS = [
+    test_corpus_schemas_present,
+    test_dbc_schema_present,
+    test_realm_schemas_present,
+    test_resolver_assigns_known_zones,
+]
 
 if __name__ == "__main__":
     failures = 0

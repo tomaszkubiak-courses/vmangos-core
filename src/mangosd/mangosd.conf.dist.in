@@ -3365,3 +3365,19 @@ DynamicRespawn.AffectLevelBelow = 0
 DynamicRespawn.PlayersThreshold = 0
 DynamicRespawn.PlayersMaxLevelDiff = 0
 
+#
+#    ContentAudit.ResolveAreasFile
+#        TEMPORARY - content audit tooling, not a server feature.
+#        When set, the server resolves each coordinate in this CSV to a game
+#        area immediately after loading the DBC stores, writes the result to
+#        ContentAudit.ResolveAreasOutFile, and exits without loading the world.
+#        Leave empty for normal operation.
+#        Default: "" (disabled)
+#
+#    ContentAudit.ResolveAreasOutFile
+#        Output path for the above.
+#        Default: ""
+
+ContentAudit.ResolveAreasFile = ""
+ContentAudit.ResolveAreasOutFile = ""
+

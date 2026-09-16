@@ -130,6 +130,7 @@ set (game_SRCS
     LFG/LFGQueue.cpp
     Mail/Mail.cpp
     Mail/MassMailMgr.cpp
+    Maps/AreaResolverDump.cpp
     Maps/GridMap.cpp
     Maps/GridNotifiers.cpp
     Maps/GridSearchers.cpp
@@ -361,6 +362,7 @@ set (game_SRCS
     LFG/LFGQueue.h
     Mail/Mail.h
     Mail/MassMailMgr.h
+    Maps/AreaResolverDump.h
     Maps/Cell.h
     Maps/CellImpl.h
     Maps/GridDefines.h
