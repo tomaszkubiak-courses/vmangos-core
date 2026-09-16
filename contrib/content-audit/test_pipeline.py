@@ -383,15 +383,65 @@ def test_quest_xp_no_duplicate_rows():
 
 
 def test_vmangos_stored_xp_agrees_with_its_own_inputs():
-    """Report, do not assert: quests whose RewXP contradicts the formula."""
+    """Assert-bounded for levels 1-50; report-only for levels 51-60.
+
+    Fix round 1 replaced this check's absolute (> 1 XP) tolerance with a
+    relative one: the absolute tolerance made almost the whole 1-50 band
+    "disagree" (2213 quests average 5-15 XP off a formula answer in the
+    hundreds - a rounding-scale gap, not a real one), and CEIL() on the
+    formula rescues none of it (see task-6-report.md's fix-round-1 section).
+    5% was chosen from the data, not from taste: the ratio histogram for
+    levels 1-50 has an obvious gap between "rounds to 1.0" (deviation <=5%,
+    1978/2213 quests) and a second, genuinely scattered population starting
+    just past 5% (235/2213, matching ROUND(ratio, 1) != 1.0 exactly). No
+    absolute floor is layered on top - the smallest formula value in this
+    corpus is 50 XP, and no quest pairs a small absolute gap with a large
+    relative one, so a floor would not change which rows this flags.
+
+    Levels 51-60 are excluded from the assertion on purpose:
+    cmp.vanilla_quest_xp's /0.6 divisor does not model the real, smooth
+    level-51-60 XP taper documented in task-6-report.md, so nearly all of
+    that band fails a 5% check by construction. That is a known gap in the
+    formula, not a per-quest defect - asserting on it would make the test
+    fail permanently for a reason indistinguishable from a real regression,
+    so it is reported (NOTE) rather than asserted.
+    """
     rows = corpus_sql(
         "SELECT COUNT(*) FROM cmp.n_quest_xp x "
         "JOIN v.n_quest q ON q.entry = x.quest "
         "WHERE x.src='v' AND q.rew_xp > 0 AND q.rew_money_max_level > 0 "
-        "AND ABS(q.rew_xp - cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level)) > 1"
+        "AND q.lvl BETWEEN 1 AND 50 "
+        "AND ABS(q.rew_xp - cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level)) "
+        "    / cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level) > 0.05"
     )
-    print("NOTE %s quests have a stored RewXP the vanilla formula disagrees with"
-          % rows[0][0])
+    outliers = int(rows[0][0])
+    print(
+        "NOTE %d of 2213 level 1-50 quests disagree with the formula by "
+        "more than 5%% (genuine outliers, not rounding noise)" % outliers
+    )
+    # The ceiling is roughly double this corpus's current count (235): loose
+    # enough that ordinary corpus or content changes will not trip it, tight
+    # enough that a regression that doubles the outlier count will.
+    assert outliers <= 470, (
+        "%d level 1-50 quests now disagree with the formula by more than "
+        "5%%, expected <= 470 - investigate before raising this ceiling"
+        % outliers
+    )
+
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.n_quest_xp x "
+        "JOIN v.n_quest q ON q.entry = x.quest "
+        "WHERE x.src='v' AND q.rew_xp > 0 AND q.rew_money_max_level > 0 "
+        "AND q.lvl BETWEEN 51 AND 60 "
+        "AND ABS(q.rew_xp - cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level)) "
+        "    / cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level) > 0.05"
+    )
+    print(
+        "NOTE %s of 1185 level 51-60 quests diverge from the formula by "
+        "more than 5%% - the known near-cap XP taper the formula does not "
+        "model, not per-quest defects (report only, not asserted)"
+        % rows[0][0]
+    )
     print("PASS test_vmangos_stored_xp_agrees_with_its_own_inputs")
 
 
