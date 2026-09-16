@@ -24,16 +24,24 @@
 -- task-4-report.md). actor=0 is the creature case (actor=1/2, a small
 -- minority, are gameobject- and item-triggered quest relations that the other
 -- three sources' views do not carry either).
+--
+-- From fix round 1: entry/quest/item/target columns are CAST to UNSIGNED and
+-- the signed quest-chain columns to SIGNED (both land on BIGINT, the only
+-- width CAST can produce) so this schema's mediumint/smallint columns match
+-- ac's wider int columns exactly - see v.sql's header for the full
+-- reasoning. rew_xp, which this schema cannot express at all, is CAST(NULL
+-- AS UNSIGNED) rather than a bare NULL so it carries a real numeric type
+-- instead of MySQL's untyped-literal varbinary.
 
 CREATE OR REPLACE VIEW n_creature AS
-SELECT Entry AS entry, Name AS name, MinLevel AS lvl_min, MaxLevel AS lvl_max,
+SELECT CAST(Entry AS UNSIGNED) AS entry, Name AS name, MinLevel AS lvl_min, MaxLevel AS lvl_max,
        FactionAlliance AS faction, `Rank` AS `rank`, CreatureType AS type,
        NpcFlags AS npc_flags, UnitClass AS unit_class,
        HealthMultiplier AS hp_mult
 FROM creature_template;
 
 CREATE OR REPLACE VIEW n_spawn AS
-SELECT a.kind, c.id AS entry, a.zone, a.area, c.map,
+SELECT a.kind, CAST(c.id AS UNSIGNED) AS entry, a.zone, a.area, CAST(c.map AS UNSIGNED) AS map,
        c.spawntimesecs AS resp_min, c.spawntimesecs AS resp_max,
        c.spawndist AS wander
 FROM creature c
@@ -44,15 +52,15 @@ FROM gameobject g
 JOIN cmp.areas a ON a.src = 'mz' AND a.kind = 'gobject' AND a.id = g.guid;
 
 CREATE OR REPLACE VIEW n_quest AS
-SELECT entry, Title AS title, QuestLevel AS lvl, MinLevel AS min_lvl,
-       ZoneOrSort AS zone_or_sort, PrevQuestId AS prev, NextQuestId AS next,
-       ExclusiveGroup AS excl_group, RequiredRaces AS req_race,
-       RequiredClasses AS req_class,
-       RewMoneyMaxLevel AS rew_money_max_level, NULL AS rew_xp
+SELECT CAST(entry AS UNSIGNED) AS entry, Title AS title, CAST(QuestLevel AS UNSIGNED) AS lvl, MinLevel AS min_lvl,
+       ZoneOrSort AS zone_or_sort, CAST(PrevQuestId AS SIGNED) AS prev, CAST(NextQuestId AS SIGNED) AS next,
+       CAST(ExclusiveGroup AS SIGNED) AS excl_group, CAST(RequiredRaces AS UNSIGNED) AS req_race,
+       CAST(RequiredClasses AS UNSIGNED) AS req_class,
+       RewMoneyMaxLevel AS rew_money_max_level, CAST(NULL AS UNSIGNED) AS rew_xp
 FROM quest_template;
 
 CREATE OR REPLACE VIEW n_quest_obj AS
-SELECT entry AS quest, 'npc'  AS kind, ReqCreatureOrGOId1 AS target, ReqCreatureOrGOCount1 AS cnt FROM quest_template WHERE ReqCreatureOrGOId1 > 0
+SELECT CAST(entry AS UNSIGNED) AS quest, 'npc'  AS kind, ReqCreatureOrGOId1 AS target, ReqCreatureOrGOCount1 AS cnt FROM quest_template WHERE ReqCreatureOrGOId1 > 0
 UNION ALL SELECT entry, 'npc',  ReqCreatureOrGOId2, ReqCreatureOrGOCount2 FROM quest_template WHERE ReqCreatureOrGOId2 > 0
 UNION ALL SELECT entry, 'npc',  ReqCreatureOrGOId3, ReqCreatureOrGOCount3 FROM quest_template WHERE ReqCreatureOrGOId3 > 0
 UNION ALL SELECT entry, 'npc',  ReqCreatureOrGOId4, ReqCreatureOrGOCount4 FROM quest_template WHERE ReqCreatureOrGOId4 > 0
@@ -66,7 +74,7 @@ UNION ALL SELECT entry, 'item', ReqItemId3, ReqItemCount3 FROM quest_template WH
 UNION ALL SELECT entry, 'item', ReqItemId4, ReqItemCount4 FROM quest_template WHERE ReqItemId4 > 0;
 
 CREATE OR REPLACE VIEW n_quest_rew AS
-SELECT entry AS quest, 'item'   AS kind, RewItemId1 AS id, RewItemCount1 AS cnt FROM quest_template WHERE RewItemId1 > 0
+SELECT CAST(entry AS UNSIGNED) AS quest, 'item'   AS kind, RewItemId1 AS id, RewItemCount1 AS cnt FROM quest_template WHERE RewItemId1 > 0
 UNION ALL SELECT entry, 'item',   RewItemId2, RewItemCount2 FROM quest_template WHERE RewItemId2 > 0
 UNION ALL SELECT entry, 'item',   RewItemId3, RewItemCount3 FROM quest_template WHERE RewItemId3 > 0
 UNION ALL SELECT entry, 'item',   RewItemId4, RewItemCount4 FROM quest_template WHERE RewItemId4 > 0
@@ -85,7 +93,7 @@ UNION ALL SELECT entry, 'spell',  RewSpell, 1 FROM quest_template WHERE RewSpell
 UNION ALL SELECT entry, 'money',  0, RewOrReqMoney FROM quest_template WHERE RewOrReqMoney > 0;
 
 CREATE OR REPLACE VIEW n_loot AS
-SELECT 'creature' AS tbl, entry, item, ABS(ChanceOrQuestChance) AS chance, groupid AS grp,
+SELECT 'creature' AS tbl, CAST(entry AS UNSIGNED) AS entry, CAST(item AS UNSIGNED) AS item, ABS(ChanceOrQuestChance) AS chance, groupid AS grp,
        CASE WHEN mincountOrRef < 0 THEN -mincountOrRef ELSE 0 END AS ref,
        CASE WHEN ChanceOrQuestChance < 0 THEN 1 ELSE 0 END AS quest_only,
        CASE WHEN mincountOrRef > 0 THEN mincountOrRef ELSE 1 END AS cmin, maxcount AS cmax
@@ -104,7 +112,7 @@ SELECT 'reference', entry, item, ABS(ChanceOrQuestChance), groupid,
 FROM reference_loot_template;
 
 CREATE OR REPLACE VIEW n_rel AS
-SELECT 'questgiver' AS kind, entry AS npc, quest AS target FROM quest_relations WHERE actor = 0 AND role = 0
+SELECT 'questgiver' AS kind, entry AS npc, CAST(quest AS UNSIGNED) AS target FROM quest_relations WHERE actor = 0 AND role = 0
 UNION ALL SELECT 'questender', entry, quest FROM quest_relations WHERE actor = 0 AND role = 1
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
 UNION ALL SELECT 'trainer',    entry, spell FROM npc_trainer

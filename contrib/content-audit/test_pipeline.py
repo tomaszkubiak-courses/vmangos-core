@@ -178,24 +178,44 @@ NORMALISED_VIEWS = [
 
 
 def test_normalised_views_exist_and_agree_on_shape():
-    """Every source exposes every view, with the same columns, non-empty."""
+    """Every source exposes every view, with the same columns, same types, non-empty.
+
+    Column *names* alone are not the whole contract: fix round 1 found three
+    columns (tw.n_creature.hp_mult, mz/ac.n_quest.rew_xp) that were bare
+    `NULL` literals reporting as `varbinary` - a type that would silently
+    break a numeric CAST or aggregate in Tasks 5/6 - and a dozen more where
+    names lined up but widths did not (ac's id-ish columns are `int` where
+    the others are `mediumint`, mz's n_spawn.map is `int` where the others
+    are narrower, ac's n_loot numerics were narrower still). Comparing only
+    column_name, as this test originally did, missed all of it. Comparing
+    data_type here would have caught every one of them.
+    """
     shapes = {}
+    types = {}
     for view in NORMALISED_VIEWS:
         for src in ("v", "mz", "tw", "ac"):
             cols = corpus_sql(
-                "SELECT column_name FROM information_schema.columns "
+                "SELECT column_name, data_type FROM information_schema.columns "
                 "WHERE table_schema='%s' AND table_name='%s' "
                 "ORDER BY ordinal_position" % (src, view)
             )
             names = tuple(c[0] for c in cols)
+            data_types = tuple(c[1] for c in cols)
             assert names, "%s.%s does not exist" % (src, view)
             shapes.setdefault(view, {})[src] = names
+            types.setdefault(view, {})[src] = data_types
 
             rows = corpus_sql("SELECT COUNT(*) FROM %s.%s" % (src, view))
             assert int(rows[0][0]) > 0, "%s.%s is empty" % (src, view)
 
         distinct = set(shapes[view].values())
         assert len(distinct) == 1, "%s has differing shapes: %s" % (view, shapes[view])
+
+        distinct_types = set(types[view].values())
+        assert len(distinct_types) == 1, "%s has differing column types: %s" % (
+            view,
+            types[view],
+        )
     print("PASS test_normalised_views_exist_and_agree_on_shape")
 
 

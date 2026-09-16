@@ -13,34 +13,46 @@
 -- AzerothCore has no direct equivalent of `creature_linking`, so n_rel omits
 -- the `link` kind entirely - an abstention, not a claim that the relationship
 -- is absent (see task-4-report.md and the pipeline README).
+--
+-- From fix round 1: this schema's id-ish columns (entry, quest, item, ref,
+-- quest_only, cmin) and chance are narrower than the other three sources'
+-- (int/tinyint/float here vs mediumint/bigint/double there). CAST can only
+-- target SIGNED/UNSIGNED (both become BIGINT) or FLOAT/DOUBLE exactly, so
+-- every one of those is cast to whichever of those two families matches, and
+-- this schema's own already-wide columns are cast too so the whole set of
+-- four converges on the same type rather than three of them moving and this
+-- one standing still - see v.sql's header for the full reasoning. rew_xp,
+-- which this schema has no direct column for, is CAST(NULL AS UNSIGNED)
+-- rather than a bare NULL so it carries a real numeric type instead of
+-- MySQL's untyped-literal varbinary.
 
 CREATE OR REPLACE VIEW n_creature AS
-SELECT entry, name, minlevel AS lvl_min, maxlevel AS lvl_max, faction,
+SELECT CAST(entry AS UNSIGNED) AS entry, name, minlevel AS lvl_min, maxlevel AS lvl_max, faction,
        `rank`, type, npcflag AS npc_flags, unit_class,
        HealthModifier AS hp_mult
 FROM creature_template;
 
 CREATE OR REPLACE VIEW n_spawn AS
-SELECT a.kind, c.id AS entry, a.zone, a.area, c.map,
+SELECT a.kind, CAST(c.id AS UNSIGNED) AS entry, a.zone, a.area, c.map,
        c.spawntimesecs AS resp_min, c.spawntimesecs AS resp_max,
        c.wander_distance AS wander
 FROM creature c
 JOIN cmp.areas a ON a.src = 'ac' AND a.kind = 'creature' AND a.id = c.guid
 UNION ALL
-SELECT a.kind, g.id, a.zone, a.area, g.map, g.spawntimesecs, g.spawntimesecs, 0
+SELECT a.kind, g.id, a.zone, a.area, CAST(g.map AS UNSIGNED) AS map, g.spawntimesecs, g.spawntimesecs, 0
 FROM gameobject g
 JOIN cmp.areas a ON a.src = 'ac' AND a.kind = 'gobject' AND a.id = g.guid;
 
 CREATE OR REPLACE VIEW n_quest AS
-SELECT q.ID AS entry, q.LogTitle AS title, q.QuestLevel AS lvl,
+SELECT CAST(q.ID AS UNSIGNED) AS entry, q.LogTitle AS title, CAST(q.QuestLevel AS UNSIGNED) AS lvl,
        q.MinLevel AS min_lvl, q.QuestSortID AS zone_or_sort,
-       0 AS prev, q.RewardNextQuest AS next, 0 AS excl_group,
-       q.AllowableRaces AS req_race, 0 AS req_class,
-       q.RewardMoney AS rew_money_max_level, NULL AS rew_xp
+       CAST(0 AS SIGNED) AS prev, CAST(q.RewardNextQuest AS SIGNED) AS next, CAST(0 AS SIGNED) AS excl_group,
+       CAST(q.AllowableRaces AS UNSIGNED) AS req_race, CAST(0 AS UNSIGNED) AS req_class,
+       q.RewardMoney AS rew_money_max_level, CAST(NULL AS UNSIGNED) AS rew_xp
 FROM quest_template q;
 
 CREATE OR REPLACE VIEW n_quest_obj AS
-SELECT ID AS quest, 'npc' AS kind, RequiredNpcOrGo1 AS target, RequiredNpcOrGoCount1 AS cnt FROM quest_template WHERE RequiredNpcOrGo1 > 0
+SELECT CAST(ID AS UNSIGNED) AS quest, 'npc' AS kind, RequiredNpcOrGo1 AS target, RequiredNpcOrGoCount1 AS cnt FROM quest_template WHERE RequiredNpcOrGo1 > 0
 UNION ALL SELECT ID, 'npc',  RequiredNpcOrGo2, RequiredNpcOrGoCount2 FROM quest_template WHERE RequiredNpcOrGo2 > 0
 UNION ALL SELECT ID, 'npc',  RequiredNpcOrGo3, RequiredNpcOrGoCount3 FROM quest_template WHERE RequiredNpcOrGo3 > 0
 UNION ALL SELECT ID, 'npc',  RequiredNpcOrGo4, RequiredNpcOrGoCount4 FROM quest_template WHERE RequiredNpcOrGo4 > 0
@@ -54,7 +66,7 @@ UNION ALL SELECT ID, 'item', RequiredItemId3, RequiredItemCount3 FROM quest_temp
 UNION ALL SELECT ID, 'item', RequiredItemId4, RequiredItemCount4 FROM quest_template WHERE RequiredItemId4 > 0;
 
 CREATE OR REPLACE VIEW n_quest_rew AS
-SELECT ID AS quest, 'item' AS kind, RewardItem1 AS id, RewardAmount1 AS cnt FROM quest_template WHERE RewardItem1 > 0
+SELECT CAST(ID AS UNSIGNED) AS quest, 'item' AS kind, RewardItem1 AS id, RewardAmount1 AS cnt FROM quest_template WHERE RewardItem1 > 0
 UNION ALL SELECT ID, 'item',   RewardItem2, RewardAmount2 FROM quest_template WHERE RewardItem2 > 0
 UNION ALL SELECT ID, 'item',   RewardItem3, RewardAmount3 FROM quest_template WHERE RewardItem3 > 0
 UNION ALL SELECT ID, 'item',   RewardItem4, RewardAmount4 FROM quest_template WHERE RewardItem4 > 0
@@ -73,9 +85,9 @@ UNION ALL SELECT ID, 'spell',  RewardSpell, 1 FROM quest_template WHERE RewardSp
 UNION ALL SELECT ID, 'money',  0, RewardMoney FROM quest_template WHERE RewardMoney > 0;
 
 CREATE OR REPLACE VIEW n_loot AS
-SELECT 'creature' AS tbl, Entry AS entry, Item AS item, Chance AS chance,
-       GroupId AS grp, Reference AS ref, QuestRequired AS quest_only,
-       MinCount AS cmin, MaxCount AS cmax
+SELECT 'creature' AS tbl, CAST(Entry AS UNSIGNED) AS entry, CAST(Item AS UNSIGNED) AS item, CAST(Chance AS DOUBLE) AS chance,
+       GroupId AS grp, CAST(Reference AS SIGNED) AS ref, CAST(QuestRequired AS SIGNED) AS quest_only,
+       CAST(MinCount AS SIGNED) AS cmin, MaxCount AS cmax
 FROM creature_loot_template
 UNION ALL
 SELECT 'gobject', Entry, Item, Chance, GroupId, Reference, QuestRequired, MinCount, MaxCount
@@ -85,7 +97,15 @@ SELECT 'reference', Entry, Item, Chance, GroupId, Reference, QuestRequired, MinC
 FROM reference_loot_template;
 
 CREATE OR REPLACE VIEW n_rel AS
-SELECT 'questgiver' AS kind, id AS npc, quest AS target FROM creature_queststarter
+-- SIGNED, not UNSIGNED: this schema's vendor.item and trainer.SpellID
+-- columns are declared as plain (signed) int, unlike the other three
+-- branches here and unlike every other source's equivalent columns. Casting
+-- the first branch to UNSIGNED and combining it with those two still-signed
+-- ones widened the whole view to DECIMAL rather than BIGINT (MySQL's
+-- promotion rule for a mixed signed/unsigned UNION), which is a data_type
+-- the other three sources never produce. SIGNED sidesteps the mix entirely -
+-- every value below (npc/spell/item ids) is far inside signed BIGINT range.
+SELECT 'questgiver' AS kind, id AS npc, CAST(quest AS SIGNED) AS target FROM creature_queststarter
 UNION ALL SELECT 'questender', id, quest FROM creature_questender
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
 UNION ALL SELECT 'trainer',    ID, SpellID FROM npc_trainer;
