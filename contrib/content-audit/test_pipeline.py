@@ -730,6 +730,41 @@ def test_link_relation_uses_creature_entry_not_guid():
     print("PASS test_link_relation_uses_creature_entry_not_guid")
 
 
+def test_spawn_count_never_strong_when_both_peers_absent():
+    """Task 9 fix round 1 regression pin.
+
+    06_spawns.sql used to build the spawn_count finding with
+    COALESCE(peer.n, 0) on mz and ac alike. spawn_agg.n is a COUNT(*), so
+    it is never 0 - a peer's absence from the aggregate was being turned
+    into a literal 0, and when BOTH peers were absent for the same
+    (kind, zone, entry), the two coalesced zeros agreed with each other and
+    cmp.strength_num read that as corroboration: 'strong', the report's top
+    label, for a claim neither peer made. Measured before the fix: 140
+    spawn_count findings were 'strong' this way.
+
+    This is checked independently of how mz_value/ac_value happen to be
+    stored (NULL vs '0') by going back to cmp.spawn_agg directly: for every
+    'strong' spawn_count finding, at least one of mz or ac must actually
+    have a row for that (kind, zone, entry). Reverting the fix (COALESCE on
+    both peer arguments) reproduces the 140 failures.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings f "
+        "LEFT JOIN cmp.spawn_agg amz ON amz.src='mz' AND amz.kind=f.entity_kind "
+        "  AND amz.zone=f.zone AND amz.entry=f.entity_id "
+        "LEFT JOIN cmp.spawn_agg aac ON aac.src='ac' AND aac.kind=f.entity_kind "
+        "  AND aac.zone=f.zone AND aac.entry=f.entity_id "
+        "WHERE f.topic='spawns' AND f.field='spawn_count' AND f.strength='strong' "
+        "  AND amz.n IS NULL AND aac.n IS NULL"
+    )
+    n = int(rows[0][0])
+    assert n == 0, (
+        "%s spawn_count findings are 'strong' with both mz and ac absent from "
+        "spawn_agg - two absences are being read as mutual corroboration" % n
+    )
+    print("PASS test_spawn_count_never_strong_when_both_peers_absent")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -755,6 +790,7 @@ TESTS = [
     test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty,
     test_pilot_zones_produce_findings,
     test_link_relation_uses_creature_entry_not_guid,
+    test_spawn_count_never_strong_when_both_peers_absent,
 ]
 
 if __name__ == "__main__":

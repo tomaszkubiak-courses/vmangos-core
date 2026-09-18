@@ -25,9 +25,18 @@ UNION ALL SELECT 'ac', kind FROM ac.n_rel GROUP BY kind;
 -- times and burying every other relation finding in the report (Task 4
 -- already judged the size gap a genuine content difference, not a bug). All
 -- four sources have trainer rows (v 4676, mz 27324, tw 38038, ac 4934), so
--- an absent (src, npc) pair here is a real zero - "this source's trainer
--- does not teach this spell list" - not an abstention, and no
--- rel_kinds_present gating is needed for this half of the topic.
+-- no rel_kinds_present gating is needed for this half of the topic - every
+-- source is capable of voting on a trainer NPC.
+--
+-- An absent (src, npc) pair is still a real, informative zero for v (see
+-- the mandatory COALESCE(tv.n, 0) below), because we know the realm under
+-- audit's full NPC set. It is NOT safe to coalesce for the peers: two
+-- peers independently having no trainer row for the same npc is not the
+-- same thing as two peers agreeing the npc teaches 0 spells, and
+-- COALESCE(...,0) on both would make that non-agreement read as
+-- corroboration - the same fabricated-'strong' shape fixed for
+-- spawn_count in diffs/06_spawns.sql (fix round 1). The peer arguments
+-- below stay NULL when absent.
 CREATE OR REPLACE VIEW cmp.trainer_spell_count AS
 SELECT 'v'  AS src, npc, COUNT(*) AS n FROM v.n_rel  WHERE kind = 'trainer' GROUP BY npc
 UNION ALL SELECT 'mz', npc, COUNT(*) FROM mz.n_rel WHERE kind = 'trainer' GROUP BY npc
@@ -43,8 +52,8 @@ UNION SELECT DISTINCT npc FROM ac.n_rel WHERE kind = 'trainer';
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT z.zone, 'relations', 'creature', tn.npc, 'trainer_spell_count',
-       COALESCE(tv.n, 0), COALESCE(tmz.n, 0), COALESCE(ttw.n, 0), COALESCE(tac.n, 0),
-       cmp.strength_num(COALESCE(tv.n, 0), COALESCE(tmz.n, 0), COALESCE(tac.n, 0), 0.50, 5),
+       COALESCE(tv.n, 0), tmz.n, ttw.n, tac.n,
+       cmp.strength_num(COALESCE(tv.n, 0), tmz.n, tac.n, 0.50, 5),
        ''
 FROM cmp.trainer_npc tn
 JOIN cmp.zone_creature z ON z.entry = tn.npc
@@ -52,7 +61,7 @@ LEFT JOIN cmp.trainer_spell_count tv  ON tv.src  = 'v'  AND tv.npc  = tn.npc
 LEFT JOIN cmp.trainer_spell_count tmz ON tmz.src = 'mz' AND tmz.npc = tn.npc
 LEFT JOIN cmp.trainer_spell_count ttw ON ttw.src = 'tw' AND ttw.npc = tn.npc
 LEFT JOIN cmp.trainer_spell_count tac ON tac.src = 'ac' AND tac.npc = tn.npc
-WHERE cmp.strength_num(COALESCE(tv.n, 0), COALESCE(tmz.n, 0), COALESCE(tac.n, 0), 0.50, 5) <> '';
+WHERE cmp.strength_num(COALESCE(tv.n, 0), tmz.n, tac.n, 0.50, 5) <> '';
 
 -- (b) vendor, questgiver, questender and link stay per-target: a specific
 -- missing vendor item or quest giver is directly actionable, and at ~7k
