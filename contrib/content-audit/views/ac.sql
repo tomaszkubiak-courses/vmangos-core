@@ -97,18 +97,32 @@ SELECT 'reference', Entry, Item, Chance, GroupId, Reference, QuestRequired, MinC
 FROM reference_loot_template;
 
 CREATE OR REPLACE VIEW n_rel AS
--- SIGNED, not UNSIGNED: this schema's vendor.item and trainer.SpellID
--- columns are declared as plain (signed) int, unlike the other three
--- branches here and unlike every other source's equivalent columns. Casting
--- the first branch to UNSIGNED and combining it with those two still-signed
--- ones widened the whole view to DECIMAL rather than BIGINT (MySQL's
--- promotion rule for a mixed signed/unsigned UNION), which is a data_type
--- the other three sources never produce. SIGNED sidesteps the mix entirely -
--- every value below (npc/spell/item ids) is far inside signed BIGINT range.
+-- SIGNED, not UNSIGNED: this schema's vendor.item column is declared as
+-- plain (signed) int, unlike the other branches here and unlike every
+-- other source's equivalent columns. Casting the first branch to UNSIGNED
+-- and combining it with that still-signed one widened the whole view to
+-- DECIMAL rather than BIGINT (MySQL's promotion rule for a mixed
+-- signed/unsigned UNION), which is a data_type the other three sources
+-- never produce. SIGNED sidesteps the mix entirely - every value below
+-- (npc/spell/item ids) is far inside signed BIGINT range.
 -- npc is cast here too (Task 9): the other three sources now explicitly
 -- CAST their own npc column to keep the type-consistency contract after
 -- Step 0's link fix changed which branch used to drive their width.
+--
+-- No `trainer` branch (Task 9 fix round 2, item 1): this schema's real
+-- trainer data is creature_default_trainer -> trainer -> trainer_spell,
+-- not npc_trainer, which is a legacy stub table here (4934 rows). Measured
+-- on the real tables, over the 213 trainer NPCs v and ac share: ac
+-- averages 35.5 spells against v's 16.6 and agrees with v within the
+-- trainer_spell_count tolerance on only 119 of 213 (56%), where mz agrees
+-- on 189 of 213 (89%) - WotLK roughly doubled trainer lists, so even ac's
+-- *correct* trainer data cannot corroborate a vanilla spell count, and
+-- npc_trainer's stub rows are worse still (458 of 459 non-NULL
+-- trainer_spell_count findings against them had ac <= 3 spells). ac
+-- already abstains on `link` for the analogous reason; this drops
+-- `trainer` from n_rel entirely rather than repointing it at either table,
+-- so ac abstains on trainer_spell_count via the existing NULL-peer
+-- machinery (see diffs/02_relations.sql).
 SELECT 'questgiver' AS kind, CAST(id AS SIGNED) AS npc, CAST(quest AS SIGNED) AS target FROM creature_queststarter
 UNION ALL SELECT 'questender', id, quest FROM creature_questender
-UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
-UNION ALL SELECT 'trainer',    ID, SpellID FROM npc_trainer;
+UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor;

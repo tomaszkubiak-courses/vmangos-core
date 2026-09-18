@@ -120,3 +120,45 @@ RETURN CASE
          OR NOT cmp._agrees_num(v, ac, ratio_tol, abs_tol) THEN 'weak'
     ELSE ''
 END;
+
+-- cmp.strength_num's second branch ('weak' whenever v disagrees with mz OR
+-- with ac) is correct for the existence topic and the per-target relation
+-- kinds: there, a NULL peer genuinely means "this source cannot express
+-- this fact" and the other peer's vote is the whole finding regardless of
+-- whether it agrees with v. Task 8 tested that property on purpose and
+-- cmp.strength_num above must go on providing it unchanged.
+--
+-- It is the wrong rule for the four *magnitude* topics wired to it
+-- (effective health, trainer_spell_count, spawn_count, respawn_min): there,
+-- a lone abstaining peer plus a voting peer that agrees with v is not a
+-- disagreement anyone raised - it is one source, alone, matching v, and
+-- cmp.strength_num's second branch still writes 'weak' for it because
+-- `NOT cmp._agrees_num(v, NULL, ...)` is unconditionally TRUE. Measured on
+-- this corpus, that is most of the 'weak' volume in every magnitude field,
+-- and it corroborates nothing:
+--   field                 weak total   contentless    strong affected
+--   spawn_count           5487         4562 (83%)      0
+--   respawn_min           7416         1334 (18%)      0
+--   hp@N (all levels)     5747         696  (12%)       0
+--   trainer_spell_count   514          180  (35%)       0
+-- 6772 of 38771 findings (17.5%) assert nothing and disappear once this
+-- function filters them. Zero 'strong' findings move in any field - the
+-- case this suppresses only ever downgrades a contentless 'weak' to '',
+-- which is what proves it cannot reach a corroborated signal.
+--
+-- cmp.strength_mag delegates to cmp.strength_num for every other input; it
+-- only intercepts the lone-abstention-plus-agreement shape and reads it as
+-- silence instead of a finding. Wire the four magnitude call sites to this
+-- function, never to cmp.strength_num directly - the existence topic and
+-- the per-target relation kinds must keep using cmp.strength_num (or
+-- cmp.strength) so they keep reporting a lone peer's disagreement.
+DROP FUNCTION IF EXISTS cmp.strength_mag;
+CREATE FUNCTION cmp.strength_mag(v DOUBLE, mz DOUBLE, ac DOUBLE, ratio_tol DOUBLE, abs_tol DOUBLE)
+RETURNS VARCHAR(8) DETERMINISTIC
+RETURN CASE
+    WHEN mz IS NULL AND ac IS NOT NULL
+         AND cmp._agrees_num(v, ac, ratio_tol, abs_tol)     THEN ''
+    WHEN ac IS NULL AND mz IS NOT NULL
+         AND cmp._agrees_num(v, mz, ratio_tol, abs_tol)     THEN ''
+    ELSE cmp.strength_num(v, mz, ac, ratio_tol, abs_tol)
+END;

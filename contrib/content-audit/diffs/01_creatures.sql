@@ -73,13 +73,16 @@ WHERE cmp.strength(f.v, f.mz, f.ac) <> '';
 -- of writing empty ones.
 --
 -- Mandatory numeric form (see diffs/00_schema.sql): filter with
--- cmp.strength_num(...) <> '', never restate the tolerance arithmetic here.
+-- cmp.strength_mag(...) <> '', never restate the tolerance arithmetic here.
+-- strength_mag, not strength_num: hp@N is a magnitude topic, so a lone
+-- voting peer that agrees with v must not write a contentless 'weak'
+-- (fix round 2, item 2).
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT zc.zone, 'creatures', 'creature', zc.entry,
        CONCAT('hp@', hv.lvl),
        ROUND(hv.hp), ROUND(hmz.hp), ROUND(htw.hp), ROUND(hac.hp),
-       cmp.strength_num(
+       cmp.strength_mag(
            hv.hp,
            hmz.hp,
            CASE WHEN hmz.hp IS NULL THEN NULL ELSE hac.hp END,
@@ -90,7 +93,7 @@ JOIN      cmp.n_creature_hp hv  ON hv.src  = 'v'  AND hv.entry  = zc.entry
 LEFT JOIN cmp.n_creature_hp hmz ON hmz.src = 'mz' AND hmz.entry = zc.entry AND hmz.lvl = hv.lvl
 LEFT JOIN cmp.n_creature_hp htw ON htw.src = 'tw' AND htw.entry = zc.entry AND htw.lvl = hv.lvl
 LEFT JOIN cmp.n_creature_hp hac ON hac.src = 'ac' AND hac.entry = zc.entry AND hac.lvl = hv.lvl
-WHERE cmp.strength_num(
+WHERE cmp.strength_mag(
         hv.hp,
         hmz.hp,
         CASE WHEN hmz.hp IS NULL THEN NULL ELSE hac.hp END,

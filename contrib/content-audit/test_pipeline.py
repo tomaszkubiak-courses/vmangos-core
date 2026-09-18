@@ -668,8 +668,63 @@ def test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty():
     print("PASS test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty")
 
 
+def _strength_mag(v, mz, ac, ratio_tol, abs_tol):
+    def lit(x):
+        return "NULL" if x is None else str(x)
+
+    rows = corpus_sql(
+        "SELECT cmp.strength_mag(%s, %s, %s, %s, %s)"
+        % (lit(v), lit(mz), lit(ac), ratio_tol, abs_tol)
+    )
+    got = rows[0][0]
+    return "" if got == "NULL" else got
+
+
+def test_consensus_strength_mag_rule():
+    """Item 2 (fix round 2): cmp.strength_mag wraps cmp.strength_num for the
+    four magnitude topics (health, trainer_spell_count, spawn_count,
+    respawn_min). cmp.strength_num's third branch reads 'exactly one peer
+    NULL' as automatic disagreement, even when the peer that did vote
+    agrees with v - a row that asserts nothing, since no source is claiming
+    a difference. cmp.strength_mag intercepts exactly that shape and
+    returns '' instead; every other input must fall through to
+    cmp.strength_num unchanged.
+
+    Cases hand-computed from the rule, not round-tripped out of the
+    function under test.
+    """
+    cases = [
+        # (v, mz, ac, ratio_tol, abs_tol, expected)
+        # one peer NULL, the other agrees with v (5/100 = 0.05 <= 0.20) -> ''
+        (100, None, 105, 0.20, 0, ""),
+        (100, 105, None, 0.20, 0, ""),
+        # one peer NULL, the other disagrees with v (100/100 = 1.0 > 0.20) -> weak
+        (100, None, 200, 0.20, 0, "weak"),
+        (100, 200, None, 0.20, 0, "weak"),
+        # both peers present, agree with each other but not v -> strong,
+        # unchanged from cmp.strength_num (same case that test uses)
+        (100, 150, 145, 0.20, 0, "strong"),
+        # both peers NULL -> ''
+        (100, None, None, 0.20, 0, ""),
+    ]
+    for v, mz, ac, ratio_tol, abs_tol, expected in cases:
+        got = _strength_mag(v, mz, ac, ratio_tol, abs_tol)
+        assert got == expected, (
+            "cmp.strength_mag(%s, %s, %s, %s, %s) gave %r, expected %r"
+            % (v, mz, ac, ratio_tol, abs_tol, got, expected)
+        )
+    print("PASS test_consensus_strength_mag_rule")
+
+
 def test_pilot_zones_produce_findings():
-    """Westfall and the Deadmines each produce findings in every topic run."""
+    """Westfall and the Deadmines each produce findings in every topic run.
+
+    Item 3 (fix round 2, minor 7): the previous assertion only checked that
+    the per-zone topic dict was non-empty, which passes even when a single
+    topic fires and the other two produce nothing. Assert all three topic
+    keys are present for each zone, per the docstring's actual claim.
+    """
+    topics = ("creatures", "relations", "spawns")
     for zone, label in ((40, "Westfall"), (1581, "The Deadmines")):
         rows = corpus_sql(
             "SELECT topic, COUNT(*) FROM cmp.findings WHERE zone=%d "
@@ -677,6 +732,10 @@ def test_pilot_zones_produce_findings():
         )
         got = {r[0]: int(r[1]) for r in rows}
         assert got, "%s produced no findings at all" % label
+        missing = [t for t in topics if t not in got]
+        assert not missing, (
+            "%s produced no findings in topic(s) %s: %s" % (label, missing, got)
+        )
         print("NOTE %s: %s" % (label, got))
     # A zone where every topic fires on nearly every entity means a broken
     # join, not a broken game.
@@ -691,7 +750,7 @@ def test_pilot_zones_produce_findings():
 
 
 def test_link_relation_uses_creature_entry_not_guid():
-    """Task 9 Step 0 regression pin.
+    """Task 9 Step 0 regression pin, over every source with creature_linking.
 
     creature_linking is keyed by spawn GUID; n_rel's 'link' kind must resolve
     both sides to creature entry, like the other four kinds, not carry the
@@ -700,33 +759,40 @@ def test_link_relation_uses_creature_entry_not_guid():
     creature, and the row count would jump back up to one row per
     creature_linking record instead of one per distinct entry pair.
 
-    Checked by reverting the Step 0 fix: with n_rel.link keyed by GUID, 406
-    of v's 407 link rows have an npc value that is not a v.n_creature entry
-    (only 1 is a coincidental GUID/entry collision), and the row count is
-    407 instead of 58.
+    Checked by reverting the Step 0 fix: with v.n_rel.link keyed by GUID,
+    406 of v's 407 link rows have an npc value that is not a v.n_creature
+    entry (only 1 is a coincidental GUID/entry collision), and the row
+    count is 407 instead of 58.
+
+    Item 4 (fix round 2, minor 8): the original pin checked only v, although
+    mz.sql and tw.sql received the identical Step 0 edit - a revert of
+    either alone passed the suite. Loops over all three sources that have
+    creature_linking; ac has no equivalent table and must stay excluded
+    (views/ac.sql's own comment on this).
     """
-    rows = corpus_sql("SELECT COUNT(*) FROM v.n_rel WHERE kind='link'")
-    n_link = int(rows[0][0])
-    assert n_link > 0, "v.n_rel has no link rows to check"
+    for src in ("v", "mz", "tw"):
+        rows = corpus_sql("SELECT COUNT(*) FROM %s.n_rel WHERE kind='link'" % src)
+        n_link = int(rows[0][0])
+        assert n_link > 0, "%s.n_rel has no link rows to check" % src
 
-    rows = corpus_sql(
-        "SELECT COUNT(*) FROM v.n_rel r "
-        "LEFT JOIN v.n_creature c ON c.entry = r.npc "
-        "WHERE r.kind='link' AND c.entry IS NULL"
-    )
-    assert int(rows[0][0]) == 0, (
-        "%s of %s link npc values are not creature entries - n_rel.link is "
-        "keyed by GUID, not entry" % (rows[0][0], n_link)
-    )
+        rows = corpus_sql(
+            "SELECT COUNT(*) FROM %s.n_rel r "
+            "LEFT JOIN %s.n_creature c ON c.entry = r.npc "
+            "WHERE r.kind='link' AND c.entry IS NULL" % (src, src)
+        )
+        assert int(rows[0][0]) == 0, (
+            "%s: %s of %s link npc values are not creature entries - "
+            "n_rel.link is keyed by GUID, not entry" % (src, rows[0][0], n_link)
+        )
 
-    rows = corpus_sql(
-        "SELECT COUNT(*) FROM v.n_rel r "
-        "LEFT JOIN v.n_creature c ON c.entry = r.target "
-        "WHERE r.kind='link' AND c.entry IS NULL"
-    )
-    assert int(rows[0][0]) == 0, (
-        "%s link target values are not creature entries" % rows[0][0]
-    )
+        rows = corpus_sql(
+            "SELECT COUNT(*) FROM %s.n_rel r "
+            "LEFT JOIN %s.n_creature c ON c.entry = r.target "
+            "WHERE r.kind='link' AND c.entry IS NULL" % (src, src)
+        )
+        assert int(rows[0][0]) == 0, (
+            "%s: %s link target values are not creature entries" % (src, rows[0][0])
+        )
     print("PASS test_link_relation_uses_creature_entry_not_guid")
 
 
@@ -765,6 +831,47 @@ def test_spawn_count_never_strong_when_both_peers_absent():
     print("PASS test_spawn_count_never_strong_when_both_peers_absent")
 
 
+def test_magnitude_topics_never_write_a_contentless_weak_finding():
+    """Item 2 (fix round 2) regression pin, over the live findings table.
+
+    No finding in a magnitude field (hp@N, trainer_spell_count, spawn_count,
+    respawn_min) may have exactly one peer NULL while the other peer agrees
+    with v_value within that field's own tolerance - cmp.strength_mag exists
+    precisely to filter that shape out before diffs/*.sql inserts it.
+
+    Tolerances are restated here as a literal table, not read out of
+    diffs/00_schema.sql or diffs/*.sql, so a future tolerance change shows up
+    as a failing assertion here instead of silently validating against
+    whatever the SQL currently says. Checked by reverting the four call
+    sites (01_creatures.sql, 02_relations.sql, 06_spawns.sql x2) from
+    cmp.strength_mag back to cmp.strength_num and rebuilding: see the fix
+    round 2 report for the counts this reproduces.
+    """
+    # (topic, field predicate, ratio_tol, abs_tol)
+    fields = [
+        ("creatures", "field LIKE 'hp@%'", 0.20, 0),
+        ("relations", "field = 'trainer_spell_count'", 0.50, 5),
+        ("spawns", "field = 'spawn_count'", 0.50, 5),
+        ("spawns", "field = 'respawn_min'", 1.0, 0),
+    ]
+    for topic, field_pred, ratio_tol, abs_tol in fields:
+        rows = corpus_sql(
+            "SELECT COUNT(*) FROM cmp.findings WHERE topic='%s' AND %s AND ("
+            "  (mz_value IS NULL AND ac_value IS NOT NULL"
+            "     AND cmp._agrees_num(CAST(v_value AS DOUBLE), CAST(ac_value AS DOUBLE), %s, %s))"
+            "  OR (ac_value IS NULL AND mz_value IS NOT NULL"
+            "     AND cmp._agrees_num(CAST(v_value AS DOUBLE), CAST(mz_value AS DOUBLE), %s, %s))"
+            ")" % (topic, field_pred, ratio_tol, abs_tol, ratio_tol, abs_tol)
+        )
+        n = int(rows[0][0])
+        assert n == 0, (
+            "%s/%s: %s findings have exactly one peer NULL with the other "
+            "agreeing with v - a contentless weak finding cmp.strength_mag "
+            "should have filtered" % (topic, field_pred, n)
+        )
+    print("PASS test_magnitude_topics_never_write_a_contentless_weak_finding")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -788,9 +895,11 @@ TESTS = [
     test_consensus_strength_num_is_symmetric,
     test_consensus_strength_num_never_strong_with_an_abstaining_peer,
     test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty,
+    test_consensus_strength_mag_rule,
     test_pilot_zones_produce_findings,
     test_link_relation_uses_creature_entry_not_guid,
     test_spawn_count_never_strong_when_both_peers_absent,
+    test_magnitude_topics_never_write_a_contentless_weak_finding,
 ]
 
 if __name__ == "__main__":
