@@ -111,9 +111,18 @@ SELECT 'reference', entry, item, ABS(ChanceOrQuestChance), groupid,
        CASE WHEN mincountOrRef > 0 THEN mincountOrRef ELSE 1 END, maxcount
 FROM reference_loot_template;
 
+-- Task 9 Step 0 fix: see v.sql's n_rel comment. creature_linking is keyed
+-- by spawn GUID; both sides are resolved to creature entry here so
+-- n_rel.npc/target mean the same thing as the other four kinds. npc is
+-- explicitly CAST here too, for the same type-consistency reason as v.sql:
+-- without an explicit width the type contract with the other three sources
+-- is only accidental.
 CREATE OR REPLACE VIEW n_rel AS
-SELECT 'questgiver' AS kind, entry AS npc, CAST(quest AS UNSIGNED) AS target FROM quest_relations WHERE actor = 0 AND role = 0
+SELECT 'questgiver' AS kind, CAST(entry AS UNSIGNED) AS npc, CAST(quest AS UNSIGNED) AS target FROM quest_relations WHERE actor = 0 AND role = 0
 UNION ALL SELECT 'questender', entry, quest FROM quest_relations WHERE actor = 0 AND role = 1
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
 UNION ALL SELECT 'trainer',    entry, spell FROM npc_trainer
-UNION ALL SELECT 'link',       guid, master_guid FROM creature_linking;
+UNION ALL SELECT DISTINCT 'link', c1.id, c2.id
+    FROM creature_linking l
+    JOIN creature c1 ON c1.guid = l.guid
+    JOIN creature c2 ON c2.guid = l.master_guid;

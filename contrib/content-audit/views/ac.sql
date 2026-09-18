@@ -105,7 +105,10 @@ CREATE OR REPLACE VIEW n_rel AS
 -- promotion rule for a mixed signed/unsigned UNION), which is a data_type
 -- the other three sources never produce. SIGNED sidesteps the mix entirely -
 -- every value below (npc/spell/item ids) is far inside signed BIGINT range.
-SELECT 'questgiver' AS kind, id AS npc, CAST(quest AS SIGNED) AS target FROM creature_queststarter
+-- npc is cast here too (Task 9): the other three sources now explicitly
+-- CAST their own npc column to keep the type-consistency contract after
+-- Step 0's link fix changed which branch used to drive their width.
+SELECT 'questgiver' AS kind, CAST(id AS SIGNED) AS npc, CAST(quest AS SIGNED) AS target FROM creature_queststarter
 UNION ALL SELECT 'questender', id, quest FROM creature_questender
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
 UNION ALL SELECT 'trainer',    ID, SpellID FROM npc_trainer;

@@ -186,9 +186,27 @@ SELECT 'reference', entry, item, ABS(ChanceOrQuestChance), groupid,
 FROM reference_loot_template
 WHERE 10 BETWEEN patch_min AND patch_max;
 
+-- Task 9 Step 0 fix: creature_linking is keyed by spawn GUID, unlike the
+-- other four kinds which key npc/target by creature entry, and GUIDs do not
+-- survive the trip between databases at all (a guid in v and the same guid
+-- in mz name unrelated rows). Both sides are resolved to creature entry
+-- here so n_rel.npc/target mean the same thing for every kind. Verified on
+-- the corpus: all 407 v link guids resolve on both sides (0 unresolvable),
+-- collapsing to 58 distinct entry pairs. Exactly one linked spawn sits on an
+-- id2 pool; reading c.id alone is correct to within that single row.
+--
+-- The old link branch (raw guid, an `int unsigned` column) happened to be
+-- the widest contributor to npc's UNION type, so npc matched the other
+-- three sources' int-typed npc column by accident rather than by CAST. The
+-- new entry-keyed branch is narrower (mediumint), so npc now needs its own
+-- explicit CAST here to keep the type-consistency contract
+-- test_normalised_views_exist_and_agree_on_shape checks.
 CREATE OR REPLACE VIEW n_rel AS
-SELECT 'questgiver' AS kind, id AS npc, CAST(quest AS UNSIGNED) AS target FROM creature_questrelation WHERE 10 BETWEEN patch_min AND patch_max
+SELECT 'questgiver' AS kind, CAST(id AS UNSIGNED) AS npc, CAST(quest AS UNSIGNED) AS target FROM creature_questrelation WHERE 10 BETWEEN patch_min AND patch_max
 UNION ALL SELECT 'questender', id, quest FROM creature_involvedrelation WHERE 10 BETWEEN patch_min AND patch_max
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
 UNION ALL SELECT 'trainer',    entry, spell FROM npc_trainer
-UNION ALL SELECT 'link',       guid, master_guid FROM creature_linking;
+UNION ALL SELECT DISTINCT 'link', c1.id, c2.id
+    FROM creature_linking l
+    JOIN creature c1 ON c1.guid = l.guid
+    JOIN creature c2 ON c2.guid = l.master_guid;

@@ -668,6 +668,68 @@ def test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty():
     print("PASS test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty")
 
 
+def test_pilot_zones_produce_findings():
+    """Westfall and the Deadmines each produce findings in every topic run."""
+    for zone, label in ((40, "Westfall"), (1581, "The Deadmines")):
+        rows = corpus_sql(
+            "SELECT topic, COUNT(*) FROM cmp.findings WHERE zone=%d "
+            "GROUP BY topic" % zone
+        )
+        got = {r[0]: int(r[1]) for r in rows}
+        assert got, "%s produced no findings at all" % label
+        print("NOTE %s: %s" % (label, got))
+    # A zone where every topic fires on nearly every entity means a broken
+    # join, not a broken game.
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings WHERE zone=40 AND topic='creatures'"
+    )
+    assert int(rows[0][0]) < 2000, (
+        "Westfall has %s creature findings - suspect a join, not the content"
+        % rows[0][0]
+    )
+    print("PASS test_pilot_zones_produce_findings")
+
+
+def test_link_relation_uses_creature_entry_not_guid():
+    """Task 9 Step 0 regression pin.
+
+    creature_linking is keyed by spawn GUID; n_rel's 'link' kind must resolve
+    both sides to creature entry, like the other four kinds, not carry the
+    raw GUID through. A regression back to GUID keying would not error - it
+    would just make every link npc/target value fail to name a real
+    creature, and the row count would jump back up to one row per
+    creature_linking record instead of one per distinct entry pair.
+
+    Checked by reverting the Step 0 fix: with n_rel.link keyed by GUID, 406
+    of v's 407 link rows have an npc value that is not a v.n_creature entry
+    (only 1 is a coincidental GUID/entry collision), and the row count is
+    407 instead of 58.
+    """
+    rows = corpus_sql("SELECT COUNT(*) FROM v.n_rel WHERE kind='link'")
+    n_link = int(rows[0][0])
+    assert n_link > 0, "v.n_rel has no link rows to check"
+
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM v.n_rel r "
+        "LEFT JOIN v.n_creature c ON c.entry = r.npc "
+        "WHERE r.kind='link' AND c.entry IS NULL"
+    )
+    assert int(rows[0][0]) == 0, (
+        "%s of %s link npc values are not creature entries - n_rel.link is "
+        "keyed by GUID, not entry" % (rows[0][0], n_link)
+    )
+
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM v.n_rel r "
+        "LEFT JOIN v.n_creature c ON c.entry = r.target "
+        "WHERE r.kind='link' AND c.entry IS NULL"
+    )
+    assert int(rows[0][0]) == 0, (
+        "%s link target values are not creature entries" % rows[0][0]
+    )
+    print("PASS test_link_relation_uses_creature_entry_not_guid")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -691,6 +753,8 @@ TESTS = [
     test_consensus_strength_num_is_symmetric,
     test_consensus_strength_num_never_strong_with_an_abstaining_peer,
     test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty,
+    test_pilot_zones_produce_findings,
+    test_link_relation_uses_creature_entry_not_guid,
 ]
 
 if __name__ == "__main__":
