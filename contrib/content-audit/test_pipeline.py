@@ -872,6 +872,49 @@ def test_magnitude_topics_never_write_a_contentless_weak_finding():
     print("PASS test_magnitude_topics_never_write_a_contentless_weak_finding")
 
 
+def test_all_six_topics_fire():
+    """Every topic in the spec produces at least one finding somewhere."""
+    rows = corpus_sql("SELECT DISTINCT topic FROM cmp.findings")
+    got = {r[0] for r in rows}
+    expected = {
+        "creatures",
+        "relations",
+        "quests",
+        "quest_rewards",
+        "quest_item_drops",
+        "spawns",
+    }
+    missing = expected - got
+    assert not missing, "no findings at all for: %s" % sorted(missing)
+    print("PASS test_all_six_topics_fire")
+
+
+def test_quest_item_drops_never_strong_when_both_peers_absent():
+    """Ruling (g) regression pin: COALESCE(..., 0) belongs on v only.
+
+    diffs/05_quest_item_drops.sql applies COALESCE(lv.p_drop, 0) to the v
+    argument of cmp.strength_mag but leaves lmz.p_drop/lac.p_drop as bare
+    NULLs when absent. Coalescing a peer's absence to 0 as well would let
+    two independently absent peers agree with each other on a value neither
+    one asserted - the exact shape that fabricated 169 'strong' spawn_count
+    findings before diffs/06_spawns.sql was fixed
+    (test_spawn_count_never_strong_when_both_peers_absent). This checks the
+    live findings table directly, the same way that test does, rather than
+    trusting the SQL was written the safe way.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings "
+        "WHERE topic='quest_item_drops' AND strength='strong' "
+        "AND mz_value IS NULL AND ac_value IS NULL"
+    )
+    n = int(rows[0][0])
+    assert n == 0, (
+        "%s quest_item_drops findings are 'strong' with both mz and ac "
+        "absent - a peer's absence is being read as corroboration" % n
+    )
+    print("PASS test_quest_item_drops_never_strong_when_both_peers_absent")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -900,6 +943,8 @@ TESTS = [
     test_link_relation_uses_creature_entry_not_guid,
     test_spawn_count_never_strong_when_both_peers_absent,
     test_magnitude_topics_never_write_a_contentless_weak_finding,
+    test_all_six_topics_fire,
+    test_quest_item_drops_never_strong_when_both_peers_absent,
 ]
 
 if __name__ == "__main__":
