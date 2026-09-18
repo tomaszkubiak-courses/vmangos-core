@@ -40,3 +40,83 @@ RETURN CASE
     WHEN NOT (v <=> mz) OR NOT (v <=> ac)               THEN 'weak'
     ELSE ''
 END;
+
+-- cmp.strength judges peer agreement with byte equality ('<=>'), which is
+-- right for the boolean and existence topics (exists, relations,
+-- objectives). Every numeric topic (effective health, spawn count, respawn
+-- window, drop chance) instead judges v against a tolerance, so byte
+-- equality between two independently computed floats is the wrong test for
+-- them - it almost never holds, which makes 'strong' effectively
+-- unreachable for those topics (measured: an 8704-candidate health-shaped
+-- reproduction on this corpus gave 18 strong and 8686 weak before this
+-- function existed).
+--
+-- cmp.strength_num is that sibling: same branch order, same abstention
+-- semantics (a NULL peer can never produce 'strong'; a NULL v is a real,
+-- distinct value, not an abstention - see cmp.strength's comment above) and
+-- the same three return values, with the tolerance predicate
+-- cmp._agrees_num substituted for '<=>' in both the "disagrees with v" and
+-- the "peers agree with each other" positions.
+--
+-- Two tolerances, not one, because the topics need both shapes: a purely
+-- relative one (health) and one where a small absolute slack matters more
+-- than the ratio (spawn count, where 2 vs 3 should not be a finding even
+-- though the ratio is large). Either tolerance may be 0 to mean "this half
+-- of the rule does not apply" - respawn window and health have no absolute
+-- component, so they pass abs_tol=0. cmp._agrees_num guards each half on
+-- its own tolerance being > 0; a naive `ABS(a-b) >= abs_tol` would treat
+-- abs_tol=0 as "everything differs" and turn every row into a finding.
+--
+-- The ratio denominator is GREATEST(LEAST(ABS(a), ABS(b)), 1), not
+-- GREATEST(b, 1) the way the topics' own draft WHERE clauses had it -
+-- dividing by whichever argument happens to be the peer is asymmetric
+-- (a=2b gives ratio 1.0, but b=2a gives 0.5, so the same pair agrees or
+-- disagrees depending on which source is v), and a consensus rule cannot
+-- depend on argument order. This is a deliberate departure from the plan
+-- and moves the candidate counts slightly; see the fix round 1 report.
+--
+-- Mandatory form for every numeric topic's diff query, so the Item 3
+-- defect (a doubly-abstaining peer writing a contentless finding) cannot
+-- recur: filter with `WHERE cmp.strength_num(...) <> ''`, never restate the
+-- tolerance arithmetic in the WHERE clause. When mz abstains, the topic's
+-- own advisory-ac wrapper (CASE WHEN mz IS NULL THEN NULL ELSE ac END, used
+-- where ac's figure is only trustworthy alongside a corroborating mz)
+-- nulls ac's argument too, both peer arguments arrive NULL, and
+-- cmp.strength_num's first branch (shared with cmp.strength) returns ''
+-- like any other doubly-abstaining row - the WHERE clause drops it by
+-- construction instead of a bare tolerance predicate writing a finding
+-- that asserts nothing.
+--
+-- Tolerance values, from the plan, for this signature:
+--   topic                          ratio_tol   abs_tol
+--   effective health               0.20        0
+--   spawn count                    0.50        5
+--   respawn window (2x)            1.0         0
+--   drop chance (2x or 5 points)   1.0         0.05
+DROP FUNCTION IF EXISTS cmp._agrees_num;
+CREATE FUNCTION cmp._agrees_num(a DOUBLE, b DOUBLE, ratio_tol DOUBLE, abs_tol DOUBLE)
+RETURNS BOOLEAN DETERMINISTIC
+RETURN CASE
+    WHEN a IS NULL AND b IS NULL                         THEN TRUE
+    WHEN a IS NULL OR b IS NULL                           THEN FALSE
+    WHEN ratio_tol > 0
+         AND ABS(a - b) / GREATEST(LEAST(ABS(a), ABS(b)), 1) <= ratio_tol
+                                                            THEN TRUE
+    WHEN abs_tol > 0 AND ABS(a - b) <= abs_tol             THEN TRUE
+    WHEN ratio_tol = 0 AND abs_tol = 0 AND a = b           THEN TRUE
+    ELSE FALSE
+END;
+
+DROP FUNCTION IF EXISTS cmp.strength_num;
+CREATE FUNCTION cmp.strength_num(v DOUBLE, mz DOUBLE, ac DOUBLE, ratio_tol DOUBLE, abs_tol DOUBLE)
+RETURNS VARCHAR(8) DETERMINISTIC
+RETURN CASE
+    WHEN mz IS NULL AND ac IS NULL                       THEN ''
+    WHEN mz IS NOT NULL AND ac IS NOT NULL
+         AND NOT cmp._agrees_num(v, mz, ratio_tol, abs_tol)
+         AND NOT cmp._agrees_num(v, ac, ratio_tol, abs_tol)
+         AND cmp._agrees_num(mz, ac, ratio_tol, abs_tol)  THEN 'strong'
+    WHEN NOT cmp._agrees_num(v, mz, ratio_tol, abs_tol)
+         OR NOT cmp._agrees_num(v, ac, ratio_tol, abs_tol) THEN 'weak'
+    ELSE ''
+END;

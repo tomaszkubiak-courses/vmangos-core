@@ -563,6 +563,111 @@ def test_consensus_strength_missing_from_v_is_strong_when_peers_agree():
     print("PASS test_consensus_strength_missing_from_v_is_strong_when_peers_agree")
 
 
+def _strength_num(v, mz, ac, ratio_tol, abs_tol):
+    def lit(x):
+        return "NULL" if x is None else str(x)
+
+    rows = corpus_sql(
+        "SELECT cmp.strength_num(%s, %s, %s, %s, %s)"
+        % (lit(v), lit(mz), lit(ac), ratio_tol, abs_tol)
+    )
+    got = rows[0][0]
+    return "" if got == "NULL" else got
+
+
+def test_consensus_strength_num_rule():
+    """cmp.strength_num: the same rule, but peer agreement is judged by a
+    tolerance instead of byte equality.
+
+    Fix round 1: cmp.strength alone made every numeric topic (health, spawn
+    count, respawn window, drop chance) judge peer agreement by byte
+    equality while each topic's own WHERE clause judged v against a
+    tolerance - two independently computed floats almost never round to the
+    same integer, so 'strong' was unreachable in practice (measured on an
+    8704-candidate health-shaped reproduction: 18 strong, 8686 weak).
+    cmp.strength_num shares cmp.strength's branch structure with the
+    tolerance predicate substituted for '<=>' in both positions.
+    """
+    cases = [
+        # (v, mz, ac, ratio_tol, abs_tol, expected)
+        # health-shaped tolerance (0.20 ratio, no absolute component)
+        (100, 150, 145, 0.20, 0, "strong"),  # both peers outside 20% of v, but agree with each other
+        (100, 200, 115, 0.20, 0, "weak"),  # mz outside tolerance, ac inside
+        (2, 12, 13, 0.20, 0, "strong"),  # the brief's own worked example
+        # spawn-count-shaped tolerance (0.50 ratio, 5 absolute): abs_tol
+        # rescues a small-number pair the ratio alone would flag
+        (2, 3, 3, 0.50, 5, ""),  # diff=1, within abs_tol alone
+        # a zero half of the tolerance must mean "this half does not apply",
+        # not "everything differs" - each case below relies on only ONE
+        # half being nonzero to reach agreement
+        (100, 105, 110, 1.0, 0, ""),  # ratio_tol alone carries agreement; abs_tol=0 must not force a finding
+        (100, 104, 103, 0, 5, ""),  # abs_tol alone carries agreement; ratio_tol=0 must not force a finding
+        (1, 1, 1, 0, 0, ""),  # both tolerances 0: falls back to exact equality
+        (1, 2, 2, 0, 0, "strong"),  # both tolerances 0: exact equality still distinguishes
+    ]
+    for v, mz, ac, ratio_tol, abs_tol, expected in cases:
+        got = _strength_num(v, mz, ac, ratio_tol, abs_tol)
+        assert got == expected, (
+            "v=%s mz=%s ac=%s ratio_tol=%s abs_tol=%s gave %r, expected %r"
+            % (v, mz, ac, ratio_tol, abs_tol, got, expected)
+        )
+    print("PASS test_consensus_strength_num_rule")
+
+
+def test_consensus_strength_num_is_symmetric():
+    """The ratio predicate must not depend on which argument is v and which
+    is the peer.
+
+    Fix round 1: the plan's existing WHERE clauses divided by
+    GREATEST(peer, 1) - peer-relative, so a=2b gives ratio 1.0 but b=2a
+    gives 0.5, and the same pair of values agrees or disagrees depending on
+    which source happened to be v. cmp.strength_num divides by
+    GREATEST(LEAST(ABS(a), ABS(b)), 1) instead. 300 and 100 are 3x apart -
+    outside a 100% (ratio_tol=1.0) tolerance either way under a correct
+    symmetric denominator, but the old asymmetric one would call it
+    agreement in one direction (200/300 = 0.667) and disagreement in the
+    other (200/100 = 2.0). ac is pinned equal to v in both calls so only
+    the v-vs-mz comparison is under test.
+    """
+    got_a = _strength_num(300, 100, 300, 1.0, 0)  # v=300, mz=100, ac=300 (agrees)
+    got_b = _strength_num(100, 300, 100, 1.0, 0)  # v=100, mz=300, ac=100 (agrees) - same pair, swapped
+    assert got_a == got_b == "weak", (
+        "asymmetric denominator: (v=300,mz=100) gave %r, (v=100,mz=300) gave %r, expected both 'weak'"
+        % (got_a, got_b)
+    )
+    print("PASS test_consensus_strength_num_is_symmetric")
+
+
+def test_consensus_strength_num_never_strong_with_an_abstaining_peer():
+    """No input with mz or ac NULL can ever return 'strong', exhaustively -
+    the same property test_consensus_strength_never_strong_with_an_abstaining_peer
+    proves for cmp.strength, mirrored here for the tolerance-based sibling.
+    """
+    values = [None, 1, 2, 3]
+    for v in values:
+        for other in values:
+            for mz, ac in ((None, other), (other, None)):
+                got = _strength_num(v, mz, ac, 0.20, 5)
+                assert got != "strong", (
+                    "cmp.strength_num(%s, %s, %s, 0.20, 5) gave 'strong' with an abstaining peer"
+                    % (v, mz, ac)
+                )
+    print("PASS test_consensus_strength_num_never_strong_with_an_abstaining_peer")
+
+
+def test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty():
+    """Item 3: the advisory-ac wrapper (CASE WHEN mz IS NULL THEN NULL ELSE
+    ROUND(ac) END) nulls ac's vote whenever mz abstains, so both peer
+    arguments arrive NULL. cmp.strength_num must return '' for that case -
+    the same first branch cmp.strength uses - so that a diff query's
+    mandatory 'WHERE cmp.strength_num(...) <> \'\'' guard drops these rows
+    by construction instead of writing a contentless finding.
+    """
+    got = _strength_num(50, None, None, 0.20, 0)
+    assert got == "", "both peers abstaining gave %r, expected ''" % got
+    print("PASS test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -582,6 +687,10 @@ TESTS = [
     test_consensus_strength_rule,
     test_consensus_strength_never_strong_with_an_abstaining_peer,
     test_consensus_strength_missing_from_v_is_strong_when_peers_agree,
+    test_consensus_strength_num_rule,
+    test_consensus_strength_num_is_symmetric,
+    test_consensus_strength_num_never_strong_with_an_abstaining_peer,
+    test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty,
 ]
 
 if __name__ == "__main__":
