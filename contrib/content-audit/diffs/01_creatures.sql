@@ -19,11 +19,20 @@ UNION SELECT DISTINCT zone, entry FROM ac.n_spawn WHERE kind = 'creature';
 
 -- `rank` is a real column of n_creature and a reserved word on this MySQL
 -- build; every reference below is backticked (recorded from Task 4).
+--
+-- Task 13: cmp.peer_lineage (kind='creature_stat') only ever carries rows
+-- for field IN ('lvl_min', 'lvl_max') - see views/derived.sql. The LEFT
+-- JOIN below is harmless for every other field (exists, faction, rank,
+-- type): pl.k1 is NULL there, cmp.apply_lineage sees is_lineage=FALSE, and
+-- the strength value it returns is unchanged. No WHERE-clause update is
+-- needed: cmp.apply_lineage only ever turns 'strong' into 'lineage', never
+-- into or out of '', so the WHERE clause below still filters on the
+-- pre-lineage cmp.strength(...) call exactly as before.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT zc.zone, 'creatures', 'creature', zc.entry, f.field,
        f.v, f.mz, f.tw, f.ac,
-       cmp.strength(f.v, f.mz, f.ac),
+       cmp.apply_lineage(cmp.strength(f.v, f.mz, f.ac), pl.k1 IS NOT NULL),
        CASE WHEN f.v IS NULL THEN 'absent from the live database' ELSE '' END
 FROM cmp.zone_creature zc
 JOIN (
@@ -63,6 +72,8 @@ JOIN (
     LEFT JOIN tw.n_creature ctw ON ctw.entry = zc2.entry
     LEFT JOIN ac.n_creature cac ON cac.entry = zc2.entry
 ) f ON f.entry = zc.entry
+LEFT JOIN cmp.peer_lineage pl
+  ON pl.kind = 'creature_stat' AND pl.k1 = CAST(zc.entry AS CHAR) AND pl.k2 = f.field
 WHERE cmp.strength(f.v, f.mz, f.ac) <> '';
 
 -- Effective health, at the 20% tolerance from the spec. AzerothCore's vote is
