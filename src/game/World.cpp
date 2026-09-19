@@ -49,7 +49,6 @@
 #include "LootMgr.h"
 #include "ItemEnchantmentMgr.h"
 #include "MapManager.h"
-#include "AreaResolverDump.h"
 #include "ScriptMgr.h"
 #include "CreatureAIRegistry.h"
 #include "Policies/SingletonImp.h"
@@ -1412,27 +1411,6 @@ void World::SetInitialWorldSettings()
 
     sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Loading AreaTemplate...");
     sObjectMgr.LoadAreaTemplate();
-
-    // TEMPORARY - content audit tooling. The area/zone lookup the resolver
-    // uses (AreaEntry::GetByAreaFlagAndMap) walks sAreaStorage and
-    // sMapStorage, which are SQLStorage instances backed by the world DB's
-    // area_template/map_template tables (Database/SQLStorages.cpp), not the
-    // DBC files directly - they are empty until LoadAreaTemplate/
-    // LoadMapTemplate run just above, so the resolver must not run any
-    // earlier than this. Those two tables are tiny reference data, so this
-    // is still seconds rather than the minutes a full spawn/quest load
-    // would take. Remove with AreaResolverDump.{h,cpp}.
-    {
-        std::string const resolveIn = sConfig.GetStringDefault("ContentAudit.ResolveAreasFile", "");
-        if (!resolveIn.empty())
-        {
-            std::string const resolveOut = sConfig.GetStringDefault("ContentAudit.ResolveAreasOutFile", "");
-            ResolveAreasFromFile(resolveIn, resolveOut);
-            sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "[ContentAudit] resolver finished, exiting");
-            Log::WaitBeforeContinueIfNeed();
-            exit(0);
-        }
-    }
 
     sLog.Out(LOG_BASIC, LOG_LVL_MINIMAL, "Loading `spell_mod` and `spell_effect_mod`...");
     sSpellModMgr.LoadSpellMods();

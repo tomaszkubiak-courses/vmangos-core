@@ -6,6 +6,14 @@
 # exits on its own once the resolver has written its output.
 #
 # Usage: run_resolver.sh <input.csv> <output.csv>
+#
+# NOTE: this needs the ContentAudit.ResolveAreasFile hook, which is removed from
+# the core once a corpus has been built - the resolver was temporary tooling, not
+# a server feature, and carrying it in the core would mean carrying a config key
+# that makes mangosd exit on startup. Re-apply commit 4a1fdd85c ("Add a temporary
+# area resolver for the content audit") and rebuild before running this again;
+# the areas table it fills only needs rebuilding when a source's spawn data
+# changes.
 set -eu
 
 HERE=$(dirname "$0")

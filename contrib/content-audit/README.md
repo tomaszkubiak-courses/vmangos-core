@@ -38,3 +38,80 @@ content in the reports.
 ## Checks
 
     python test_pipeline.py
+
+## Pilot results (Westfall and The Deadmines)
+
+Measured by hand-checking a drawn sample against the sources' raw tables - not
+against the normalising views, because a view cannot be the witness for its own
+correctness. 112 rows, up to 20 per topic, drawn from the rows the report
+actually renders in its six topic tables (the collapsed restatements and the
+appendix moves are excluded: the rate that matters is the one a reader meets in
+the body of the document). The draw is reproducible - ordering is a
+deterministic hash of entity id, zone and field rather than `RAND()`.
+
+Every row was judged into one of three verdicts. **Real** means the values
+reproduce and the difference is one this realm would want to act on. **Expected**
+means they reproduce but the difference is correct for a vanilla realm and needs
+no action - post-vanilla content, WotLK rescaling, a fork's own custom content.
+**Artefact** means the finding did not survive contact with the raw data.
+
+| Topic | Findings | Sampled | Real | Expected | Artefact | Unsure |
+|---|---|---|---|---|---|---|
+| Creatures | 10834 | 20 | 19 | 1 | 0 | 0 |
+| Connected creatures | 12091 | 20 | 13 | 7 | 0 | 0 |
+| Quests | 6522 | 20 | 0 | 19 | 1 | 0 |
+| Quest rewards | 5712 | 20 | 16 | 2 | 2 | 0 |
+| Quest item drop rates | 5687 | 12 | 1 | 9 | 2 | 0 |
+| Spawn rates | 8637 | 20 | 11 | 0 | 0 | 9 |
+
+The quest topic was expected to be the noisiest: AzerothCore's `exp` column
+filters post-vanilla creatures cleanly, but quests have no equivalent marker and
+many were revamped between 1.12 and 3.3.5.
+
+### What the sample changed
+
+The judging found six structural defects, and none of them was a tolerance
+problem, so **no tolerance was changed**. All six are fixed; the finding counts
+in the table above are the corrected ones, while the verdict columns were
+measured before the fixes, so they still count artefacts that no longer occur.
+
+- AzerothCore's reputation reward is a signed index into a DBC, not an amount
+  (its range is -7..9 against vmangos' -500..500), so it disagreed with the realm
+  on 3275 findings for reasons unrelated to content. It now abstains, as it
+  already did for quest experience and trainer lists. No corroborated finding was
+  lost: every one of those rows was `weak`.
+- The vanilla-lineage views read `RewSpell` but not `RewSpellCast`, and 319
+  quests use the latter against only 95 for the former - so the audit reported
+  the realm as missing spell rewards it actually has. Both columns are read now.
+- AzerothCore stores a quest level of -1 to mean "scales to the player", which
+  was cast unsigned and reached the reports as 18446744073709551615 on 777 rows.
+- AzerothCore's gameobject respawn time is a categorical default rather than
+  tuned data - 120 seconds covers 36.5% of its table - and 5157 respawn findings
+  rested on its word alone. It now counts only where mangoszero corroborates it,
+  the rule creature health already used.
+- 123 drop-rate findings compared loot rows for gameobjects that have no template
+  row in any source: orphaned rows in every database, compared against each other.
+- A source that has an NPC but no vendor row for an item is saying the NPC does
+  not sell it. That was stored as an abstention and rendered as a blank cell
+  under a caption promising the source could not express the field, on 8286 of
+  the relation findings. Absence and abstention are now distinct.
+
+### Where no tolerance helps, recorded rather than tuned
+
+The quest topic is 19 of 20 **expected** rather than artefact, and two field
+groups produce most of it: `req_race`, where this realm stores 0 for
+"unrestricted" and the peers store an explicit race bitmask, and `next`, where
+this realm records a quest chain on the successor's `PrevQuestId` while
+AzerothCore records it on the predecessor's `RewardNextQuest`. Both are
+conventions, not content, and both need a candidate-selection rule rather than a
+number. Tuning a tolerance until the topic empties would report nothing and hide
+everything.
+
+The spawn topic's nine `unsure` rows are the AzerothCore respawn default above.
+They are counted as unsure rather than artefact because "this is a default" could
+not be proven from a raw table, only inferred from its distribution.
+
+Two caveats on the verdicts themselves, from the judging: the `req_race`
+explanation was spot-checked on 2 of its 15 rows rather than proven for all, and
+AzerothCore's `RewardFactionOverrideN` column, which does carry a genuine raw
+amount, is populated on 97 rows and is still not read.

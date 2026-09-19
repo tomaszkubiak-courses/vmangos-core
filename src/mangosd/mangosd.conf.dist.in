@@ -3365,23 +3365,3 @@ DynamicRespawn.AffectLevelBelow = 0
 DynamicRespawn.PlayersThreshold = 0
 DynamicRespawn.PlayersMaxLevelDiff = 0
 
-#
-#    ContentAudit.ResolveAreasFile
-#        TEMPORARY - content audit tooling, not a server feature.
-#        When set, the server resolves each coordinate in this CSV to a game
-#        area right after loading the map and area templates, writes the
-#        result to ContentAudit.ResolveAreasOutFile, and exits without
-#        loading the rest of the world. The templates have to load first:
-#        the zone/area lookup reads the world DB's area_template and
-#        map_template tables, which only that step populates - running any
-#        earlier resolves every coordinate to zone 0 and area 0.
-#        Leave empty for normal operation.
-#        Default: "" (disabled)
-#
-#    ContentAudit.ResolveAreasOutFile
-#        Output path for the above.
-#        Default: ""
-
-ContentAudit.ResolveAreasFile = ""
-ContentAudit.ResolveAreasOutFile = ""
-
