@@ -70,6 +70,16 @@ WHERE cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5) <> '';
 -- respawn_min findings, 18%, were exactly this case). The IF() wrappers
 -- above already null a peer *toward* abstention (a real 0 read as "no
 -- respawn"), which is the safe direction and stays unchanged.
+--
+-- ac's respawn figure is advisory (fix round 3, item 12d), the same
+-- pattern 01_creatures.sql already applies to hp@N: ac.gameobject.
+-- spawntimesecs is 120 on 36.5% of its 96628 rows (v's own most common
+-- value is 300 at 22.6%) - a categorical default covering over a third of
+-- the table, not tens of thousands of independently tuned figures, and it
+-- was voting against the realm on 3501 of 7096 respawn_min findings.
+-- Gating ac's argument on mangozero corroborating it (NULL whenever mz
+-- doesn't also vote a real respawn window) keeps every row where mz backs
+-- ac up and silences the ones asserting nothing but ac's own bulk default.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT k.zone, 'spawns', k.kind, k.entry, 'respawn_min',
@@ -77,7 +87,7 @@ SELECT k.zone, 'spawns', k.kind, k.entry, 'respawn_min',
        cmp.strength_mag(
            av.resp_min,
            IF(amz.resp_min > 0, amz.resp_min, NULL),
-           IF(aac.resp_min > 0, aac.resp_min, NULL),
+           CASE WHEN amz.resp_min > 0 THEN IF(aac.resp_min > 0, aac.resp_min, NULL) ELSE NULL END,
            1.0, 0),
        ''
 FROM (SELECT DISTINCT kind, zone, entry FROM cmp.spawn_agg) k
@@ -89,5 +99,5 @@ WHERE av.resp_min > 0
   AND cmp.strength_mag(
            av.resp_min,
            IF(amz.resp_min > 0, amz.resp_min, NULL),
-           IF(aac.resp_min > 0, aac.resp_min, NULL),
+           CASE WHEN amz.resp_min > 0 THEN IF(aac.resp_min > 0, aac.resp_min, NULL) ELSE NULL END,
            1.0, 0) <> '';

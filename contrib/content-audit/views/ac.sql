@@ -43,8 +43,22 @@ SELECT a.kind, g.id, a.zone, a.area, CAST(g.map AS UNSIGNED) AS map, g.spawntime
 FROM gameobject g
 JOIN cmp.areas a ON a.src = 'ac' AND a.kind = 'gobject' AND a.id = g.guid;
 
+-- QuestLevel is SIGNED here (fix round 3, item 12c), matching prev/next/
+-- excl_group's existing SIGNED casts below: quest 1652 (and 1323 other rows
+-- corpus-wide) has QuestLevel = -1, WotLK's "scales to the player" marker.
+-- CAST(... AS UNSIGNED) wrapped that to 18446744073709551615, a value that
+-- can never legitimately match anything and read as a random-looking wall
+-- of digits rather than the real, if incommensurable, figure. -1 is kept
+-- (not turned into NULL/abstain) on purpose: cmp.strength (the function
+-- 03_quests.sql's lvl finding uses) has no lone-peer-abstention guard the
+-- way cmp.strength_mag does, so a NULL ac argument here would still mark
+-- every one of these rows 'weak' whenever mz voted at all, regardless of
+-- whether mz agreed with v - the exact contentless-weak shape strength_mag
+-- exists elsewhere to suppress, reintroduced through the back door. -1
+-- disagreeing with v's real level is an honest, real disagreement (a fixed
+-- vanilla level versus a WotLK scaling marker), not a manufactured one.
 CREATE OR REPLACE VIEW n_quest AS
-SELECT CAST(q.ID AS UNSIGNED) AS entry, q.LogTitle AS title, CAST(q.QuestLevel AS UNSIGNED) AS lvl,
+SELECT CAST(q.ID AS UNSIGNED) AS entry, q.LogTitle AS title, CAST(q.QuestLevel AS SIGNED) AS lvl,
        q.MinLevel AS min_lvl, q.QuestSortID AS zone_or_sort,
        CAST(0 AS SIGNED) AS prev, CAST(q.RewardNextQuest AS SIGNED) AS next, CAST(0 AS SIGNED) AS excl_group,
        CAST(q.AllowableRaces AS UNSIGNED) AS req_race, CAST(0 AS UNSIGNED) AS req_class,
@@ -76,11 +90,30 @@ UNION ALL SELECT ID, 'choice', RewardChoiceItemID3, RewardChoiceItemQuantity3 FR
 UNION ALL SELECT ID, 'choice', RewardChoiceItemID4, RewardChoiceItemQuantity4 FROM quest_template WHERE RewardChoiceItemID4 > 0
 UNION ALL SELECT ID, 'choice', RewardChoiceItemID5, RewardChoiceItemQuantity5 FROM quest_template WHERE RewardChoiceItemID5 > 0
 UNION ALL SELECT ID, 'choice', RewardChoiceItemID6, RewardChoiceItemQuantity6 FROM quest_template WHERE RewardChoiceItemID6 > 0
-UNION ALL SELECT ID, 'rep',    RewardFactionID1, RewardFactionValue1 FROM quest_template WHERE RewardFactionID1 > 0
-UNION ALL SELECT ID, 'rep',    RewardFactionID2, RewardFactionValue2 FROM quest_template WHERE RewardFactionID2 > 0
-UNION ALL SELECT ID, 'rep',    RewardFactionID3, RewardFactionValue3 FROM quest_template WHERE RewardFactionID3 > 0
-UNION ALL SELECT ID, 'rep',    RewardFactionID4, RewardFactionValue4 FROM quest_template WHERE RewardFactionID4 > 0
-UNION ALL SELECT ID, 'rep',    RewardFactionID5, RewardFactionValue5 FROM quest_template WHERE RewardFactionID5 > 0
+-- rep's amount abstains (fix round 3, item 12a): RewardFactionValueN is not
+-- a reputation amount in this schema, it is a signed index into
+-- QuestFactionReward.dbc (resolved at runtime by Player::RewardReputation),
+-- ranging -7..9 on this corpus against v's raw RewRepValue amounts of
+-- -500..500. Feeding it into the shared cnt column voted in a different
+-- unit than every other source, so ac's vote could essentially never match
+-- - 3275 of 3573 rep: findings carried a non-NULL ac value, not one of them
+-- 'strong'. The DBC that would resolve the index isn't in this corpus, so
+-- abstaining (CAST(NULL AS SIGNED), not a bare NULL, to keep a real numeric
+-- type per this file's header) is the honest answer; the (quest, 'rep',
+-- faction id) row itself is kept so ac still corroborates which factions a
+-- quest rewards, just not the amount.
+--
+-- RewardFactionOverrideN - the actual raw-amount override this schema
+-- offers instead of the abs-index path - is left unread here, per the fix
+-- brief's request to note it rather than wire it up this round: 97 of
+-- quest_template's rows have a nonzero override on this corpus, so a future
+-- pass resolving it would recover a real amount for those, not just a
+-- second abstention.
+UNION ALL SELECT ID, 'rep',    RewardFactionID1, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID1 > 0
+UNION ALL SELECT ID, 'rep',    RewardFactionID2, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID2 > 0
+UNION ALL SELECT ID, 'rep',    RewardFactionID3, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID3 > 0
+UNION ALL SELECT ID, 'rep',    RewardFactionID4, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID4 > 0
+UNION ALL SELECT ID, 'rep',    RewardFactionID5, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID5 > 0
 UNION ALL SELECT ID, 'spell',  RewardSpell, 1 FROM quest_template WHERE RewardSpell > 0
 UNION ALL SELECT ID, 'money',  0, RewardMoney FROM quest_template WHERE RewardMoney > 0;
 

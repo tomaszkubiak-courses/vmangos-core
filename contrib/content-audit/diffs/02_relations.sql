@@ -77,11 +77,36 @@ WHERE cmp.strength_mag(COALESCE(tv.n, 0), tmz.n, tac.n, 0.50, 5) <> '';
 -- (b) vendor, questgiver, questender and link stay per-target: a specific
 -- missing vendor item or quest giver is directly actionable, and at ~7k
 -- rows (post-Step-0, with link now entry-keyed) the volume is fine.
+--
+-- v_value (fix round 3, item 12f): v's schema always has npc_vendor,
+-- creature_queststarter, creature_involvedrelation and creature_linking, so
+-- v can always state whether a creature it has sells an item, gives a
+-- quest, or links to another spawn - a missing row there is a real,
+-- expressible "no", not an abstention. The old CASE stored NULL for every
+-- one of those real "no" answers (8286 of 12091 relation findings,
+-- report.py's blank-cell caption calling every one of them something v
+-- "cannot express at all"), with no distinction from the one case that
+-- genuinely is an abstention: v not having the NPC (a creature_template
+-- row) at all, checked with a correlated EXISTS against the raw table
+-- below rather than a JOIN to v.n_creature - n_creature reads through
+-- _creature_current, a GROUP BY over the whole (entry, patch)-keyed table,
+-- and joining that view here (rather than probing it once per candidate
+-- row against creature_template's own (entry, patch) primary key) turned
+-- the query's cost estimate from 1e6 rows to 1e27 and it had to be killed
+-- after 7 minutes. Existence does not depend on which patch a row belongs
+-- to, so the raw table needs no patch filtering to answer it. This only
+-- changes the DISPLAY column - the strength() call two lines down keeps
+-- its unconditional '0' for a missing v row on purpose (per
+-- diffs/00_schema.sql: an npc genuinely missing from v must still read as
+-- v disagreeing with two corroborating peers, the "content missing from
+-- the realm" finding this audit exists to catch), so no finding's
+-- strength moves.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT z.zone, 'relations', 'creature', r.npc,
        CONCAT(r.kind, ':', r.target),
-       CASE WHEN rv.npc  IS NULL THEN NULL ELSE '1' END,
+       CASE WHEN NOT EXISTS (SELECT 1 FROM v.creature_template ct WHERE ct.entry = r.npc) THEN NULL
+            WHEN rv.npc IS NULL THEN '0' ELSE '1' END,
        CASE WHEN rmz.npc IS NULL AND kmz.kind IS NOT NULL THEN '0'
             WHEN rmz.npc IS NULL THEN NULL ELSE '1' END,
        CASE WHEN rtw.npc IS NULL AND ktw.kind IS NOT NULL THEN '0'

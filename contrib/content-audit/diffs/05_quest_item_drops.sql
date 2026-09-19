@@ -29,6 +29,28 @@ JOIN mz.n_quest_obj o ON o.quest = zq.quest AND o.kind = 'item';
 -- rebuilds cmp.findings from scratch on every run and this table must be
 -- just as non-cumulative, or a stale row from a previous corpus rebuild
 -- could outlive the source data it was scoped from.
+-- Fix round 3, item 12e: a loot-template row for a gameobject/creature entry
+-- that has no template row anywhere is dead, unreachable content, not a
+-- comparable drop source. Item 6037's rows for gobject entries 22342 and
+-- 22984 are the sampled case: neither has a gameobject_template row in v,
+-- mz OR ac (tw is excluded on purpose - it is never a strength() voter for
+-- this topic, only context), so "which dead loot-row id a source happens to
+-- carry" manufactured a strong finding out of independent database rot in
+-- every source, not a real difference in what the realm can drop. Verified
+-- on this corpus: 123 of 211 gameobject-sourced quest_item_drops findings
+-- name an entry with no template row in any of the three judging sources;
+-- creature-sourced findings are unaffected (0 of 5599 orphaned this way -
+-- the creature-only entries this topic does see, like the WotLK-only
+-- murlocs sampled in Task 12's judging, are real ac.creature_template rows,
+-- just not vanilla ones).
+CREATE OR REPLACE VIEW cmp.loot_source_exists AS
+SELECT 'creature' AS tbl, entry FROM v.n_creature
+UNION SELECT 'creature', entry FROM mz.n_creature
+UNION SELECT 'creature', entry FROM ac.n_creature
+UNION SELECT 'gobject', CAST(entry AS UNSIGNED) FROM v.gameobject_template
+UNION SELECT 'gobject', CAST(entry AS UNSIGNED) FROM mz.gameobject_template
+UNION SELECT 'gobject', CAST(entry AS UNSIGNED) FROM ac.gameobject_template;
+
 DROP TABLE IF EXISTS cmp.quest_loot_eff;
 CREATE TABLE cmp.quest_loot_eff (
     src    VARCHAR(16)    NOT NULL,
@@ -40,9 +62,10 @@ CREATE TABLE cmp.quest_loot_eff (
 ) ENGINE=InnoDB;
 
 INSERT INTO cmp.quest_loot_eff (src, tbl, entry, item, p_drop)
-SELECT src, tbl, entry, item, p_drop
-FROM cmp.n_loot_eff
-WHERE item IN (SELECT DISTINCT item FROM cmp.quest_items);
+SELECT l.src, l.tbl, l.entry, l.item, l.p_drop
+FROM cmp.n_loot_eff l
+WHERE l.item IN (SELECT DISTINCT item FROM cmp.quest_items)
+  AND EXISTS (SELECT 1 FROM cmp.loot_source_exists e WHERE e.tbl = l.tbl AND e.entry = l.entry);
 
 -- One row per (zone, quest, item, tbl, entry) candidate - still fanned out
 -- over every quest that demands the item, because cmp.quest_items carries

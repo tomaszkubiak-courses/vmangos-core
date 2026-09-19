@@ -158,7 +158,20 @@ UNION ALL SELECT entry, 'rep',    RewRepFaction2, RewRepValue2 FROM _quest_curre
 UNION ALL SELECT entry, 'rep',    RewRepFaction3, RewRepValue3 FROM _quest_current WHERE RewRepFaction3 > 0
 UNION ALL SELECT entry, 'rep',    RewRepFaction4, RewRepValue4 FROM _quest_current WHERE RewRepFaction4 > 0
 UNION ALL SELECT entry, 'rep',    RewRepFaction5, RewRepValue5 FROM _quest_current WHERE RewRepFaction5 > 0
+-- Fix round 3, item 12b: RewSpellCast (cast on the player at turn-in) is a
+-- second, independent spell reward slot from RewSpell (taught to the
+-- player) - not an alternate column for the same fact. Quest 3861
+-- ("CLUCK!") has RewSpell=0, RewSpellCast=13563; the old single-branch view
+-- read this as "no spell reward" while ac's RewardSpell (which this
+-- lineage's schema maps to the cast-on-complete effect) correctly saw
+-- 13563, manufacturing a "content missing from the realm" finding for
+-- content the realm actually has. Verified corpus-wide: 319 of 4727
+-- quest_template rows have RewSpellCast<>0 against only 95 with
+-- RewSpell<>0. Both are unioned as their own rows below (a quest with both
+-- set emits both, rather than the view picking one), matching how ac's
+-- single RewardSpell column already votes on this fact.
 UNION ALL SELECT entry, 'spell',  RewSpell, 1 FROM _quest_current WHERE RewSpell > 0
+UNION ALL SELECT entry, 'spell',  RewSpellCast, 1 FROM _quest_current WHERE RewSpellCast > 0
 UNION ALL SELECT entry, 'money',  0, RewOrReqMoney FROM _quest_current WHERE RewOrReqMoney > 0;
 
 -- Signs carry meaning in this lineage: a negative chance means the row only

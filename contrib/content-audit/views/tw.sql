@@ -116,7 +116,11 @@ UNION ALL SELECT entry, 'rep',    RewRepFaction2, RewRepValue2 FROM quest_templa
 UNION ALL SELECT entry, 'rep',    RewRepFaction3, RewRepValue3 FROM quest_template WHERE RewRepFaction3 > 0
 UNION ALL SELECT entry, 'rep',    RewRepFaction4, RewRepValue4 FROM quest_template WHERE RewRepFaction4 > 0
 UNION ALL SELECT entry, 'rep',    RewRepFaction5, RewRepValue5 FROM quest_template WHERE RewRepFaction5 > 0
+-- Fix round 3, item 12b: see v.sql's n_quest_rew for the full account.
+-- RewSpellCast is a second, independent spell-reward slot, not a
+-- fall-back column for RewSpell; both are unioned as their own rows.
 UNION ALL SELECT entry, 'spell',  RewSpell, 1 FROM quest_template WHERE RewSpell > 0
+UNION ALL SELECT entry, 'spell',  RewSpellCast, 1 FROM quest_template WHERE RewSpellCast > 0
 UNION ALL SELECT entry, 'money',  0, RewOrReqMoney FROM quest_template WHERE RewOrReqMoney > 0;
 
 -- Signs carry meaning in this lineage: a negative chance means the row only
