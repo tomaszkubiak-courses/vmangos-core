@@ -122,3 +122,7 @@ Progression.h
 
 # Local planning notes, never distributed
 /doc/local/
+
+# Content audit pipeline: real machine config and corpus build logs
+/contrib/content-audit/config.env
+/contrib/content-audit/logs/
