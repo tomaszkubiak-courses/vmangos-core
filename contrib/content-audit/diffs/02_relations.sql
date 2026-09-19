@@ -101,6 +101,23 @@ WHERE cmp.strength_mag(COALESCE(tv.n, 0), tmz.n, tac.n, 0.50, 5) <> '';
 -- v disagreeing with two corroborating peers, the "content missing from
 -- the realm" finding this audit exists to catch), so no finding's
 -- strength moves.
+--
+-- note (Follow-up 3, task-16 part B): a 'strong' finding here means v
+-- differs from both mz and ac while mz and ac agree with each other - and
+-- that agreement can point either way. v='1' with mz=ac='0' is this realm
+-- carrying a relation neither peer has (985 of 1915 strong relations
+-- findings on this corpus - almost never a gap, since mangoszero is a
+-- leaner content set and AzerothCore is a different expansion); v='0'
+-- with mz=ac='1' is the opposite, and the one the audit exists to find
+-- (930 of 1915). Recorded here, not suppressed - the ruling is explicit
+-- that "this realm has content the peers lack" is still worth a reader's
+-- attention, just a different claim than a gap. Only stated when the
+-- finding is 'strong': a 'weak' finding means the peers disagree with
+-- each other too, so there is no single peer-side answer to name.
+-- cmp.strength(...) is called a third time here (already appears in the
+-- SELECT list and in the WHERE clause below) rather than restating its
+-- inputs under a different name, so this column can never drift from the
+-- verdict actually stored.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT z.zone, 'relations', 'creature', r.npc,
@@ -117,7 +134,13 @@ SELECT z.zone, 'relations', 'creature', r.npc,
            CASE WHEN rv.npc IS NULL THEN '0' ELSE '1' END,
            CASE WHEN kmz.kind IS NULL THEN NULL WHEN rmz.npc IS NULL THEN '0' ELSE '1' END,
            CASE WHEN kac.kind IS NULL THEN NULL WHEN rac.npc IS NULL THEN '0' ELSE '1' END),
-       ''
+       CASE WHEN cmp.strength(
+                     CASE WHEN rv.npc IS NULL THEN '0' ELSE '1' END,
+                     CASE WHEN kmz.kind IS NULL THEN NULL WHEN rmz.npc IS NULL THEN '0' ELSE '1' END,
+                     CASE WHEN kac.kind IS NULL THEN NULL WHEN rac.npc IS NULL THEN '0' ELSE '1' END) <> 'strong'
+                THEN ''
+            WHEN rv.npc IS NULL THEN 'this realm lacks it; both peers have it'
+            ELSE 'this realm has it; neither peer does' END
 FROM (
     SELECT kind, npc, target FROM v.n_rel  WHERE kind IN ('vendor', 'questgiver', 'questender', 'link')
     UNION SELECT kind, npc, target FROM mz.n_rel WHERE kind IN ('vendor', 'questgiver', 'questender', 'link')
