@@ -1127,6 +1127,115 @@ def test_spawn_count_shared_ancestor_row_is_lineage_not_strong():
     print("PASS test_spawn_count_shared_ancestor_row_is_lineage_not_strong")
 
 
+def test_quest_item_drops_near_miss_shared_ancestor_row_is_lineage_not_strong():
+    """Task 16 part A pin: a quest-item-drop finding whose mz and ac values
+    are CLOSE but not byte-identical must also be labelled 'lineage' when
+    they are within cmp.peer_lineage's 15% near-match band - not just the
+    exact-match case Task 13 already covers.
+
+    Fixture is the brief's own worked example, verified on the corpus
+    before writing this: zone 17, item 5017, sourced from creature 3376 -
+    this realm stores 80%, mangoszero 30%, AzerothCore 28%. mz and ac are
+    6.7% apart (well inside 15%) and both far from v, which is exactly the
+    drifted-shared-row shape (AzerothCore's reference_loot_template
+    indirection rounding a value mangoszero still stores raw) that the
+    Task 13 exact-match test missed. Before this fix this row was 'strong'
+    (mz != ac, so ROUND(mz,2) = ROUND(ac,2) never matched); reverting the
+    views/derived.sql 'loot' kind's WHERE clause to exact equality, or
+    widening/narrowing the 0.15 threshold past this pair's 0.0714 ratio,
+    would make it come back 'strong'.
+    """
+    rows = corpus_sql(
+        "SELECT strength, mz_value, ac_value FROM cmp.findings "
+        "WHERE topic='quest_item_drops' AND zone=17 AND entity_id=5017 "
+        "AND field='creature:3376'"
+    )
+    assert rows, "fixture quest_item_drops row (zone 17, item 5017, creature:3376) no longer exists"
+    strength, mz_value, ac_value = rows[0]
+    assert mz_value != ac_value, (
+        "fixture row's peers now agree exactly (mz=%s, ac=%s) - it no longer isolates "
+        "the near-miss (not exact-match) case this test pins" % (mz_value, ac_value)
+    )
+    ratio = abs(float(mz_value) - float(ac_value)) / max(min(abs(float(mz_value)), abs(float(ac_value))), 1)
+    assert ratio <= 0.15, (
+        "fixture row's peers are now %.4f apart, outside the 15%% band - pick a "
+        "different corpus example" % ratio
+    )
+    assert strength == "lineage", (
+        "quest_item_drops row with near-miss mz/ac values (mz=%s, ac=%s, ratio=%.4f) "
+        "came out %r, expected 'lineage'" % (mz_value, ac_value, ratio, strength)
+    )
+    print("PASS test_quest_item_drops_near_miss_shared_ancestor_row_is_lineage_not_strong")
+
+
+def test_relations_finding_note_records_direction():
+    """Task 16 part B pin: a 'strong' relations finding's note names which
+    side of the disagreement is short - this realm, or both peers.
+
+    Fixture is Westfall (zone 40), already used by
+    test_report_suppresses_absent_creature_relations: creature 151 sells
+    four thrown weapons (2946/2947/3111/3131) neither peer carries (v='1',
+    mz=ac='0') and two vendor items (14341/18256) it does NOT sell that
+    both peers do (v='0', mz=ac='1') - the two directions side by side on
+    the same NPC. Verified directly against cmp.findings before writing
+    this.
+    """
+    rows = corpus_sql(
+        "SELECT field, v_value, note FROM cmp.findings "
+        "WHERE topic='relations' AND zone=40 AND strength='strong' "
+        "AND field IN ('vendor:2946', 'vendor:14341')"
+    )
+    by_field = {field: (v_value, note) for field, v_value, note in rows}
+    assert set(by_field) == {"vendor:2946", "vendor:14341"}, (
+        "fixture vendor rows (zone 40, vendor:2946/vendor:14341) no longer both 'strong' - "
+        "pick different corpus examples"
+    )
+    v_value, note = by_field["vendor:2946"]
+    assert v_value == "1", "fixture vendor:2946 no longer has v='1' - pick a different example"
+    assert note == "this realm has it; neither peer does", (
+        "vendor:2946 (v=1, peers=0) has note %r, expected the realm-has direction" % note
+    )
+    v_value, note = by_field["vendor:14341"]
+    assert v_value == "0", "fixture vendor:14341 no longer has v='0' - pick a different example"
+    assert note == "this realm lacks it; both peers have it", (
+        "vendor:14341 (v=0, peers=1) has note %r, expected the realm-lacks direction" % note
+    )
+    print("PASS test_relations_finding_note_records_direction")
+
+
+def test_quest_objective_finding_note_records_the_genuine_gap():
+    """Task 16 part B pin: an obj: quest-objective finding only gets a
+    direction note when v is NULL (the objective does not exist for this
+    realm's quest at all) - not when all three sources have the objective
+    but disagree on the required count.
+
+    Fixture verified on the corpus before writing this: zone 406, quest
+    6481, item objective 16603 - v.n_quest_obj has no row at all for this
+    quest/item pair while mz and ac both require exactly 1 (the band
+    sample's own REAL row: this realm's quest objective is missing a
+    required item). Measured corpus-wide: 6 of 28 strong obj: findings
+    are this v-NULL shape; the other 22 have a non-NULL v that simply
+    differs in count from the peers' shared value and must NOT get this
+    note (see diffs/03_quests.sql's comment on the same INSERT).
+    """
+    rows = corpus_sql(
+        "SELECT v_value, mz_value, ac_value, strength, note FROM cmp.findings "
+        "WHERE topic='quests' AND zone=406 AND entity_id=6481 AND field='obj:item:16603'"
+    )
+    assert rows, "fixture quests row (zone 406, quest 6481, obj:item:16603) no longer exists"
+    v_value, mz_value, ac_value, strength, note = rows[0]
+    assert v_value == "NULL", (
+        "fixture row's v_value is no longer NULL (%r) - it no longer isolates the "
+        "genuine-gap shape this test pins" % v_value
+    )
+    assert strength == "strong", "fixture row is no longer 'strong' (got %r)" % strength
+    assert note == "objective count; this realm lacks it; both peers have it", (
+        "obj:item:16603 (v NULL, mz=%s, ac=%s) has note %r, expected the "
+        "genuine-gap direction note" % (mz_value, ac_value, note)
+    )
+    print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
+
+
 def test_report_renders_for_pilot_zones():
     """report.py writes a readable file per zone with every section present."""
     subprocess.run(
@@ -1200,6 +1309,16 @@ def test_report_suppresses_absent_creature_relations():
     assert "29 findings (6 strong, 0 lineage, 23 weak)" in section2, (
         "section 2's count line does not match the post-suppression total"
     )
+    # Task 16 part B: the count line itself is untouched (direction is a
+    # note, not a strength, so it never adds or removes a finding) - this
+    # zone's 6 strong rows just gain a second line underneath, split 4/2 per
+    # test_relations_finding_note_records_direction's own two fixture rows
+    # (vendor:2946 = this realm has it, vendor:14341 = this realm lacks it),
+    # both among these 6.
+    assert (
+        "Of these, 4 point at content only this realm has (neither peer does) "
+        "and 2 point at a gap both peers have that this realm lacks." in section2
+    ), "section 2 is missing the Task 16 direction-split line, or its counts moved"
     assert "consequences of the exists findings moved to Appendix A" in section2, (
         "no Appendix-A suppression pointer line in section 2"
     )
@@ -1341,6 +1460,9 @@ TESTS = [
     test_quest_item_drops_shared_ancestor_row_is_lineage_not_strong,
     test_creature_level_lineage_requires_the_whole_pair,
     test_spawn_count_shared_ancestor_row_is_lineage_not_strong,
+    test_quest_item_drops_near_miss_shared_ancestor_row_is_lineage_not_strong,
+    test_relations_finding_note_records_direction,
+    test_quest_objective_finding_note_records_the_genuine_gap,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,

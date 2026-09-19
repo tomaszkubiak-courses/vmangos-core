@@ -79,6 +79,14 @@ NAME_SOURCES = {
     ],
 }
 
+# Follow-up 3, task-16 part B: the exact strings diffs/02_relations.sql and
+# diffs/03_quests.sql write into cmp.findings.note for a 'strong' per-target
+# relation or quest-objective finding. Matched by substring below rather than
+# by exact equality, since the quests topic's obj: rows prefix this with
+# "objective count; ".
+REALM_HAS_NOTE = "this realm has it; neither peer does"
+REALM_LACKS_NOTE = "this realm lacks it; both peers have it"
+
 COMPARABILITY = """\
 - AzerothCore does not vote on quest experience figures, only on whether a
   quest awards experience at all. Its own figure indexes a DBC that is not
@@ -96,6 +104,11 @@ COMPARABILITY = """\
   most actionable signal the audit produces (this realm diverged from what
   both peers inherited), but it is one witness, not two, so it is kept out of
   the `strong` count. See README.md's corpus-overlap section for why.
+- A `relations`/`quests` note reading "this realm has it; neither peer does"
+  or "this realm lacks it; both peers have it" (Task 16) names which side of
+  a `strong` finding is short. The first is usually the peers being a leaner
+  or different content set, not a defect here; the second is the shape this
+  audit exists to find. Neither is suppressed - both are real disagreements.
 """
 
 
@@ -363,6 +376,25 @@ def render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids):
     lines.append(
         "%d findings (%d strong, %d lineage, %d weak)" % (len(shown), strong, lineage, weak)
     )
+
+    # Follow-up 3, task-16 part B: the relations (vendor/questgiver/
+    # questender/link) and quests (obj:) topics carry a note recording which
+    # way a 'strong' finding points - diffs/02_relations.sql and
+    # diffs/03_quests.sql write REALM_HAS_NOTE/REALM_LACKS_NOTE literally,
+    # never reconstructed here, so this can never drift from what a reader
+    # sees in the Note column. Only these two topics ever produce the note
+    # text, so the substring check is safe without a topic filter, but the
+    # topic check still gates the line to avoid a stray "(0 ..., 0 ...)" on
+    # every other topic's summary.
+    if topic in ("relations", "quests"):
+        realm_has = sum(1 for r in shown if REALM_HAS_NOTE in r["note"])
+        realm_lacks = sum(1 for r in shown if REALM_LACKS_NOTE in r["note"])
+        if realm_has or realm_lacks:
+            lines.append(
+                "Of these, %d point at content only this realm has (neither peer does) "
+                "and %d point at a gap both peers have that this realm lacks."
+                % (realm_has, realm_lacks)
+            )
 
     if topic == "creatures" and moved:
         lines.append("")

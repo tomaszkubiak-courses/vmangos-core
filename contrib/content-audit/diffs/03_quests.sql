@@ -74,13 +74,28 @@ WHERE cmp.strength(f.v, f.mz, f.ac) <> '';
 -- quest objective demands), so exact match is the intended semantic - unlike
 -- the drop-chance and xp figures in 04_quest_rewards.sql / 05_quest_item_drops.sql,
 -- which are computed magnitudes and use cmp.strength_mag instead.
+--
+-- note (Follow-up 3, task-16 part B): cmp.strength's first branch (both
+-- peers NULL) already means a 'strong' row here always has mz and ac both
+-- non-null and agreeing - the only way v can still differ is either v
+-- itself is NULL (this quest has no row for this objective at all: a real
+-- existence gap) or v holds a different, non-null count than the peers'
+-- shared one (both sides have the objective, they only disagree on the
+-- required count - not an existence claim in either direction). Measured
+-- on this corpus: of 28 strong obj: findings, 6 are the v-IS-NULL gap and
+-- 22 are the differing-count shape - so only the 6 get a direction note;
+-- the other 22 keep the plain 'objective count' note, since "this realm
+-- has it; neither peer does" would be false when this realm's row exists
+-- too, just with a different number.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT zq.zone, 'quests', 'quest', o.quest,
        CONCAT('obj:', o.kind, ':', o.target),
        ov.cnt, omz.cnt, otw.cnt, oac.cnt,
        cmp.strength(ov.cnt, omz.cnt, oac.cnt),
-       'objective count'
+       CASE WHEN cmp.strength(ov.cnt, omz.cnt, oac.cnt) = 'strong' AND ov.cnt IS NULL
+                THEN 'objective count; this realm lacks it; both peers have it'
+            ELSE 'objective count' END
 FROM cmp.zone_quest zq
 JOIN (
     SELECT quest, kind, target FROM v.n_quest_obj
