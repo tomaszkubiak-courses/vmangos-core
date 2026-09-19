@@ -22,11 +22,13 @@ TOPICS = [
     ("spawns", "6. Spawn rates and counts"),
 ]
 
-# The field column embeds a second id in these two topics: 'creature:NNN' /
-# 'gobject:NNN' in quest_item_drops, and 'vendor:NNN' / 'questgiver:NNN' /
-# 'questender:NNN' / 'link:NNN' in relations. Read off views/v.sql's n_rel
-# definition, not guessed - 'link' resolves to a creature entry because Task
-# 9 rekeyed it from the spawn GUID creature_linking used natively.
+# The field column embeds a second id in these topics: 'creature:NNN' /
+# 'gobject:NNN' in quest_item_drops, 'vendor:NNN' / 'questgiver:NNN' /
+# 'questender:NNN' / 'link:NNN' in relations, 'item:NNN' / 'choice:NNN' in
+# quest_rewards, and 'obj:npc:NNN' / 'obj:item:NNN' in quests. Read off
+# views/v.sql's n_rel definition, not guessed - 'link' resolves to a
+# creature entry because Task 9 rekeyed it from the spawn GUID
+# creature_linking used natively.
 FIELD_PREFIX_KIND = {
     "creature": "creature",
     "gobject": "gobject",
@@ -34,6 +36,10 @@ FIELD_PREFIX_KIND = {
     "vendor": "item",
     "questgiver": "quest",
     "questender": "quest",
+    "item": "item",
+    "choice": "item",
+    "obj:npc": "creature",
+    "obj:item": "item",
 }
 
 # (schema, table, id column, name column, patch-keyed) per kind, first
@@ -152,10 +158,14 @@ def load_zone_findings(zone):
 
 
 def field_ref(field):
-    """('vendor', 'item', 401) for 'vendor:401'; None when field carries no id."""
+    """('vendor', 'item', 401) for 'vendor:401'; ('obj:npc', 'creature', 6)
+    for 'obj:npc:6'; None when field carries no id. The numeric id is
+    always the last colon-separated segment, so splitting on the last colon
+    handles the two-segment 'obj:npc'/'obj:item' forms the same way as the
+    one-segment ones, without special-casing either."""
     if ":" not in field:
         return None
-    prefix, _, rest = field.partition(":")
+    prefix, _, rest = field.rpartition(":")
     kind = FIELD_PREFIX_KIND.get(prefix)
     if kind and rest.isdigit():
         return prefix, kind, int(rest)
@@ -243,8 +253,16 @@ def row_divergence(v, peers):
 
 
 def sort_key(row):
+    # Item 4: tortoise-wow is a fork of the live database (00_schema.sql's
+    # consensus comment), so its agreement or disagreement carries no
+    # evidence and neither cmp.strength nor cmp.strength_num takes it.
+    # Ordering by how far a fork strays is ordering by non-evidence -
+    # measured on this corpus, tortoise is the strict maximum divergence in
+    # 1033 of 40259 numeric-v rows (2.6%), so leaving it in did move real
+    # output. It stays a peer column in the table, which is its documented
+    # role.
     rank = 0 if row["strength"] == "strong" else 1
-    div = row_divergence(row["v"], (row["mz"], row["tw"], row["ac"]))
+    div = row_divergence(row["v"], (row["mz"], row["ac"]))
     return (rank, -div, row["id"], row["field"])
 
 
@@ -273,20 +291,49 @@ def findings_table(rows, names):
     return "\n".join(out) + "\n"
 
 
+def suppression_note(group, names, destination):
+    """Item 1: the exists row a suppressed row points back to can live in
+    either of two places - see the call sites below."""
+    distinct = sorted({r["id"] for r in group})
+    note = (
+        "%d further finding%s here belong to %d creature%s that are absent "
+        "from the live database entirely; they are consequences of the "
+        "exists findings %s."
+        % (len(group), "" if len(group) == 1 else "s", len(distinct), "" if len(distinct) == 1 else "s", destination)
+    )
+    if len(distinct) <= 12:
+        note += " (" + ", ".join(render_id(names, "creature", i) for i in distinct) + ")"
+    return note
+
+
 def render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids):
     lines = ["## %s" % heading, ""]
 
     if topic == "creatures":
         moved = [r for r in rows if r["field"] == "exists" and r["id"] in appendix_a_ids]
         shown = [r for r in rows if r not in moved]
+        to_appendix_a = to_section1 = []
     else:
         # Ruling 11(c): suppress rows that only restate a creature's absence.
         # Scoped to entity_kind == 'creature' so a numeric id shared with
         # another kind (e.g. an item or quest id) can never be caught by
         # this filter - mirrors the kind-filter defect ruling 11(a) found in
         # the plan's n_spawn/n_creature join.
+        #
+        # Item 1: the suppressed creature's own exists row does not always
+        # live in the same place. Ruling 11(d) moved every exists row with
+        # both v and mz absent to Appendix A; a creature absent from v alone
+        # (mz still has it) keeps its exists row in section 1. Pick the
+        # destination per creature rather than pointing every suppression at
+        # a fixed string - appendix_a_ids is always a subset of absent_ids,
+        # so this partition is exhaustive. The two sets are equal on this
+        # corpus (verified: 0 findings with v absent and mz present) but
+        # nothing in the schema forces that, so both branches stay live and
+        # a block spanning both says both.
         suppressed = [r for r in rows if r["kind"] == "creature" and r["id"] in absent_ids]
         shown = [r for r in rows if r not in suppressed]
+        to_appendix_a = [r for r in suppressed if r["id"] in appendix_a_ids]
+        to_section1 = [r for r in suppressed if r["id"] not in appendix_a_ids]
 
     strong = sum(1 for r in shown if r["strength"] == "strong")
     lines.append("%d findings (%d strong, %d weak)" % (len(shown), strong, len(shown) - strong))
@@ -294,38 +341,50 @@ def render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids):
     if topic == "creatures" and moved:
         lines.append("")
         lines.append(
-            "%d finding%s moved to Appendix A: entit%s that exist%s only in "
-            "AzerothCore (probable post-vanilla content)."
+            "%d finding%s moved to Appendix A: entit%s absent from both "
+            "vanilla peers (probable post-vanilla or custom content)."
             % (
                 len(moved),
                 "" if len(moved) == 1 else "s",
                 "y" if len(moved) == 1 else "ies",
-                "s" if len(moved) == 1 else "",
             )
         )
-    elif topic != "creatures" and suppressed:
-        distinct = sorted({r["id"] for r in suppressed})
+    elif topic != "creatures" and (to_section1 or to_appendix_a):
         lines.append("")
-        note = (
-            "%d further findings here belong to %d creature%s that are absent "
-            "from the live database entirely; they are consequences of the "
-            "exists findings in section 1."
-            % (len(suppressed), len(distinct), "" if len(distinct) == 1 else "s")
-        )
-        if len(distinct) <= 12:
-            note += " (" + ", ".join(render_id(names, "creature", i) for i in distinct) + ")"
-        lines.append(note)
+        if to_section1:
+            lines.append(suppression_note(to_section1, names, "in section 1"))
+        if to_appendix_a:
+            lines.append(suppression_note(to_appendix_a, names, "moved to Appendix A"))
 
     lines.append("")
     lines.append(findings_table(shown, names))
     return "\n".join(lines)
 
 
-def appendix_a(appendix_a_ids, names):
+def appendix_a(appendix_a_rows, names):
+    # Item 2: the predicate (v and mz both absent) is right - it deliberately
+    # covers both the ac-only shape and the tortoise+ac shape - but the old
+    # heading claimed every row was AzerothCore-only, which made 22
+    # (zone, entry) pairs corpus-wide contradict Appendix B's "tortoise-only"
+    # heading for the same creature. Fix the label, not the predicate: name
+    # what the set really is, and read who actually claims each row off its
+    # own tw_value/ac_value rather than assuming AzerothCore.
     body = "None.\n"
-    if appendix_a_ids:
-        body = "\n".join("- " + render_id(names, "creature", i) for i in sorted(appendix_a_ids)) + "\n"
-    return "## Appendix A - AzerothCore-only entities (probable post-vanilla)\n\n%s\n" % body
+    if appendix_a_rows:
+        lines = []
+        for i in sorted(appendix_a_rows):
+            f = appendix_a_rows[i]
+            sources = [
+                label
+                for key, label in (("tw", "tortoise-wow"), ("ac", "AzerothCore"))
+                if f[key] not in (None, "NULL")
+            ]
+            lines.append("- %s (%s)" % (render_id(names, "creature", i), ", ".join(sources) or "no source"))
+        body = "\n".join(lines) + "\n"
+    return (
+        "## Appendix A - absent from both vanilla peers (probable "
+        "post-vanilla or custom content)\n\n%s\n" % body
+    )
 
 
 def appendix_b(zone):
@@ -384,14 +443,15 @@ def render(zone):
         for f in findings
         if f["topic"] == "creatures" and f["field"] == "exists" and f["v"] in (None, "NULL")
     }
-    appendix_a_ids = {
-        f["id"]
+    appendix_a_rows = {
+        f["id"]: f
         for f in findings
         if f["topic"] == "creatures"
         and f["field"] == "exists"
         and f["v"] in (None, "NULL")
         and f["mz"] in (None, "NULL")
     }
+    appendix_a_ids = set(appendix_a_rows)
 
     needed = collect_ids(findings)
     needed["creature"] |= appendix_a_ids
@@ -411,7 +471,7 @@ def render(zone):
         parts.append(render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids))
         parts.append("")
 
-    parts.append(appendix_a(appendix_a_ids, names))
+    parts.append(appendix_a(appendix_a_rows, names))
     parts.append(appendix_b(zone))
     parts.append(appendix_c())
     parts.append("## Comparability notes\n\n" + COMPARABILITY)

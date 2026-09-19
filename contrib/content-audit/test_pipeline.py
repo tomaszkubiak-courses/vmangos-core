@@ -1019,6 +1019,11 @@ def test_report_suppresses_absent_creature_relations():
     weak). A test that only checked the table was non-empty would pass
     whether or not the suppression ran; this checks the specific row is
     gone and the pointer naming its creature is present.
+
+    Fix-round item 1: all five of those creatures also have mz_value NULL,
+    so ruling 11(d) moves their exists rows to Appendix A, not section 1 -
+    verified on the corpus (0 findings corpus-wide have v absent and mz
+    present), so the pointer here must name Appendix A, not section 1.
     """
     subprocess.run([sys.executable, os.path.join(HERE, "report.py"), "40"], check=True)
     repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -1035,8 +1040,11 @@ def test_report_suppresses_absent_creature_relations():
     assert "29 findings (6 strong, 23 weak)" in section2, (
         "section 2's count line does not match the post-suppression total"
     )
-    assert "consequences of the exists findings in section 1" in section2, (
-        "no suppression pointer line in section 2"
+    assert "consequences of the exists findings moved to Appendix A" in section2, (
+        "no Appendix-A suppression pointer line in section 2"
+    )
+    assert "in section 1" not in section2, (
+        "suppression pointer wrongly names section 1 - these creatures moved to Appendix A"
     )
     assert "29288" in section2, "suppression pointer does not name creature 29288"
     print("PASS test_report_suppresses_absent_creature_relations")
@@ -1065,6 +1073,77 @@ def test_report_resolves_creature_names():
         "creature 449 rendered without its name (%r) - bare id instead" % name
     )
     print("PASS test_report_resolves_creature_names")
+
+
+def test_report_orders_findings_by_divergence_not_id():
+    """Fix-round item 3, pin for ruling 11(b): rows sort by magnitude of
+    divergence within a strength band, not by entity id.
+
+    Verified on the corpus before writing this (mz/ac peers only, matching
+    the item 4 fix that drops tortoise-wow from the divergence vote): in
+    Westfall's (zone 40) creatures topic, both rows below are 'weak', so id
+    order and divergence order disagree on them - id order puts 68 first
+    (68 < 98), divergence order puts 98 first (0.393 > 0.364):
+
+      creature 68 lvl_max  (v=55, mz=55, ac=75) -> divergence 0.3636
+      creature 98 hp@17    (v=386, mz=277, ac=386) -> divergence 0.3935
+
+    Reverting the sort to id order (div = 0.0 in report.py's sort_key) must
+    make this fail - the earlier round's suite passed 32/32 with that
+    revert applied, because no test pinned the order.
+    """
+    subprocess.run([sys.executable, os.path.join(HERE, "report.py"), "40"], check=True)
+    repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    report_dir = os.path.join(repo_root, CFG["REPORT_DIR"])
+    written = [f for f in os.listdir(report_dir) if f.startswith("40-")]
+    path = os.path.join(report_dir, written[0])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    section1 = text.split("## 1. Creatures", 1)[1].split("## 2. Connected creatures", 1)[0]
+
+    pos_98 = section1.find("| creature | 98 ")
+    pos_68 = section1.find("| creature | 68 ")
+    assert pos_98 != -1 and pos_68 != -1, "fixture rows for creature 68 or 98 missing from section 1"
+    assert pos_98 < pos_68, (
+        "creature 98's hp@17 row (divergence 0.393) should render before "
+        "creature 68's lvl_max row (divergence 0.364) - rows are in id "
+        "order, not divergence order"
+    )
+    print("PASS test_report_orders_findings_by_divergence_not_id")
+
+
+def test_report_ac_only_creature_moves_to_appendix_a():
+    """Fix-round item 3, pin for ruling 11(d): an exists row with v and mz
+    both absent renders in Appendix A, not in section 1.
+
+    Verified on the corpus before writing this: creature 29288 (Engineer
+    Kurtis Paddock) has a creatures/exists finding in Westfall (zone 40)
+    with v_value and mz_value both NULL. Reverting the move (moved = [] in
+    report.py's render_topic) must make this fail - the earlier round's
+    suite passed 32/32 with that revert applied, because no test pinned
+    where the row landed, only that section 2's pointer named it.
+    """
+    subprocess.run([sys.executable, os.path.join(HERE, "report.py"), "40"], check=True)
+    repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    report_dir = os.path.join(repo_root, CFG["REPORT_DIR"])
+    written = [f for f in os.listdir(report_dir) if f.startswith("40-")]
+    path = os.path.join(report_dir, written[0])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+
+    rows = corpus_sql(
+        "SELECT v_value, mz_value FROM cmp.findings WHERE zone=40 AND topic='creatures' "
+        "AND field='exists' AND entity_id=29288"
+    )
+    assert rows and rows[0][0] == "NULL" and rows[0][1] == "NULL", (
+        "fixture creature 29288 no longer has v and mz both absent in zone 40"
+    )
+
+    section1 = text.split("## 1. Creatures", 1)[1].split("## 2. Connected creatures", 1)[0]
+    appendix_a = text.split("## Appendix A", 1)[1].split("## Appendix B", 1)[0]
+    assert "29288" not in section1, "ac-only creature 29288 still rendered in section 1"
+    assert "29288" in appendix_a, "ac-only creature 29288 is missing from Appendix A"
+    print("PASS test_report_ac_only_creature_moves_to_appendix_a")
 
 
 TESTS = [
@@ -1101,6 +1180,8 @@ TESTS = [
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,
+    test_report_orders_findings_by_divergence_not_id,
+    test_report_ac_only_creature_moves_to_appendix_a,
 ]
 
 if __name__ == "__main__":
