@@ -90,6 +90,12 @@ COMPARABILITY = """\
   finding; it appears only where it disagrees, as context.
 - A blank cell means the source cannot express the field at all. That is an
   abstention, not a claim that the value is missing.
+- `lineage` (Task 13) means mangoszero and AzerothCore agree with each other,
+  disagree with this realm, AND their rows are the same shared-ancestor row -
+  not two independent sources reaching the same conclusion. It is still the
+  most actionable signal the audit produces (this realm diverged from what
+  both peers inherited), but it is one witness, not two, so it is kept out of
+  the `strong` count. See README.md's corpus-overlap section for why.
 """
 
 
@@ -252,6 +258,9 @@ def row_divergence(v, peers):
     return best
 
 
+STRENGTH_RANK = {"strong": 0, "lineage": 1, "weak": 2}
+
+
 def sort_key(row):
     # Item 4: tortoise-wow is a fork of the live database (00_schema.sql's
     # consensus comment), so its agreement or disagreement carries no
@@ -261,7 +270,12 @@ def sort_key(row):
     # 1033 of 40259 numeric-v rows (2.6%), so leaving it in did move real
     # output. It stays a peer column in the table, which is its documented
     # role.
-    rank = 0 if row["strength"] == "strong" else 1
+    #
+    # Task 13: strong > lineage > weak (diffs/00_schema.sql's doctrine
+    # comment on cmp.apply_lineage) - a shared-ancestry finding is still more
+    # actionable than an ordinary disagreement, but less than two
+    # independent sources agreeing.
+    rank = STRENGTH_RANK.get(row["strength"], 3)
     div = row_divergence(row["v"], (row["mz"], row["ac"]))
     return (rank, -div, row["id"], row["field"])
 
@@ -344,7 +358,11 @@ def render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids):
         to_section1 = [r for r in suppressed if r["id"] not in appendix_a_ids]
 
     strong = sum(1 for r in shown if r["strength"] == "strong")
-    lines.append("%d findings (%d strong, %d weak)" % (len(shown), strong, len(shown) - strong))
+    lineage = sum(1 for r in shown if r["strength"] == "lineage")
+    weak = len(shown) - strong - lineage
+    lines.append(
+        "%d findings (%d strong, %d lineage, %d weak)" % (len(shown), strong, lineage, weak)
+    )
 
     if topic == "creatures" and moved:
         lines.append("")
@@ -467,8 +485,11 @@ def render(zone):
 
     total = len(findings)
     strong_total = sum(1 for f in findings if f["strength"] == "strong")
+    lineage_total = sum(1 for f in findings if f["strength"] == "lineage")
+    weak_total = total - strong_total - lineage_total
     summary = (
-        "%d findings (%d strong, %d weak)" % (total, strong_total, total - strong_total)
+        "%d findings (%d strong, %d lineage, %d weak)"
+        % (total, strong_total, lineage_total, weak_total)
         if total
         else "no findings"
     )
