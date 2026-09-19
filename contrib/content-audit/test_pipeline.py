@@ -975,6 +975,98 @@ def test_quest_item_drops_never_strong_when_both_peers_absent():
     print("PASS test_quest_item_drops_never_strong_when_both_peers_absent")
 
 
+def test_report_renders_for_pilot_zones():
+    """report.py writes a readable file per zone with every section present."""
+    subprocess.run(
+        [sys.executable, os.path.join(HERE, "report.py"), "40", "1581"], check=True
+    )
+    repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    report_dir = os.path.join(repo_root, CFG["REPORT_DIR"])
+    written = [f for f in os.listdir(report_dir) if f.endswith(".md")]
+    assert any(f.startswith("40-") for f in written), "no Westfall report"
+    assert any(f.startswith("1581-") for f in written), "no Deadmines report"
+
+    path = os.path.join(report_dir, [f for f in written if f.startswith("40-")][0])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    for heading in (
+        "## 1. Creatures",
+        "## 2. Connected creatures",
+        "## 3. Quests",
+        "## 4. Quest rewards",
+        "## 5. Quest item drop rates",
+        "## 6. Spawn rates and counts",
+        "## Appendix A",
+        "## Appendix B",
+        "## Appendix C",
+        "## Comparability notes",
+    ):
+        assert heading in text, "report is missing %r" % heading
+    print("PASS test_report_renders_for_pilot_zones")
+
+
+def test_report_suppresses_absent_creature_relations():
+    """Ruling 11(c): a relation finding that only restates a creature's
+    absence from the live database is dropped, with a pointer line in its
+    place.
+
+    Verified directly on the corpus before writing this: in Westfall (zone
+    40), creature 29288 has a creatures/exists finding with v_value NULL
+    (it is AzerothCore-only - Engineer Kurtis Paddock) and 48
+    'relations' rows, one of them field='vendor:2320'. Five creatures
+    (29288, 29291, 26401, 25962, 25910) are suppressed this way in this
+    zone's relations topic, dropping 72 of 101 rows to 29 (6 strong, 23
+    weak). A test that only checked the table was non-empty would pass
+    whether or not the suppression ran; this checks the specific row is
+    gone and the pointer naming its creature is present.
+    """
+    subprocess.run([sys.executable, os.path.join(HERE, "report.py"), "40"], check=True)
+    repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    report_dir = os.path.join(repo_root, CFG["REPORT_DIR"])
+    written = [f for f in os.listdir(report_dir) if f.startswith("40-")]
+    path = os.path.join(report_dir, written[0])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    section2 = text.split("## 2. Connected creatures", 1)[1].split("## 3. Quests", 1)[0]
+
+    assert "vendor:2320" not in section2, (
+        "suppressed relation row (creature 29288, vendor:2320) still rendered"
+    )
+    assert "29 findings (6 strong, 23 weak)" in section2, (
+        "section 2's count line does not match the post-suppression total"
+    )
+    assert "consequences of the exists findings in section 1" in section2, (
+        "no suppression pointer line in section 2"
+    )
+    assert "29288" in section2, "suppression pointer does not name creature 29288"
+    print("PASS test_report_suppresses_absent_creature_relations")
+
+
+def test_report_resolves_creature_names():
+    """Ruling 11(e): the Id column reads '<id> <name>', not a bare id.
+
+    Creature 449 (Defias Knuckleduster in this corpus) carries a
+    creatures/lvl_min finding in Westfall (zone 40). The name is read from
+    v.n_creature here, not hardcoded, so a future content change to this
+    creature cannot make the assertion fail for the wrong reason.
+    """
+    subprocess.run([sys.executable, os.path.join(HERE, "report.py"), "40"], check=True)
+    repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    report_dir = os.path.join(repo_root, CFG["REPORT_DIR"])
+    written = [f for f in os.listdir(report_dir) if f.startswith("40-")]
+    path = os.path.join(report_dir, written[0])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+
+    rows = corpus_sql("SELECT name FROM v.n_creature WHERE entry=449")
+    assert rows, "fixture creature 449 no longer in v.n_creature"
+    name = rows[0][0]
+    assert "449 %s" % name in text, (
+        "creature 449 rendered without its name (%r) - bare id instead" % name
+    )
+    print("PASS test_report_resolves_creature_names")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -1006,6 +1098,9 @@ TESTS = [
     test_magnitude_topics_never_write_a_contentless_weak_finding,
     test_all_six_topics_fire,
     test_quest_item_drops_never_strong_when_both_peers_absent,
+    test_report_renders_for_pilot_zones,
+    test_report_suppresses_absent_creature_relations,
+    test_report_resolves_creature_names,
 ]
 
 if __name__ == "__main__":
