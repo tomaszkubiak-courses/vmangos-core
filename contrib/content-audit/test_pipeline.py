@@ -716,6 +716,43 @@ def test_consensus_strength_mag_rule():
     print("PASS test_consensus_strength_mag_rule")
 
 
+def _agrees_num(a, b, ratio_tol, abs_tol):
+    rows = corpus_sql(
+        "SELECT cmp._agrees_num(%s, %s, %s, %s)" % (a, b, ratio_tol, abs_tol)
+    )
+    return rows[0][0] == "1"
+
+
+def test_agrees_num_matches_spec_at_percentage_point_scale():
+    """Item 4 (fix round 1): pin cmp._agrees_num's behaviour at the exact
+    (ratio_tol=1.0, abs_tol=5) percentage-point scale
+    diffs/05_quest_item_drops.sql calls it at, hand-computed from the
+    spec's "2x ratio or 5 absolute points" rule rather than read back out
+    of the function under test.
+
+    test_all_six_topics_fire alone would not catch abs_tol silently
+    reverting to 0.05 while the *100 scaling on p_drop stayed in place -
+    the ratio branch still fires some findings either way (it is on a
+    percentage-point scale, so the GREATEST(...,1) floor trap
+    diffs/00_schema.sql documents does not apply here), so the topic would
+    not disappear from cmp.findings, only which rows it flags would
+    quietly change. This pins the intended per-pair verdicts directly.
+    """
+    # Inside 5 points: agrees outright, regardless of ratio.
+    assert _agrees_num(30, 33, 1.0, 5) is True, (
+        "30 vs 33 (diff 3, within 5 points) should agree"
+    )
+    # Outside 5 points and beyond 2x (b is 5x a): disagrees on both halves.
+    assert _agrees_num(2, 10, 1.0, 5) is False, (
+        "2 vs 10 (diff 8, b is 5x a) should disagree"
+    )
+    # Outside 5 points but within 2x (b is 1.7x a): rescued by the ratio half.
+    assert _agrees_num(10, 17, 1.0, 5) is True, (
+        "10 vs 17 (diff 7, b is 1.7x a) should agree (within 2x)"
+    )
+    print("PASS test_agrees_num_matches_spec_at_percentage_point_scale")
+
+
 def test_pilot_zones_produce_findings():
     """Westfall and the Deadmines each produce findings in every topic run.
 
@@ -939,6 +976,7 @@ TESTS = [
     test_consensus_strength_num_never_strong_with_an_abstaining_peer,
     test_consensus_strength_num_filters_a_doubly_abstaining_peer_to_empty,
     test_consensus_strength_mag_rule,
+    test_agrees_num_matches_spec_at_percentage_point_scale,
     test_pilot_zones_produce_findings,
     test_link_relation_uses_creature_entry_not_guid,
     test_spawn_count_never_strong_when_both_peers_absent,

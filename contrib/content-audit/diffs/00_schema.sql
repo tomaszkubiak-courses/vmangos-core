@@ -92,7 +92,27 @@ END;
 --   effective health               0.20        0
 --   spawn count                    0.50        5
 --   respawn window (2x)            1.0         0
---   drop chance (2x or 5 points)   1.0         0.05
+--   drop chance (2x or 5 points)   1.0         5     (on p_drop * 100 -
+--                                                      see the trap below)
+--
+-- The ratio half of the predicate below divides by
+-- GREATEST(LEAST(ABS(a), ABS(b)), 1) - a floor of 1. Every other topic in
+-- this table is already on a scale of 1 or more (health in the hundreds,
+-- counts as whole numbers), so the floor never engages for them. It is a
+-- trap for a topic whose native values sit inside [0,1], as drop chance's
+-- raw p_drop fraction does: fed directly, the floor forces the denominator
+-- to exactly 1 for every pair, so the ratio check collapses to
+-- "ABS(a-b) <= ratio_tol" - true for any two values in [0,1] once
+-- ratio_tol >= 1 - and it is checked (and satisfied) before abs_tol is ever
+-- reached, so abs_tol never gets a say. Measured: called on the raw
+-- fraction, drop chance produced zero findings out of 113556 candidates on
+-- this corpus despite 9657 differing from v by more than 5 points -
+-- cmp._agrees_num(0.02, 0.99, 1.0, 0.05), a 49x disagreement, reads as
+-- agreement. Scale any future [0,1]-valued topic to a range of 1 or more
+-- (percentage points, not a fraction) before calling cmp.strength_mag or
+-- cmp.strength_num with a ratio_tol - see diffs/05_quest_item_drops.sql's
+-- comment on its strength_mag call site for the worked case this table's
+-- drop-chance row now reflects.
 DROP FUNCTION IF EXISTS cmp._agrees_num;
 CREATE FUNCTION cmp._agrees_num(a DOUBLE, b DOUBLE, ratio_tol DOUBLE, abs_tol DOUBLE)
 RETURNS BOOLEAN DETERMINISTIC
