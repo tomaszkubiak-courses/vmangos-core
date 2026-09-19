@@ -295,11 +295,19 @@ def suppression_note(group, names, destination):
     """Item 1: the exists row a suppressed row points back to can live in
     either of two places - see the call sites below."""
     distinct = sorted({r["id"] for r in group})
+    one = len(group) == 1
     note = (
-        "%d further finding%s here belong to %d creature%s that are absent "
-        "from the live database entirely; they are consequences of the "
-        "exists findings %s."
-        % (len(group), "" if len(group) == 1 else "s", len(distinct), "" if len(distinct) == 1 else "s", destination)
+        "%d further finding%s here %s to %d creature%s absent from the live "
+        "database entirely; %s of the exists findings %s."
+        % (
+            len(group),
+            "" if one else "s",
+            "belongs" if one else "belong",
+            len(distinct),
+            "" if len(distinct) == 1 else "s",
+            "it is a consequence" if one else "they are consequences",
+            destination,
+        )
     )
     if len(distinct) <= 12:
         note += " (" + ", ".join(render_id(names, "creature", i) for i in distinct) + ")"
