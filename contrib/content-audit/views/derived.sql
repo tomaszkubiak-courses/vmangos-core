@@ -224,6 +224,8 @@ FROM ac.quest_template;
 -- join against:
 --   kind='loot':          k1=tbl, k2=entry, k3=item
 --   kind='creature_stat':  k1=entry, k2=field ('lvl_min'/'lvl_max'), k3='' (unused)
+--   kind='spawn_count':    k1=spawn kind ('creature'/'gobject'), k2=zone, k3=entry
+--   kind='respawn_min':    k1=spawn kind ('creature'/'gobject'), k2=zone, k3=entry
 DROP TABLE IF EXISTS cmp.peer_lineage;
 CREATE TABLE cmp.peer_lineage (
     kind VARCHAR(16) NOT NULL,
@@ -283,3 +285,54 @@ UNION ALL
 SELECT 'creature_stat', CAST(mz.entry AS CHAR), 'lvl_max', ''
 FROM mz.n_creature mz JOIN ac.n_creature ac ON ac.entry = mz.entry
 WHERE mz.lvl_min = ac.lvl_min AND mz.lvl_max = ac.lvl_max;
+
+-- 'spawn_count' / 'respawn_min': diffs/06_spawns.sql's two magnitude fields,
+-- each keyed on (spawn kind, zone, entry) - cmp.spawn_agg's own grain - with
+-- k1=kind ('creature'/'gobject'), k2=zone, k3=entry.
+--
+-- This is NOT the creature_stat shape above, on purpose, even though both
+-- are "two related fields sharing a table". creature_stat needs the WHOLE
+-- level pair because cmp.strength (byte equality) already means a 'strong'
+-- lvl_min finding implies mz=ac on lvl_min exactly - testing that one field
+-- again proves nothing, only the pair is new information. spawn_count and
+-- respawn_min are judged by cmp.strength_mag under a TOLERANCE instead (0.50
+-- ratio / 5 absolute for count, 2x for respawn), so a 'strong' finding there
+-- only means mz and ac fall within tolerance of each other, not that they
+-- hold the same number - byte identity is extra information on each field
+-- independently, and neither field's identity is implied by the other's.
+-- There is also no reason to demand both: a realm can inherit a shared
+-- spawn count while independently retuning the respawn timer, or vice versa.
+-- So each field gets its own kind and its own WHERE, unlike creature_stat's
+-- shared one.
+--
+-- Measured on this corpus before wiring: of 16933 (kind, zone, entry) groups
+-- common to mz and ac, 9343 (55%) match on BOTH count and respawn - but
+-- applying that joint condition to the existing 'strong' findings gives 641
+-- of 929 spawn_count and 809 of 1023 respawn_min, not the per-field figures
+-- below - confirming the two fields are independent evidence, not one
+-- signal. Testing each field against its OWN peer identity gives 806 of 929
+-- strong spawn_count findings (87%) and 902 of 1023 strong respawn_min
+-- findings (88%) with byte-identical mz/ac values - 1708 of 1952 overall.
+--
+-- resp_min uses <=> (both are NULL-safe here in principle, though
+-- cmp.spawn_agg's MIN(resp_min) is never actually NULL on this corpus) -
+-- matching the null-safety diffs/00_schema.sql uses throughout rather than
+-- a bare '=' that would silently drop a NULL pairing instead of matching it.
+-- A group where both peers store a real respawn of 0 poses no risk of a
+-- false 'lineage' here: 06_spawns.sql's IF() wrappers already null out a
+-- zero respawn before it ever reaches cmp.strength_mag, so that finding can
+-- never be 'strong' in the first place and this row is simply never looked
+-- up - the same "harmless LEFT JOIN" property 01_creatures.sql's comment
+-- documents for creature_stat's other fields.
+INSERT INTO cmp.peer_lineage (kind, k1, k2, k3)
+SELECT 'spawn_count', mz.kind, CAST(mz.zone AS CHAR), CAST(mz.entry AS CHAR)
+FROM cmp.spawn_agg mz
+JOIN cmp.spawn_agg ac
+  ON ac.src = 'ac' AND ac.kind = mz.kind AND ac.zone = mz.zone AND ac.entry = mz.entry
+WHERE mz.src = 'mz' AND mz.n = ac.n
+UNION ALL
+SELECT 'respawn_min', mz.kind, CAST(mz.zone AS CHAR), CAST(mz.entry AS CHAR)
+FROM cmp.spawn_agg mz
+JOIN cmp.spawn_agg ac
+  ON ac.src = 'ac' AND ac.kind = mz.kind AND ac.zone = mz.zone AND ac.entry = mz.entry
+WHERE mz.src = 'mz' AND mz.resp_min <=> ac.resp_min;

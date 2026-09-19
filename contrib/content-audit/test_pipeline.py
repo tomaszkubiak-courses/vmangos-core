@@ -1086,6 +1086,47 @@ def test_creature_level_lineage_requires_the_whole_pair():
     print("PASS test_creature_level_lineage_requires_the_whole_pair")
 
 
+def test_spawn_count_shared_ancestor_row_is_lineage_not_strong():
+    """Task 14 pin: a spawns/spawn_count finding whose mz and ac aggregate
+    counts are byte-identical must be labelled 'lineage', not 'strong'.
+
+    Unlike creature_stat (Task 13), this field does NOT need its sibling
+    field (respawn_min) to also agree - spawn_count and respawn_min are
+    judged by cmp.strength_mag under a TOLERANCE (0.50 ratio / 5 absolute),
+    so a 'strong' finding there only means the peers were close, not that
+    they held the same number; byte identity on count alone is already new
+    information cmp.strength_mag's own verdict did not require, unlike
+    creature_stat's byte-equality fields. Measured on this corpus before
+    writing this: of 16933 common (kind, zone, entry) spawn groups, 9343
+    (55%) agree on BOTH count and respawn, but requiring that joint pair
+    against the existing 929 strong spawn_count findings gives only 641 -
+    not the 806 the per-field test (views/derived.sql's actual kind='spawn_count'
+    WHERE clause) gives - confirming the two fields are independent evidence.
+
+    Verified on this corpus before writing this: zone 1, gobject 3658 has
+    mz_value = ac_value = 10 (v_value = 30) and is exactly the shared-row
+    shape cmp.peer_lineage (kind='spawn_count') exists to catch. Reverting
+    the 06_spawns.sql wiring or cmp.apply_lineage itself would make this
+    come back 'strong'.
+    """
+    rows = corpus_sql(
+        "SELECT strength, mz_value, ac_value FROM cmp.findings "
+        "WHERE topic='spawns' AND zone=1 AND entity_kind='gobject' "
+        "AND entity_id=3658 AND field='spawn_count'"
+    )
+    assert rows, "fixture spawns row (zone 1, gobject 3658, spawn_count) no longer exists"
+    strength, mz_value, ac_value = rows[0]
+    assert mz_value == ac_value, (
+        "fixture row's peers no longer carry an identical value (mz=%s, ac=%s) - "
+        "pick a different corpus example" % (mz_value, ac_value)
+    )
+    assert strength == "lineage", (
+        "spawns/spawn_count row with identical mz/ac values (mz=%s, ac=%s) came out %r, "
+        "expected 'lineage'" % (mz_value, ac_value, strength)
+    )
+    print("PASS test_spawn_count_shared_ancestor_row_is_lineage_not_strong")
+
+
 def test_report_renders_for_pilot_zones():
     """report.py writes a readable file per zone with every section present."""
     subprocess.run(
@@ -1299,6 +1340,7 @@ TESTS = [
     test_no_finding_has_strength_outside_allowed_set,
     test_quest_item_drops_shared_ancestor_row_is_lineage_not_strong,
     test_creature_level_lineage_requires_the_whole_pair,
+    test_spawn_count_shared_ancestor_row_is_lineage_not_strong,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,
