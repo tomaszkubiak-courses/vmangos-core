@@ -248,12 +248,38 @@ CREATE TABLE cmp.peer_lineage (
 -- GROUP BY collapses them to one row per key - acceptable during
 -- build_views.sh, which nothing downstream re-enters mid-run the way
 -- run_diffs.sh's long queries do.
+--
+-- Follow-up 3 (task-16): exact match is too strict here. AzerothCore
+-- routes a loot row through reference_loot_template often enough that a
+-- shared-ancestor value drifts a few points off mangoszero's still-raw
+-- copy of the same row (measured: item 3014, creature 435 - mz stores the
+-- ancestral 80% flat, ac's reference table resolves the same row to 70%),
+-- and the exact test above missed all of those, leaving them to read as
+-- ordinary independent corroboration. Widened to a relative near-match:
+-- mz and ac's effective drop chances (already scaled to percentage points,
+-- to sidestep cmp._agrees_num's floor-of-1 trap the way
+-- diffs/05_quest_item_drops.sql's own strength_mag call site already does)
+-- agree within 15% relative, via cmp._agrees_num with abs_tol=0 so a small
+-- absolute slack near zero never substitutes for the ratio test.
+--
+-- 15%, not 30%: measured on this corpus, of the 51 strong quest_item_drops
+-- findings that survive today, 23 peer pairs fall within 15% of each other
+-- and 36 within 30% - the wider threshold starts pulling in pairs that
+-- could plausibly be independent agreement rather than one drifted shared
+-- row. This must also stay far tighter than the tolerance the finding was
+-- already judged 'strong' under - cmp.strength_mag's own call for this
+-- topic uses ratio_tol=1.0 (roughly "within 2x") - because a lineage test
+-- at the same looseness as the agreement test it sits inside proves
+-- nothing: it would relabel corroboration that has nothing to do with
+-- shared ancestry. 15% is close enough to be the signature of a rounding
+-- or reference-table indirection on one shared row, not two sources that
+-- merely landed in the same ballpark.
 INSERT INTO cmp.peer_lineage (kind, k1, k2, k3)
 SELECT 'loot', mz.tbl, CAST(mz.entry AS CHAR), CAST(mz.item AS CHAR)
 FROM cmp.n_loot_eff_mz mz
 JOIN cmp.n_loot_eff_ac ac
   ON ac.tbl = mz.tbl AND ac.entry = mz.entry AND ac.item = mz.item
-WHERE ROUND(mz.p_drop * 100, 2) = ROUND(ac.p_drop * 100, 2)
+WHERE cmp._agrees_num(ROUND(mz.p_drop * 100, 2), ROUND(ac.p_drop * 100, 2), 0.15, 0)
 GROUP BY mz.tbl, mz.entry, mz.item;
 
 -- 'creature_stat': the level PAIR, not each level field independently.
