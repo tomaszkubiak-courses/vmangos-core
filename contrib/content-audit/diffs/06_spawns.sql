@@ -42,17 +42,30 @@ FROM ac.n_spawn GROUP BY kind, zone, entry;
 -- lone voting peer that agrees with v must not write a contentless 'weak'
 -- (fix round 2, item 2 - measured before this fix: 4562 of 5487 weak
 -- spawn_count findings, 83%, were exactly this case).
+--
+-- Task 14: cmp.peer_lineage (kind='spawn_count', populated in
+-- views/derived.sql from cmp.spawn_agg's own mz/ac rows at this same (kind,
+-- zone, entry) grain) marks the keys where mz and ac's own spawn counts are
+-- byte-identical, not merely within the 0.50/5 tolerance cmp.strength_mag
+-- already required - measured 806 of 929 strong spawn_count findings on this
+-- corpus. As with 01_creatures.sql and 05_quest_item_drops.sql, the WHERE
+-- clause stays on the pre-lineage cmp.strength_mag(...) call: apply_lineage
+-- cannot turn a row into or out of '', so nothing there needs to change.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT k.zone, 'spawns', k.kind, k.entry, 'spawn_count',
        COALESCE(av.n, 0), amz.n, atw.n, aac.n,
-       cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5),
+       cmp.apply_lineage(
+           cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5),
+           pl.k1 IS NOT NULL),
        ''
 FROM (SELECT DISTINCT kind, zone, entry FROM cmp.spawn_agg) k
 LEFT JOIN cmp.spawn_agg av  ON av.src  = 'v'  AND av.kind  = k.kind AND av.zone  = k.zone AND av.entry  = k.entry
 LEFT JOIN cmp.spawn_agg amz ON amz.src = 'mz' AND amz.kind = k.kind AND amz.zone = k.zone AND amz.entry = k.entry
 LEFT JOIN cmp.spawn_agg atw ON atw.src = 'tw' AND atw.kind = k.kind AND atw.zone = k.zone AND atw.entry = k.entry
 LEFT JOIN cmp.spawn_agg aac ON aac.src = 'ac' AND aac.kind = k.kind AND aac.zone = k.zone AND aac.entry = k.entry
+LEFT JOIN cmp.peer_lineage pl
+  ON pl.kind = 'spawn_count' AND pl.k1 = k.kind AND pl.k2 = CAST(k.zone AS CHAR) AND pl.k3 = CAST(k.entry AS CHAR)
 WHERE cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5) <> '';
 
 -- resp_min of 0 means "no respawn" rather than "respawns instantly", and a
@@ -80,21 +93,30 @@ WHERE cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5) <> '';
 -- Gating ac's argument on mangozero corroborating it (NULL whenever mz
 -- doesn't also vote a real respawn window) keeps every row where mz backs
 -- ac up and silences the ones asserting nothing but ac's own bulk default.
+--
+-- Task 14: cmp.peer_lineage (kind='respawn_min', same grain as
+-- 'spawn_count' above) marks the keys where mz and ac's own respawn windows
+-- are byte-identical - measured 902 of 1023 strong respawn_min findings on
+-- this corpus. Same WHERE-unchanged property as spawn_count above.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT k.zone, 'spawns', k.kind, k.entry, 'respawn_min',
        av.resp_min, amz.resp_min, atw.resp_min, aac.resp_min,
-       cmp.strength_mag(
-           av.resp_min,
-           IF(amz.resp_min > 0, amz.resp_min, NULL),
-           CASE WHEN amz.resp_min > 0 THEN IF(aac.resp_min > 0, aac.resp_min, NULL) ELSE NULL END,
-           1.0, 0),
+       cmp.apply_lineage(
+           cmp.strength_mag(
+               av.resp_min,
+               IF(amz.resp_min > 0, amz.resp_min, NULL),
+               CASE WHEN amz.resp_min > 0 THEN IF(aac.resp_min > 0, aac.resp_min, NULL) ELSE NULL END,
+               1.0, 0),
+           pl.k1 IS NOT NULL),
        ''
 FROM (SELECT DISTINCT kind, zone, entry FROM cmp.spawn_agg) k
 JOIN      cmp.spawn_agg av  ON av.src  = 'v'  AND av.kind  = k.kind AND av.zone  = k.zone AND av.entry  = k.entry
 LEFT JOIN cmp.spawn_agg amz ON amz.src = 'mz' AND amz.kind = k.kind AND amz.zone = k.zone AND amz.entry = k.entry
 LEFT JOIN cmp.spawn_agg atw ON atw.src = 'tw' AND atw.kind = k.kind AND atw.zone = k.zone AND atw.entry = k.entry
 LEFT JOIN cmp.spawn_agg aac ON aac.src = 'ac' AND aac.kind = k.kind AND aac.zone = k.zone AND aac.entry = k.entry
+LEFT JOIN cmp.peer_lineage pl
+  ON pl.kind = 'respawn_min' AND pl.k1 = k.kind AND pl.k2 = CAST(k.zone AS CHAR) AND pl.k3 = CAST(k.entry AS CHAR)
 WHERE av.resp_min > 0
   AND cmp.strength_mag(
            av.resp_min,

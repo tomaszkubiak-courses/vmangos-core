@@ -62,9 +62,10 @@ no action - post-vanilla content, WotLK rescaling, a fork's own custom content.
 | Quests | 6522 | 0 | 20 | 0 | 19 | 1 | 0 |
 | Quest rewards | 5712 | 0 | 20 | 16 | 2 | 2 | 0 |
 | Quest item drop rates | 5687 | 2217 | 12 | 1 | 9 | 2 | 0 |
-| Spawn rates | 8637 | 0 | 20 | 11 | 0 | 0 | 9 |
+| Spawn rates | 8637 | 1708 | 20 | 11 | 0 | 0 | 9 |
 
-**Lineage** (added by Task 13, after the sample above was judged) is a subset of
+**Lineage** (added by Task 13 for creatures and quest item drops, extended to
+spawn rates by Task 14, after the sample above was judged) is a subset of
 each topic's `strong` count, not an addition to `Findings` - it never adds or
 removes a row, only relabels one that was already `strong`. It means
 mangoszero and AzerothCore agree with each other and disagree with this realm
@@ -144,6 +145,7 @@ below):
 | AzerothCore's whole `creature_loot_template` | 93648 rows |
 | mangoszero's `npc_vendor` rows also in AzerothCore | 11283 of 12558 (90%) |
 | Common creatures with identical min AND max level | 7246 of 9112 (80%) |
+| Common `(kind, entry, zone)` spawn groups with identical count AND respawn | 9343 of 16933 (55%) |
 
 ```sql
 -- shared loot pairs / byte-identical chance
@@ -157,6 +159,10 @@ SELECT COUNT(*) FROM mz.npc_vendor mz JOIN ac.npc_vendor ac ON ac.entry=mz.entry
 -- common creatures with an identical level pair
 SELECT COUNT(*) FROM mz.n_creature mz JOIN ac.n_creature ac ON ac.entry=mz.entry
   WHERE mz.lvl_min=ac.lvl_min AND mz.lvl_max=ac.lvl_max;
+-- common spawn groups with identical count AND respawn (cmp.spawn_agg, diffs/06_spawns.sql)
+SELECT COUNT(*) FROM cmp.spawn_agg mz JOIN cmp.spawn_agg ac
+  ON ac.src='ac' AND ac.kind=mz.kind AND ac.zone=mz.zone AND ac.entry=mz.entry
+  WHERE mz.src='mz' AND mz.n=ac.n AND mz.resp_min<=>ac.resp_min;
 ```
 
 What it cost before this was fixed: the Alterac Valley zone report, 1418 strong
@@ -190,13 +196,33 @@ both peers inherited - it is the most actionable signal the audit produces - it
 is just not two independent sources agreeing, so it is kept out of the `strong`
 count.
 
-### Before / after (Task 13)
+**Task 14 extends this to `spawns`' two magnitude fields (`spawn_count`,
+`respawn_min`), on different grounds than the level pair above.**
+`cmp.strength` judges `lvl_min`/`lvl_max`/`faction`/`rank`/`type` by byte
+equality, so a `strong` finding on any one of them already means mz and ac
+match exactly - testing that again is circular, which is why creature_stat
+needs the *whole pair* (neither field alone is new information, but "both
+fields separately happen to match" is). `spawn_count` and `respawn_min` are
+different: `cmp.strength_mag` judges them under a TOLERANCE (0.50 ratio / 5
+absolute for count, 2x for respawn), so a `strong` finding there only means
+mz and ac were *close*, not identical - byte identity is extra information on
+each field, independently of the other. A realm can also inherit a shared
+spawn count while retuning its own respawn timer, or vice versa, so nothing
+requires both to move together the way a level pair does. `cmp.peer_lineage`
+therefore carries two kinds for this topic, `spawn_count` and `respawn_min`,
+each judged on its own field alone - confirmed by measurement, not just
+argument: requiring the joint match above against the pre-Task-14 `strong`
+findings gives only 641 of 929 `spawn_count` and 809 of 1023 `respawn_min`,
+not the 806 and 902 the per-field kinds actually give (1708 of 1952 overall,
+87%).
+
+### Before / after (Task 13, extended to spawns by Task 14)
 
 Per-topic `strong` / `lineage` / `weak` counts on this corpus, immediately
-before and after `cmp.peer_lineage` was wired in. Two topics move; the other
-four are unaffected because their comparable kinds are all boolean-shaped
+before and after `cmp.peer_lineage` was wired in. Three topics move; the other
+three are unaffected because their comparable kinds are all boolean-shaped
 (`relations`) or have no lineage evidence measured against them at all
-(`quests`, `quest_rewards`, `spawns`):
+(`quests`, `quest_rewards`):
 
 | Topic | Before (strong / weak) | After (strong / lineage / weak) | Moved to lineage |
 |---|---|---|---|
@@ -205,7 +231,8 @@ four are unaffected because their comparable kinds are all boolean-shaped
 | Quests | 438 / 6084 | 438 / 0 / 6084 | 0 |
 | Quest rewards | 372 / 5340 | 372 / 0 / 5340 | 0 |
 | Quest item drop rates | 2268 / 3419 | 51 / 2217 / 3419 | 2217 |
-| Spawn rates | 1952 / 6685 | 1952 / 0 / 6685 | 0 |
+| Spawn rates | 1952 / 6685 | 244 / 1708 / 6685 | 1708 |
 
 Total findings per topic are unchanged in every row - `cmp.apply_lineage` only
-ever relabels an existing `strong` row, it never adds or removes one.
+ever relabels an existing `strong` row, it never adds or removes one. Spawn
+rates' 1708 splits 806 of 929 `spawn_count` and 902 of 1023 `respawn_min`.
