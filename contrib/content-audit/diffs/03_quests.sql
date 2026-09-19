@@ -35,7 +35,31 @@ WHERE r.kind = 'questgiver';
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT f.zone, 'quests', 'quest', f.quest, f.field, f.v, f.mz, f.tw, f.ac,
-       cmp.strength(f.v, f.mz, f.ac), ''
+       cmp.strength(f.v, f.mz, f.ac),
+       -- Follow-up 4: name the patch revision when the quest has more than one.
+       --
+       -- quest_template is keyed (entry, patch) here and _quest_current picks
+       -- the highest row at or below the realm's WowPatch, so a finding
+       -- compares this realm's CURRENT revision against peers that have no
+       -- patch dimension at all and carry exactly one version - usually the
+       -- older one. That reads as this realm being wrong when it is serving
+       -- the later revision correctly. Measured: 287 quest entries carry more
+       -- than one patch row and 102 of them differ in level between
+       -- revisions; 20 strong findings (16 lvl, 4 min_lvl) sit on that shape.
+       -- Three of them were accepted as real defects by a judging pass before
+       -- this note existed (quests 8292, 8293 and 7875, where the patch-6 row
+       -- this realm serves is right and the peers hold the patch-3 value).
+       --
+       -- Read from the raw table on purpose: _quest_current exists precisely
+       -- to hide the patch dimension, so it cannot answer how many revisions
+       -- a quest has.
+       CASE WHEN (SELECT COUNT(*) FROM v.quest_template qp
+                   WHERE qp.entry = f.quest AND qp.patch <= 10) > 1
+            THEN CONCAT('this realm serves the patch ',
+                        (SELECT MAX(qp2.patch) FROM v.quest_template qp2
+                          WHERE qp2.entry = f.quest AND qp2.patch <= 10),
+                        ' revision of this quest; the peers carry one version and no patch dimension')
+            ELSE '' END
 FROM (
     SELECT zq.zone, zq.quest, fld.field,
            CAST(CASE fld.field WHEN 'exists'    THEN IF(qv.entry IS NULL, NULL, '1')

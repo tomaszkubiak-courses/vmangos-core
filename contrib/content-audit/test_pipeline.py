@@ -1425,6 +1425,42 @@ def test_report_ac_only_creature_moves_to_appendix_a():
     print("PASS test_report_ac_only_creature_moves_to_appendix_a")
 
 
+
+def test_multi_patch_quest_finding_names_its_revision():
+    """Follow-up 4: a finding on a quest with more than one patch revision says so.
+
+    The peers have no patch dimension and carry a single version, usually the
+    older one, so a finding can read as this realm being wrong when it is
+    serving the later revision correctly. Fixture verified on the corpus
+    first: quest 8292 has MinLevel 60 at patch 3 and 10 at patch 6, the
+    realm serves the patch 6 row, and both peers say 60. A judging pass
+    accepted exactly this row as a real defect before the note existed.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM v.quest_template WHERE entry=8292 AND patch <= 10"
+    )
+    assert int(rows[0][0]) > 1, "fixture quest 8292 no longer has several patch rows"
+
+    rows = corpus_sql(
+        "SELECT note FROM cmp.findings WHERE entity_id=8292 AND field='min_lvl' LIMIT 1"
+    )
+    assert rows, "fixture finding for quest 8292 min_lvl is gone"
+    assert "serves the patch 6 revision" in rows[0][0], (
+        "multi-patch finding does not name the revision this realm serves: %r" % rows[0][0]
+    )
+
+    single = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings f WHERE f.topic='quests' "
+        "AND f.note LIKE 'this realm serves the patch%' "
+        "AND (SELECT COUNT(*) FROM v.quest_template q "
+        "      WHERE q.entry=f.entity_id AND q.patch <= 10) = 1"
+    )
+    assert int(single[0][0]) == 0, (
+        "%s findings claim a patch revision on a quest that has only one" % single[0][0]
+    )
+    print("PASS test_multi_patch_quest_finding_names_its_revision")
+
+
 TESTS = [
     test_corpus_schemas_present,
     test_dbc_schema_present,
@@ -1463,6 +1499,7 @@ TESTS = [
     test_quest_item_drops_near_miss_shared_ancestor_row_is_lineage_not_strong,
     test_relations_finding_note_records_direction,
     test_quest_objective_finding_note_records_the_genuine_gap,
+    test_multi_patch_quest_finding_names_its_revision,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,
