@@ -61,7 +61,7 @@ no action - post-vanilla content, WotLK rescaling, a fork's own custom content.
 | Connected creatures | 12091 | 0 | 20 | 13 | 7 | 0 | 0 |
 | Quests | 6522 | 0 | 20 | 0 | 19 | 1 | 0 |
 | Quest rewards | 5712 | 0 | 20 | 16 | 2 | 2 | 0 |
-| Quest item drop rates | 5687 | 2217 | 12 | 1 | 9 | 2 | 0 |
+| Quest item drop rates | 5687 | 2240 | 12 | 1 | 9 | 2 | 0 |
 | Spawn rates | 8637 | 1708 | 20 | 11 | 0 | 0 | 9 |
 
 **Lineage** (added by Task 13 for creatures and quest item drops, extended to
@@ -196,6 +196,25 @@ both peers inherited - it is the most actionable signal the audit produces - it
 is just not two independent sources agreeing, so it is kept out of the `strong`
 count.
 
+**Follow-up 3 (task-16) widens the loot kind from exact match to a 15%
+near-match**, because exact match missed a drifted-but-still-shared row:
+AzerothCore routes some loot rows through `reference_loot_template`, which
+resolves a value mangoszero still stores raw a few points differently (item
+3014: mangoszero 80% flat, AzerothCore's reference table resolves the same
+row to 70%). The judged sample cross-checked six such items against pfQuest
+as a vanilla reference and found this realm's stored per-creature chance
+matched vanilla exactly on all six, while the peers' near-agreed value was
+the drifted one. `cmp.peer_lineage`'s `loot` kind now marks a pair `mz`/`ac`
+agree on within 15% relative (`cmp._agrees_num(..., 0.15, 0)` on the
+percentage-point-scaled effective chance), not just byte-identical pairs -
+15%, not 30%, because at 30% the test starts to catch pairs that could be
+independent agreement rather than one drifted shared row, and because a
+lineage test has to stay far tighter than the 2x `ratio_tol` the finding was
+already judged `strong` under, or it proves nothing about shared ancestry.
+Measured on this corpus: of the 51 strong `quest_item_drops` findings that
+survived the exact-match version, 23 fall within 15% of each other and 36
+within 30% - the 15% band moves 23 to `lineage`, leaving 28 `strong`.
+
 **Task 14 extends this to `spawns`' two magnitude fields (`spawn_count`,
 `respawn_min`), on different grounds than the level pair above.**
 `cmp.strength` judges `lvl_min`/`lvl_max`/`faction`/`rank`/`type` by byte
@@ -216,23 +235,63 @@ findings gives only 641 of 929 `spawn_count` and 809 of 1023 `respawn_min`,
 not the 806 and 902 the per-field kinds actually give (1708 of 1952 overall,
 87%).
 
-### Before / after (Task 13, extended to spawns by Task 14)
+### Before / after (Task 13, extended to spawns by Task 14 and to a loot
+near-match by Follow-up 3)
 
 Per-topic `strong` / `lineage` / `weak` counts on this corpus, immediately
-before and after `cmp.peer_lineage` was wired in. Three topics move; the other
+before and after `cmp.peer_lineage` was wired in (quest item drop rates'
+"After" column is the exact-match figure from Task 13; the near-match column
+is Follow-up 3's further move on top of it). Three topics move; the other
 three are unaffected because their comparable kinds are all boolean-shaped
 (`relations`) or have no lineage evidence measured against them at all
 (`quests`, `quest_rewards`):
 
-| Topic | Before (strong / weak) | After (strong / lineage / weak) | Moved to lineage |
-|---|---|---|---|
-| Creatures | 184 / 10650 | 117 / 67 / 10650 | 67 |
-| Connected creatures | 1915 / 10176 | 1915 / 0 / 10176 | 0 |
-| Quests | 438 / 6084 | 438 / 0 / 6084 | 0 |
-| Quest rewards | 372 / 5340 | 372 / 0 / 5340 | 0 |
-| Quest item drop rates | 2268 / 3419 | 51 / 2217 / 3419 | 2217 |
-| Spawn rates | 1952 / 6685 | 244 / 1708 / 6685 | 1708 |
+| Topic | Before (strong / weak) | After exact-match (strong / lineage / weak) | After near-match (strong / lineage / weak) | Moved to lineage |
+|---|---|---|---|---|
+| Creatures | 184 / 10650 | 117 / 67 / 10650 | 117 / 67 / 10650 | 67 |
+| Connected creatures | 1915 / 10176 | 1915 / 0 / 10176 | 1915 / 0 / 10176 | 0 |
+| Quests | 438 / 6084 | 438 / 0 / 6084 | 438 / 0 / 6084 | 0 |
+| Quest rewards | 372 / 5340 | 372 / 0 / 5340 | 372 / 0 / 5340 | 0 |
+| Quest item drop rates | 2268 / 3419 | 51 / 2217 / 3419 | 28 / 2240 / 3419 | 2240 |
+| Spawn rates | 1952 / 6685 | 244 / 1708 / 6685 | 244 / 1708 / 6685 | 1708 |
 
 Total findings per topic are unchanged in every row - `cmp.apply_lineage` only
 ever relabels an existing `strong` row, it never adds or removes one. Spawn
 rates' 1708 splits 806 of 929 `spawn_count` and 902 of 1023 `respawn_min`.
+Quest item drop rates' 23-row near-match move (2217 to 2240) is Follow-up 3's
+own figure, not a second independent measurement of the exact-match one.
+
+## Relation and objective findings have a direction
+
+A `relations` finding (vendor/questgiver/questender/link) or a `quests`
+`obj:` finding fires when this realm and both peers disagree - but "disagree"
+covers two unrelated claims. This realm can carry something neither peer
+has, or it can lack something both peers have. `strong` and `weak` do not
+distinguish them, and treating both as one undifferentiated pile of
+disagreement buries the one the audit exists to find under the other, which
+is usually just the peers being a leaner or different content set.
+
+Measured on this corpus: of the 1915 `strong` `relations` findings, 985 are
+"this realm has it; neither peer does" and 930 are "this realm lacks it;
+both peers have it". The judged sample found the shape concretely - 39 of its
+40 `relations` rows were the first kind, and 30 of those were a single PvP
+rank-quest cluster (creatures 14733, 15350, 15351) that this realm carries
+completely and correctly while neither peer ever imported it; reported once
+per row, that one import gap in the peers read as 30 separate defects here.
+The same split exists for `quests`' `obj:` findings, on narrower ground: of
+28 strong findings, only 6 are a genuine existence gap (this realm's quest
+has no row for the objective at all, while both peers agree on one) - the
+other 22 have the objective on all three sides and disagree only on the
+required count, which is not a direction claim at all.
+
+`diffs/02_relations.sql` and `diffs/03_quests.sql` now write the direction
+into the finding's `note` column at the point the row is inserted - "this
+realm has it; neither peer does" or "this realm lacks it; both peers have
+it" - rather than leaving a reader to reconstruct it from the value columns.
+Neither direction is suppressed: "this realm has content the peers lack" is
+occasionally a real finding in its own right (custom content that should not
+be there, or a spawn belonging to another patch), and the audit's own
+doctrine is that suppression hides more than it saves. `report.py`'s
+per-topic count line gains the same split, so a reader ranking zones can see
+at a glance how many of a topic's findings are the peers being short rather
+than this realm.
