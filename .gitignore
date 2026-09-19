@@ -126,3 +126,7 @@ Progression.h
 # Content audit pipeline: real machine config and corpus build logs
 /contrib/content-audit/config.env
 /contrib/content-audit/logs/
+
+# Python bytecode from the contrib tooling.
+__pycache__/
+*.pyc
