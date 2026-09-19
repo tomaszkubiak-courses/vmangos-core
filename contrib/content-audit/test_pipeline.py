@@ -724,31 +724,54 @@ def _agrees_num(a, b, ratio_tol, abs_tol):
 
 
 def test_agrees_num_matches_spec_at_percentage_point_scale():
-    """Item 4 (fix round 1): pin cmp._agrees_num's behaviour at the exact
-    (ratio_tol=1.0, abs_tol=5) percentage-point scale
-    diffs/05_quest_item_drops.sql calls it at, hand-computed from the
+    """Item 4 (fix round 1, amended fix round 2): pin cmp._agrees_num's
+    behaviour at the exact (ratio_tol=1.0, abs_tol=5) percentage-point
+    scale diffs/05_quest_item_drops.sql calls it at, hand-computed from the
     spec's "2x ratio or 5 absolute points" rule rather than read back out
     of the function under test.
 
-    test_all_six_topics_fire alone would not catch abs_tol silently
-    reverting to 0.05 while the *100 scaling on p_drop stayed in place -
-    the ratio branch still fires some findings either way (it is on a
-    percentage-point scale, so the GREATEST(...,1) floor trap
-    diffs/00_schema.sql documents does not apply here), so the topic would
-    not disappear from cmp.findings, only which rows it flags would
-    quietly change. This pins the intended per-pair verdicts directly.
+    Fix round 2: the original three cases below all resolve identically
+    whether abs_tol is 5 or 0.05, because cmp._agrees_num checks the ratio
+    branch first and short-circuits on success - (30,33) and (10,17) both
+    agree via the ratio half alone and never reach abs_tol at all, and
+    (2,10) disagrees on both halves (its diff of 8 exceeds both 5 and
+    0.05). None of the three would have caught abs_tol silently reverting
+    from 5 to 0.05, the exact regression this test exists to pin. They stay
+    because they document the ratio branch's behaviour at this scale, not
+    because they pin abs_tol - do not delete the fourth case below on the
+    assumption the first three already cover it.
+
+    (1, 3) is the load-bearing pair: ratio |1-3| / GREATEST(LEAST(1,3),1)
+    = 2.0 fails ratio_tol=1.0 (so the ratio branch cannot rescue it, and
+    abs_tol is actually reached), and the absolute difference of 2 sits
+    strictly between 0.05 and 5 - inside abs_tol=5 (agrees) but outside
+    abs_tol=0.05 (disagrees). Verified directly against the corpus before
+    relying on it: cmp._agrees_num(1, 3, 1.0, 5) = 1,
+    cmp._agrees_num(1, 3, 1.0, 0.05) = 0. This is the only case in the set
+    that actually distinguishes the two tolerance values; the assertion
+    below is what fails if abs_tol reverts to 0.05.
     """
-    # Inside 5 points: agrees outright, regardless of ratio.
+    # Inside 5 points: agrees outright, regardless of ratio. Ratio branch
+    # only - does not pin abs_tol's value (see docstring).
     assert _agrees_num(30, 33, 1.0, 5) is True, (
         "30 vs 33 (diff 3, within 5 points) should agree"
     )
     # Outside 5 points and beyond 2x (b is 5x a): disagrees on both halves.
+    # Ratio branch only - does not pin abs_tol's value (see docstring).
     assert _agrees_num(2, 10, 1.0, 5) is False, (
         "2 vs 10 (diff 8, b is 5x a) should disagree"
     )
-    # Outside 5 points but within 2x (b is 1.7x a): rescued by the ratio half.
+    # Outside 5 points but within 2x (b is 1.7x a): rescued by the ratio
+    # half. Ratio branch only - does not pin abs_tol's value (see docstring).
     assert _agrees_num(10, 17, 1.0, 5) is True, (
         "10 vs 17 (diff 7, b is 1.7x a) should agree (within 2x)"
+    )
+    # Load-bearing: ratio fails (2.0 > 1.0, so abs_tol is actually reached),
+    # diff 2 is inside abs_tol=5 but outside abs_tol=0.05 - the only pair
+    # here that pins abs_tol's value rather than only exercising the ratio
+    # branch.
+    assert _agrees_num(1, 3, 1.0, 5) is True, (
+        "1 vs 3 (diff 2, ratio 2.0x fails, but inside abs_tol=5) should agree"
     )
     print("PASS test_agrees_num_matches_spec_at_percentage_point_scale")
 
