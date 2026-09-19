@@ -295,3 +295,41 @@ doctrine is that suppression hides more than it saves. `report.py`'s
 per-topic count line gains the same split, so a reader ranking zones can see
 at a glance how many of a topic's findings are the peers being short rather
 than this realm.
+
+## A vendor with no stock needs no peer at all
+
+The vendor findings are the least trustworthy block this audit produces.
+`vendor:<item>` rows are judged the same way as every other relation - two
+peers agreeing against this realm - but there is no independent vanilla
+reference to settle them, and the one reference this project uses elsewhere
+does not help: pfQuest's vanilla database is generated **from a VMaNGOS
+database** (its own README says so), so it shares this realm's lineage. Its
+agreement is inheritance, not evidence, exactly like the shared loot rows
+`cmp.peer_lineage` exists to catch. Measured on this corpus: of the 595
+`strong` vendor findings shaped "this realm has it; neither peer does",
+pfQuest confirms the pair on 595 - all of them - which says nothing about
+vanilla and everything about where its data came from.
+
+Where a reference of the same lineage still carries information is when it
+*disagrees*. Of the 792 `strong` vendor findings shaped "this realm lacks
+it; both peers have it", pfQuest lists the pair on 55 - and all 55 sit on
+just three NPCs that have no `npc_vendor` row at all.
+
+That last shape does not need a reference database, a peer, or a tolerance.
+`creature_template.npc_flags` bit `0x4` is `UNIT_NPC_FLAG_VENDOR`: the client
+offers "Browse Goods" and the core answers `CMSG_LIST_INVENTORY`. If
+`npc_vendor` then has no row for that creature, the player gets an empty
+window - a contradiction between two halves of this database, provable from
+this database. `diffs/02_relations.sql` block (c) reports it as
+`vendor_flag_no_stock`, hardcoded `strong` with the peers' item counts as
+context only, the same single-source shape as `xp_self_consistency`.
+
+It finds 17 rows over 13 creatures (four PvP quartermasters are spawned in
+two zones each and are reported in both, like every other zone-keyed
+finding). The join to `cmp.zone_creature` is what keeps it honest: only
+creatures actually spawned somewhere are considered, which silently drops
+the 16 unspawned placeholders in `creature_template` - "Programmer Vendor",
+"Eric's AAA Special Vendor", the `[UNUSED]` rows - without needing a name
+blocklist. Eight of the 13 have peer stock to copy from; the other five have
+none in either peer either, and for those the open question is which half is
+wrong, the flag or the missing stock.

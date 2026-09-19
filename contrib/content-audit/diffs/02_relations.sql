@@ -159,3 +159,47 @@ WHERE cmp.strength(
         CASE WHEN rv.npc IS NULL THEN '0' ELSE '1' END,
         CASE WHEN kmz.kind IS NULL THEN NULL WHEN rmz.npc IS NULL THEN '0' ELSE '1' END,
         CASE WHEN kac.kind IS NULL THEN NULL WHEN rac.npc IS NULL THEN '0' ELSE '1' END) <> '';
+
+-- (c) Vendor-flagged NPCs with no stock at all. Single-source finding: both
+-- halves of the contradiction are this database's own, so no peer is needed
+-- to judge it and strength is hardcoded 'strong' (the same shape as
+-- xp_self_consistency in diffs/04_quest_rewards.sql). The peer columns carry
+-- the peers' item counts as context only; they do not decide anything here.
+--
+-- creature_template.npc_flags bit 0x4 is UNIT_NPC_FLAG_VENDOR
+-- (src/game/Objects/UnitDefines.h): the client shows a "Browse Goods" gossip
+-- option and the core accepts CMSG_LIST_INVENTORY for that NPC. With no
+-- npc_vendor row the player gets an empty vendor window - a visible defect
+-- that needs no reference database to establish.
+--
+-- Why this exists even though topic (b) already compares vendor stock
+-- item by item: a peer comparison can only speak where a peer has the NPC
+-- and the item, and the audit's own vendor findings are the least
+-- trustworthy block it produces (no independent vanilla reference - pfQuest,
+-- the reference used for loot, is generated FROM a VMaNGOS database and so
+-- shares this realm's lineage, which makes its agreement inheritance rather
+-- than evidence). This check needs none of that.
+--
+-- The join to cmp.zone_creature is also the filter that keeps the check
+-- honest: it only sees creatures that are actually spawned somewhere, which
+-- drops the 16 unspawned placeholder vendors in the template table
+-- ("Programmer Vendor", "[UNUSED] ...", "Eric's AAA Special Vendor") without
+-- naming any of them.
+--
+-- Both halves are deliberately unfiltered by patch - MAX(npc_flags) over the
+-- entry's revisions, and an unqualified npc_vendor probe: an NPC that
+-- sells nothing at ANY patch is the case being reported, and a per-patch
+-- shortage is topic (b)'s business.
+INSERT INTO cmp.findings
+    (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
+SELECT z.zone, 'relations', 'creature', ct.entry, 'vendor_flag_no_stock',
+       '0',
+       (SELECT COUNT(*) FROM mz.npc_vendor n WHERE n.entry = ct.entry),
+       (SELECT COUNT(*) FROM tw.npc_vendor n WHERE n.entry = ct.entry),
+       (SELECT COUNT(*) FROM ac.npc_vendor n WHERE n.entry = ct.entry),
+       'strong',
+       'flagged as a vendor by this realm own creature_template, with no npc_vendor row at any patch'
+FROM (SELECT entry, MAX(npc_flags) AS npc_flags FROM v.creature_template GROUP BY entry) ct
+JOIN cmp.zone_creature z ON z.entry = ct.entry
+WHERE (ct.npc_flags & 4) > 0
+  AND NOT EXISTS (SELECT 1 FROM v.npc_vendor nv WHERE nv.entry = ct.entry);

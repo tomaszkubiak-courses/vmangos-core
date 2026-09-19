@@ -1236,6 +1236,61 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_vendor_flag_without_stock_is_reported_and_stays_single_source():
+    """A creature its own creature_template flags as a vendor
+    (UNIT_NPC_FLAG_VENDOR, npc_flags & 4) while npc_vendor has no row for it
+    at any patch is a finding on this realm alone - no peer decides it.
+
+    Fixture verified on the corpus before writing this: Nida Winterhoof
+    (3014, Mulgore) carries npc_flags 6 (questgiver + vendor) in all three of
+    her patch revisions and has zero npc_vendor rows, while mangoszero
+    stocks her with 10 items and AzerothCore with 11. Thirteen spawned
+    creatures are in this state corpus-wide.
+
+    The second half is the part that can rot silently: the check must never
+    reach the sixteen unspawned placeholder vendors in creature_template
+    ("Programmer Vendor", "[UNUSED] ..."), which it avoids only because it
+    joins cmp.zone_creature. Creature 130 is one of them and is asserted
+    absent.
+    """
+    rows = corpus_sql(
+        "SELECT v_value, mz_value, ac_value, strength FROM cmp.findings "
+        "WHERE topic='relations' AND field='vendor_flag_no_stock' AND entity_id=3014"
+    )
+    assert rows, (
+        "fixture creature 3014 no longer produces a vendor_flag_no_stock finding - "
+        "either the check is gone or the realm finally stocks her"
+    )
+    v_value, mz_value, ac_value, strength = rows[0]
+    assert (v_value, strength) == ("0", "strong"), (
+        "vendor_flag_no_stock on 3014 reads v=%r strength=%r, expected ('0', 'strong')"
+        % (v_value, strength)
+    )
+    assert int(mz_value) > 0 and int(ac_value) > 0, (
+        "the peer columns are context on this finding and both peers stock 3014 - "
+        "got mz=%r ac=%r" % (mz_value, ac_value)
+    )
+
+    # Every row the check writes must really have no npc_vendor row: this is
+    # the assertion that fails if the NOT EXISTS is ever widened or dropped.
+    flagged = [r[0] for r in corpus_sql(
+        "SELECT entity_id FROM cmp.findings "
+        "WHERE topic='relations' AND field='vendor_flag_no_stock'"
+    )]
+    assert flagged, "the vendor_flag_no_stock check produced nothing at all"
+    stocked = corpus_sql(
+        "SELECT COUNT(*) FROM v.npc_vendor WHERE entry IN (%s)" % ",".join(flagged)
+    )
+    assert stocked[0][0] == "0", (
+        "%s npc_vendor rows exist for creatures reported as having none" % stocked[0][0]
+    )
+    assert "130" not in flagged, (
+        "creature 130 ('Programmer Vendor') is unspawned and must not be reported - "
+        "the cmp.zone_creature join that filters it out has been lost"
+    )
+    print("PASS test_vendor_flag_without_stock_is_reported_and_stays_single_source")
+
+
 def test_report_renders_for_pilot_zones():
     """report.py writes a readable file per zone with every section present."""
     subprocess.run(
@@ -1500,6 +1555,7 @@ TESTS = [
     test_relations_finding_note_records_direction,
     test_quest_objective_finding_note_records_the_genuine_gap,
     test_multi_patch_quest_finding_names_its_revision,
+    test_vendor_flag_without_stock_is_reported_and_stays_single_source,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,
