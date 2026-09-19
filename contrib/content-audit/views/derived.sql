@@ -211,3 +211,75 @@ FROM ac.quest_template;
 -- view per source - a recursive CTE cannot be repeated inside a UNION ALL)
 -- and then defines cmp.n_loot_eff as a plain UNION ALL over those four,
 -- immediately before it sources this file.
+
+-- Task 13: cmp.peer_lineage. One shared-ancestry table, not six scattered
+-- tests - see diffs/00_schema.sql's comment above cmp.apply_lineage for the
+-- doctrine this implements and why a boolean-shaped kind (vendor,
+-- questgiver/questender/link) carries no rows here.
+--
+-- Schema is generic across kinds on purpose (kind, k1, k2, k3) rather than
+-- one column set per kind, so a future comparable kind is one more INSERT,
+-- not a new table. The PRIMARY KEY doubles as the only index a lookup
+-- needs, because k1/k2/k3 are always populated in the same order the diffs
+-- join against:
+--   kind='loot':          k1=tbl, k2=entry, k3=item
+--   kind='creature_stat':  k1=entry, k2=field ('lvl_min'/'lvl_max'), k3='' (unused)
+DROP TABLE IF EXISTS cmp.peer_lineage;
+CREATE TABLE cmp.peer_lineage (
+    kind VARCHAR(16) NOT NULL,
+    k1   VARCHAR(32) NOT NULL,
+    k2   VARCHAR(32) NOT NULL,
+    k3   VARCHAR(32) NOT NULL DEFAULT '',
+    PRIMARY KEY (kind, k1, k2, k3)
+) ENGINE=InnoDB;
+
+-- 'loot': the value is the EFFECTIVE drop chance (cmp.n_loot_eff_mz/_ac),
+-- not the raw creature_loot_template/gameobject_loot_template chance column
+-- - that is the value diffs/05_quest_item_drops.sql actually judges peer
+-- agreement on, at the same (tbl, entry, item) grain, rounded to the same
+-- 2-decimal percentage-point precision the topic already stores. Reading
+-- the two per-source recursive views directly (not the four-way
+-- cmp.n_loot_eff union diffs/05_quest_item_drops.sql's own comment warns
+-- off) keeps this to the two sources that matter and pays the recursive
+-- CTE's cost exactly once per source, here, rather than once per query
+-- site. Measured on this corpus: 1m34s, 743337 matching rows before the
+-- GROUP BY collapses them to one row per key - acceptable during
+-- build_views.sh, which nothing downstream re-enters mid-run the way
+-- run_diffs.sh's long queries do.
+INSERT INTO cmp.peer_lineage (kind, k1, k2, k3)
+SELECT 'loot', mz.tbl, CAST(mz.entry AS CHAR), CAST(mz.item AS CHAR)
+FROM cmp.n_loot_eff_mz mz
+JOIN cmp.n_loot_eff_ac ac
+  ON ac.tbl = mz.tbl AND ac.entry = mz.entry AND ac.item = mz.item
+WHERE ROUND(mz.p_drop * 100, 2) = ROUND(ac.p_drop * 100, 2)
+GROUP BY mz.tbl, mz.entry, mz.item;
+
+-- 'creature_stat': the level PAIR, not each level field independently.
+-- Caught while measuring this on the corpus, before wiring it in: a lone
+-- field (lvl_min alone, or lvl_max alone) is the wrong grain, because
+-- diffs/01_creatures.sql's 'strong' verdict for these fields already comes
+-- from cmp.strength's byte-equality test - a 'strong' lvl_min finding
+-- ALREADY means mz.lvl_min = ac.lvl_min exactly, by construction. Testing
+-- that same single field again here is not a second, independent check; it
+-- is the same test, so it fired on literally 100% of the existing strong
+-- lvl_min/lvl_max findings (measured: 72 of 72) rather than isolating the
+-- shared-ancestor subset. It also does not match the brief's own value-space
+-- reasoning: a bare level (1..63ish) is not "wide enough that agreeing by
+-- chance is implausible" - the brief's own example is "a level pair", and
+-- the evidence figure it cites (7246 of 9112, 80%) is measured jointly, on
+-- BOTH fields matching at once, not on either alone. A creature whose min
+-- and max level both agree between mz and ac is comparatively hard to reach
+-- by coincidence (up to ~63x63 combinations, most creatures narrow); a
+-- single matching scalar is not. Both fields below share the same WHERE
+-- (the joint pair), so a lineage row for one field's finding implies the
+-- other field also matched - if only one of the two matched, neither field
+-- is marked, and that 'strong' finding is left alone as ordinary
+-- independent agreement.
+INSERT INTO cmp.peer_lineage (kind, k1, k2, k3)
+SELECT 'creature_stat', CAST(mz.entry AS CHAR), 'lvl_min', ''
+FROM mz.n_creature mz JOIN ac.n_creature ac ON ac.entry = mz.entry
+WHERE mz.lvl_min = ac.lvl_min AND mz.lvl_max = ac.lvl_max
+UNION ALL
+SELECT 'creature_stat', CAST(mz.entry AS CHAR), 'lvl_max', ''
+FROM mz.n_creature mz JOIN ac.n_creature ac ON ac.entry = mz.entry
+WHERE mz.lvl_min = ac.lvl_min AND mz.lvl_max = ac.lvl_max;

@@ -14,7 +14,17 @@ CREATE TABLE cmp.findings (
     strength    VARCHAR(8)   NOT NULL,
     note        VARCHAR(255) NOT NULL DEFAULT '',
     KEY ix_zone_topic (zone, topic),
-    KEY ix_strength (strength)
+    KEY ix_strength (strength),
+    -- Task 13: the only defence against a silent empty string (or any other
+    -- typo) reaching this column. 313 rows got exactly that past every test
+    -- in the Task 12 fix round, caught only because run_diffs.sh's own
+    -- summary printed an unexpected fourth row. A CHECK is enforced at
+    -- INSERT time (MySQL 8), so a future diff query that produces '' can no
+    -- longer land it here even if nothing filters the WHERE clause for it -
+    -- it must abstain (WHERE strength <> '') like every other diff already
+    -- does. See test_no_finding_has_strength_outside_allowed_set for the
+    -- same property checked from the Python side.
+    CONSTRAINT chk_findings_strength CHECK (strength IN ('strong', 'lineage', 'weak'))
 ) ENGINE=InnoDB;
 
 -- The consensus rule, in one place.
@@ -182,3 +192,47 @@ RETURN CASE
          AND cmp._agrees_num(v, mz, ratio_tol, abs_tol)     THEN ''
     ELSE cmp.strength_num(v, mz, ac, ratio_tol, abs_tol)
 END;
+
+-- Task 13: mangoszero and AzerothCore are not independent sources. Both
+-- descend from MaNGOS and still carry large stretches of the same rows
+-- verbatim - measured on this corpus: 56479 (entry, item) creature-loot
+-- pairs shared between mz.creature_loot_template and ac.creature_loot_template,
+-- 53104 of those (94%) with byte-identical chance; 11283 of mangoszero's
+-- 12558 npc_vendor rows (90%) also in AzerothCore; 7246 of 9112 (80%)
+-- creatures both peers carry have identical min AND max level. A 'strong'
+-- finding built on one of these shared rows is one witness counted twice,
+-- not two independent ones - see task-13-lineage-brief.md and this file's
+-- own header comment on cmp.strength, which the finding was already wrong
+-- about.
+--
+-- Existence overlap alone (both peers merely have a row for the same key)
+-- is NOT this signal - two independently correct databases would both carry
+-- a row for a drop or a sale that genuinely exists, so demoting on
+-- existence alone would empty a topic of real content, which the brief
+-- forbids outright. Only VALUE identity is defensible: the peers assert the
+-- same key and the same value, in a value space wide enough that agreeing
+-- by chance is implausible (a float drop chance; a level pair). That is
+-- also why a boolean-shaped fact - an NPC selling an item, a quest giver
+-- link - gets no row-level treatment here: there is no value beyond 0/1 to
+-- be identical about, so cmp.peer_lineage (views/derived.sql) carries no
+-- rows for those kinds by construction, not by omission. The vendor and
+-- quest-relation topics (diffs/02_relations.sql) keep their existing
+-- strong/weak-only verdicts; the topic-level overlap figures above are
+-- reported as prose in README.md instead, which is what a boolean fact
+-- can actually support.
+--
+-- cmp.peer_lineage carries the keys, per comparable kind, where mz and ac's
+-- own values agree with each other exactly (see views/derived.sql for how
+-- each kind is populated). cmp.apply_lineage reclassifies a 'strong'
+-- verdict to 'lineage' whenever the pair backing it is one of those keys -
+-- it never touches 'weak' or '' (a lone or absent peer can never be a
+-- lineage row either, matching cmp.strength/cmp.strength_num/
+-- cmp.strength_mag's own abstention rule), so no diff's WHERE clause needs
+-- to change: cmp.strength(...)/cmp.strength_mag(...) <> '' still decides
+-- what gets a row at all, and cmp.apply_lineage only relabels the ones that
+-- already got one. Rank strong > lineage > weak wherever order matters
+-- (report.py's sort_key).
+DROP FUNCTION IF EXISTS cmp.apply_lineage;
+CREATE FUNCTION cmp.apply_lineage(strength VARCHAR(8), is_lineage BOOLEAN)
+RETURNS VARCHAR(8) DETERMINISTIC
+RETURN CASE WHEN strength = 'strong' AND is_lineage THEN 'lineage' ELSE strength END;
