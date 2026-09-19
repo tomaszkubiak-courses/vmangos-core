@@ -118,6 +118,18 @@ WHERE l.item IN (SELECT DISTINCT item FROM cmp.quest_items)
 -- from the row alone. mz_value/ac_value/tw_value stay the raw (uncoalesced)
 -- figures: those peers really are absent when NULL, and coalescing them is
 -- exactly ruling (g)'s forbidden move.
+--
+-- Task 13: this topic carries nearly all of the shared-ancestry problem
+-- (2206 of 2223 creature-sourced strong findings on this corpus, per
+-- task-13-lineage-brief.md) - mangoszero and AzerothCore both descend from
+-- MaNGOS and still carry the same loot rows. cmp.peer_lineage (kind='loot',
+-- populated in views/derived.sql from cmp.n_loot_eff_mz/_ac at this same
+-- (tbl, entry, item) grain) marks the keys where mz and ac's own effective
+-- drop chances agree with each other exactly; cmp.apply_lineage below
+-- reclassifies exactly those from 'strong' to 'lineage'. As with
+-- 01_creatures.sql, the WHERE clause stays on the pre-lineage
+-- cmp.strength_mag(...) call - apply_lineage cannot turn a row into or out
+-- of '', so nothing there needs to change.
 DROP TABLE IF EXISTS cmp.quest_item_drop_rows;
 CREATE TABLE cmp.quest_item_drop_rows (
     zone     INT UNSIGNED NOT NULL,
@@ -140,13 +152,17 @@ SELECT qi.zone, qi.quest, qi.item, src.tbl, src.entry,
        ROUND(lmz.p_drop * 100, 2),
        ROUND(ltw.p_drop * 100, 2),
        ROUND(lac.p_drop * 100, 2),
-       cmp.strength_mag(COALESCE(lv.p_drop, 0) * 100, lmz.p_drop * 100, lac.p_drop * 100, 1.0, 5)
+       cmp.apply_lineage(
+           cmp.strength_mag(COALESCE(lv.p_drop, 0) * 100, lmz.p_drop * 100, lac.p_drop * 100, 1.0, 5),
+           pl.k1 IS NOT NULL)
 FROM cmp.quest_items qi
 JOIN (SELECT DISTINCT tbl, entry, item FROM cmp.quest_loot_eff) src ON src.item = qi.item
 LEFT JOIN cmp.quest_loot_eff lv  ON lv.src  = 'v'  AND lv.tbl  = src.tbl AND lv.entry  = src.entry AND lv.item  = qi.item
 LEFT JOIN cmp.quest_loot_eff lmz ON lmz.src = 'mz' AND lmz.tbl = src.tbl AND lmz.entry = src.entry AND lmz.item = qi.item
 LEFT JOIN cmp.quest_loot_eff ltw ON ltw.src = 'tw' AND ltw.tbl = src.tbl AND ltw.entry = src.entry AND ltw.item = qi.item
 LEFT JOIN cmp.quest_loot_eff lac ON lac.src = 'ac' AND lac.tbl = src.tbl AND lac.entry = src.entry AND lac.item = qi.item
+LEFT JOIN cmp.peer_lineage pl
+  ON pl.kind = 'loot' AND pl.k1 = src.tbl AND pl.k2 = CAST(src.entry AS CHAR) AND pl.k3 = CAST(qi.item AS CHAR)
 WHERE cmp.strength_mag(COALESCE(lv.p_drop, 0) * 100, lmz.p_drop * 100, lac.p_drop * 100, 1.0, 5) <> '';
 
 -- Fix round 1, item 2: cmp.quest_items carries quest in its grain, but quest

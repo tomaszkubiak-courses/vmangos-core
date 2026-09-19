@@ -986,6 +986,106 @@ def test_quest_item_drops_never_strong_when_both_peers_absent():
     print("PASS test_quest_item_drops_never_strong_when_both_peers_absent")
 
 
+def test_no_finding_has_strength_outside_allowed_set():
+    """Task 12 fix round found 313 rows with strength='' - a gated expression
+    updated in the SELECT list but not in its WHERE copy - and nothing in the
+    suite noticed until run_diffs.sh's own summary printed an unexpected
+    fourth row. cmp.findings.strength is now CHECK-constrained to
+    ('strong', 'lineage', 'weak') at INSERT time (diffs/00_schema.sql), which
+    makes a recurrence impossible rather than just detectable; this is the
+    Python-side pin on the same property, checked directly against the live
+    table so a constraint that is silently dropped or weakened is still
+    caught.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings WHERE strength NOT IN ('strong', 'lineage', 'weak')"
+    )
+    n = int(rows[0][0])
+    assert n == 0, "%s findings carry a strength outside the allowed set" % n
+    print("PASS test_no_finding_has_strength_outside_allowed_set")
+
+
+def test_quest_item_drops_shared_ancestor_row_is_lineage_not_strong():
+    """Task 13 pin: a quest-item-drop finding whose mz and ac values come
+    from the same shared-ancestor loot row must be labelled 'lineage', not
+    'strong' - that pair is one witness (mangoszero and AzerothCore both
+    descend from MaNGOS and still carry the same loot rows), not two
+    independent ones agreeing.
+
+    Verified on the corpus before writing this: zone 1537 (Alterac Valley),
+    item 1179 sourced from creature 3465, has mz_value = ac_value = 30.4 and
+    is exactly the shared-row shape cmp.peer_lineage (kind='loot') exists to
+    catch. Reverting the 05_quest_item_drops.sql wiring or cmp.apply_lineage
+    itself would make this come back 'strong'.
+    """
+    rows = corpus_sql(
+        "SELECT strength, mz_value, ac_value FROM cmp.findings "
+        "WHERE topic='quest_item_drops' AND zone=1537 AND entity_id=1179 "
+        "AND field='creature:3465'"
+    )
+    assert rows, "fixture quest_item_drops row (zone 1537, item 1179, creature:3465) no longer exists"
+    strength, mz_value, ac_value = rows[0]
+    assert mz_value == ac_value, (
+        "fixture row's peers no longer carry an identical value (mz=%s, ac=%s) - "
+        "pick a different corpus example" % (mz_value, ac_value)
+    )
+    assert strength == "lineage", (
+        "quest_item_drops row with identical mz/ac values (mz=%s, ac=%s) came out %r, "
+        "expected 'lineage'" % (mz_value, ac_value, strength)
+    )
+    print("PASS test_quest_item_drops_shared_ancestor_row_is_lineage_not_strong")
+
+
+def test_creature_level_lineage_requires_the_whole_pair():
+    """Task 13 pin: cmp.peer_lineage's 'creature_stat' kind marks a creature
+    only when BOTH lvl_min and lvl_max agree between mz and ac - not either
+    field alone.
+
+    Caught while implementing this: cmp.strength's byte-equality test means
+    a 'strong' lvl_min (or lvl_max) finding already implies mz and ac agree
+    on THAT field exactly, by construction - testing the same single field
+    again is not independent evidence and, measured on this corpus, flagged
+    100% of the existing strong lvl_min/lvl_max findings (72 of 72) rather
+    than isolating a shared-ancestry subset. The brief's own value-space
+    reasoning calls for the level PAIR (its own worked example), matching
+    its cited evidence figure of 7246/9112 (80%) common creatures with
+    identical min AND max level - measured jointly, not per field. Fixed to
+    require both fields; the corpus movement dropped from 72 to 67, which
+    matches the brief's own creatures/level number (67 of 133) exactly.
+
+    Entry 1240 (zone 1) is real and exactly this shape: mz.lvl_min = 9,
+    ac.lvl_min = 9 (the two agree - v is 8, so this is 'strong' territory)
+    but mz.lvl_max = 9 while ac.lvl_max = 10 (the two do NOT agree). Because
+    the pair does not both match, lvl_min must stay 'strong', not flip to
+    'lineage' - only requiring the whole pair keeps this right; the broken
+    per-field version this replaces would have marked it 'lineage' on
+    lvl_min's own agreement alone.
+    """
+    rows = corpus_sql("SELECT lvl_min, lvl_max FROM mz.n_creature WHERE entry=1240")
+    assert rows, "fixture creature 1240 no longer in mz.n_creature"
+    mz_min, mz_max = rows[0]
+    rows = corpus_sql("SELECT lvl_min, lvl_max FROM ac.n_creature WHERE entry=1240")
+    assert rows, "fixture creature 1240 no longer in ac.n_creature"
+    ac_min, ac_max = rows[0]
+    assert mz_min == ac_min, "fixture creature 1240 no longer agrees on lvl_min between mz/ac"
+    assert mz_max != ac_max, (
+        "fixture creature 1240 now agrees on lvl_max too (mz=%s, ac=%s) - "
+        "it no longer isolates the per-field-only case this test pins" % (mz_max, ac_max)
+    )
+
+    rows = corpus_sql(
+        "SELECT strength FROM cmp.findings WHERE topic='creatures' AND zone=1 "
+        "AND entity_id=1240 AND field='lvl_min'"
+    )
+    assert rows, "entry 1240's lvl_min finding is gone"
+    assert rows[0][0] == "strong", (
+        "entry 1240's lvl_min (mz=ac=%s agree, but lvl_max does not) should stay "
+        "'strong', got %r - the pair test is checking only one field again"
+        % (mz_min, rows[0][0])
+    )
+    print("PASS test_creature_level_lineage_requires_the_whole_pair")
+
+
 def test_report_renders_for_pilot_zones():
     """report.py writes a readable file per zone with every section present."""
     subprocess.run(
@@ -1048,7 +1148,15 @@ def test_report_suppresses_absent_creature_relations():
     assert "vendor:2320" not in section2, (
         "suppressed relation row (creature 29288, vendor:2320) still rendered"
     )
-    assert "29 findings (6 strong, 23 weak)" in section2, (
+    # Task 13: report.py's count line gained a third (lineage) bucket. The
+    # relations topic's kinds (vendor, questgiver, questender, link) are all
+    # boolean-shaped - "this NPC sells this item" has no value beyond 0/1 to
+    # be identical about - so cmp.peer_lineage carries no rows for them by
+    # construction (diffs/00_schema.sql's doctrine comment) and none of
+    # these 29 rows can ever be reclassified to 'lineage'. Old pin was
+    # "29 findings (6 strong, 23 weak)"; only the format changed here, not
+    # any actual verdict, so the count stays 6/0/23.
+    assert "29 findings (6 strong, 0 lineage, 23 weak)" in section2, (
         "section 2's count line does not match the post-suppression total"
     )
     assert "consequences of the exists findings moved to Appendix A" in section2, (
@@ -1188,6 +1296,9 @@ TESTS = [
     test_magnitude_topics_never_write_a_contentless_weak_finding,
     test_all_six_topics_fire,
     test_quest_item_drops_never_strong_when_both_peers_absent,
+    test_no_finding_has_strength_outside_allowed_set,
+    test_quest_item_drops_shared_ancestor_row_is_lineage_not_strong,
+    test_creature_level_lineage_requires_the_whole_pair,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,
