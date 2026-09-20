@@ -1236,6 +1236,29 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_xp_self_consistency_keeps_its_peer_columns_empty():
+    """The xp_self_consistency check compares this realm's stored RewXP
+    against a formula over the quest's own inputs. No peer votes on it, so
+    every peer column must be NULL and the formula's answer belongs in the
+    note - it used to be written into mz_value, where 249 rows rendered an
+    expected value under a heading naming mangoszero, which never saw them.
+    """
+    rows = corpus_sql(
+        "SELECT mz_value, tw_value, ac_value, note FROM cmp.findings "
+        "WHERE field='xp_self_consistency'"
+    )
+    assert rows, "the xp_self_consistency check produced nothing at all"
+    for mz_value, tw_value, ac_value, note in rows:
+        assert (mz_value, tw_value, ac_value) == ("NULL", "NULL", "NULL"), (
+            "an xp_self_consistency row has a peer value (mz=%r tw=%r ac=%r) - "
+            "no peer votes on this check" % (mz_value, tw_value, ac_value)
+        )
+        assert "the formula gives " in note, (
+            "an xp_self_consistency row's note does not name the formula's answer: %r" % note
+        )
+    print("PASS test_xp_self_consistency_keeps_its_peer_columns_empty")
+
+
 def test_vendor_flag_without_stock_is_reported_and_stays_single_source():
     """A creature its own creature_template flags as a vendor
     (UNIT_NPC_FLAG_VENDOR, npc_flags & 4) with no stock behind the flag is a
@@ -1567,6 +1590,7 @@ TESTS = [
     test_quest_objective_finding_note_records_the_genuine_gap,
     test_multi_patch_quest_finding_names_its_revision,
     test_vendor_flag_without_stock_is_reported_and_stays_single_source,
+    test_xp_self_consistency_keeps_its_peer_columns_empty,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,

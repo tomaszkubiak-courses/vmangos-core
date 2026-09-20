@@ -72,11 +72,17 @@ LEFT JOIN cmp.n_quest_xp xac ON xac.src = 'ac' AND xac.quest = zq.quest
 WHERE cmp.strength(xv.awards_xp, xmz.awards_xp, xac.awards_xp) <> '';
 
 -- Single-source finding: the stored reward contradicts the vanilla formula
--- applied to the quest's own inputs. No peer is relevant, so the peer
--- columns carry the formula's answer rather than another database's
--- opinion, and strength is hardcoded 'strong' rather than computed - there
--- is nothing here for cmp.strength/cmp.strength_mag to judge peer agreement
--- on.
+-- applied to the quest's own inputs. No peer is relevant here, so strength
+-- is hardcoded 'strong' rather than computed - there is nothing for
+-- cmp.strength/cmp.strength_mag to judge peer agreement on.
+--
+-- The formula's answer goes in the note, NOT in mz_value. It used to sit in
+-- the mangoszero column, so all 249 of these rows rendered an expected value
+-- under a heading naming a database that never voted on them - a column
+-- whose content is not what its header says, the same defect shape as the
+-- six Task 12 fixed. Every peer column is NULL here on purpose: all three
+-- peers really did abstain, and report.py renders a NULL as a blank cell
+-- meaning exactly that.
 --
 -- The WHERE predicate is the same relative-tolerance check
 -- test_vmangos_stored_xp_agrees_with_its_own_inputs asserts (5%, no absolute
@@ -91,9 +97,9 @@ WHERE cmp.strength(xv.awards_xp, xmz.awards_xp, xac.awards_xp) <> '';
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT zq.zone, 'quest_rewards', 'quest', q.entry, 'xp_self_consistency',
-       q.rew_xp, ROUND(cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level)),
-       NULL, NULL, 'strong',
-       'stored RewXP disagrees with the vanilla formula on this quest own inputs'
+       q.rew_xp, NULL, NULL, NULL, 'strong',
+       CONCAT('stored RewXP disagrees with the vanilla formula on this quest own inputs; ',
+              'the formula gives ', ROUND(cmp.vanilla_quest_xp(q.lvl, q.rew_money_max_level)))
 FROM cmp.zone_quest zq
 JOIN v.n_quest q ON q.entry = zq.quest
 WHERE q.rew_xp > 0 AND q.rew_money_max_level > 0
