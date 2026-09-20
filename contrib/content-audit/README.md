@@ -502,3 +502,46 @@ this block has already sent one investigation chasing a content gap that
 does not exist. No peer schema has a loot column on `battleground_template`
 at all, so there is nothing to compare and nothing to gain from modelling
 it further.
+
+## Manual probes, and what they answered
+
+Some questions are worth asking once rather than wiring into the pipeline.
+These are the ones run on 2026-09-20, with their answers, so the next person
+does not re-derive them. Each is a single query against the corpus; none of
+them needs a peer to be meaningful except where noted.
+
+**Is this realm missing whole entities?** No. Against mangoszero: 0 quests
+and 11 creatures are missing, and all 11 are post-vanilla rows mangoszero
+backported (entry 17252 and up, none of them spawned even there). This realm
+carries 185 quests mangoszero does not. Every one of the 1615 `exists`
+findings is AzerothCore-only content. The "content missing from the realm"
+question the audit was built to answer has a negative answer at entity
+level; what is left is per-field drift.
+
+**Does a quest objective ever name a creature nobody spawns?** 94 do, and 88
+of those creatures are summoned rather than placed - by an instance script
+(Ysida Harmon in Stratholme), a zone script (Murkdeep), a quest-start script
+(Demetria), or C++ (the Lunar Festival credit markers). Narrowing to
+objectives whose creature *a peer spawns statically* leaves 6, and five of
+those are the summoned ones above. The sixth was real: the Horde dust
+turn-in marker in Silithus, fixed by migration 20260920124542. The
+gameobject side of the same probe is empty. Not worth wiring in - it is a
+six-row question with one answer.
+
+**Can a quest be started at all?** 196 quests have a turn-in npc and no
+quest giver; 189 of them are started by an item (`item_template.start_quest`).
+Of the remaining seven, five are superseded revisions still carrying their
+old ender row (909 and 3366 were replaced by 6922 and 6981; the Timbermaw
+quests 6131/6221/6241 had their givers capped at patch 6 when 8460/8461/8464
+replaced them at patch 7), and two are the war-effort recruiter quests
+8796/8797, which this realm hands out as 8795 from all three sergeants while
+the peers map one quest per sergeant. pfQuest shows the three as mutually
+exclusive (`close`), so either arrangement yields one quest and nothing is
+lost. The one quest in this shape that *was* a defect, 2986, was found by
+hand judging in an earlier round and is already fixed.
+
+**Is a required quest item ever unobtainable?** 255 quest-objective items
+have no source this pipeline can see - no loot row, no vendor, no quest
+reward, no `SrcItemId`, no profession loot table. pfQuest names a source for
+none of them either, which puts them in the crafted / script-granted /
+summon-dropped bucket rather than the missing-content one.
