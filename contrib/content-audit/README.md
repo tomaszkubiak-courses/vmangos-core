@@ -308,28 +308,51 @@ agreement is inheritance, not evidence, exactly like the shared loot rows
 `cmp.peer_lineage` exists to catch. Measured on this corpus: of the 595
 `strong` vendor findings shaped "this realm has it; neither peer does",
 pfQuest confirms the pair on 595 - all of them - which says nothing about
-vanilla and everything about where its data came from.
+vanilla and everything about where its data came from. An exact 100%
+agreement is the shape of shared ancestry, not proof.
 
-Where a reference of the same lineage still carries information is when it
-*disagrees*. Of the 792 `strong` vendor findings shaped "this realm lacks
-it; both peers have it", pfQuest lists the pair on 55 - and all 55 sit on
-just three NPCs that have no `npc_vendor` row at all.
+Where a same-lineage reference still informs is where it *disagrees*. Of the
+792 `strong` vendor findings shaped "this realm lacks it; both peers have
+it", pfQuest lists the pair on 55 - and all 55 sit on just three NPCs that
+have no `npc_vendor` row at all.
 
 That last shape does not need a reference database, a peer, or a tolerance.
 `creature_template.npc_flags` bit `0x4` is `UNIT_NPC_FLAG_VENDOR`: the client
-offers "Browse Goods" and the core answers `CMSG_LIST_INVENTORY`. If
-`npc_vendor` then has no row for that creature, the player gets an empty
-window - a contradiction between two halves of this database, provable from
-this database. `diffs/02_relations.sql` block (c) reports it as
-`vendor_flag_no_stock`, hardcoded `strong` with the peers' item counts as
-context only, the same single-source shape as `xp_self_consistency`.
+offers "Browse Goods" and the core answers `CMSG_LIST_INVENTORY`. If nothing
+stocks that creature, the player gets an empty window - a contradiction
+between two halves of this database, provable from this database.
+`diffs/02_relations.sql` block (c) reports it as `vendor_flag_no_stock`,
+hardcoded `strong` with the peers' item counts as context only, the same
+single-source shape as `xp_self_consistency`.
 
-It finds 17 rows over 13 creatures (four PvP quartermasters are spawned in
-two zones each and are reported in both, like every other zone-keyed
-finding). The join to `cmp.zone_creature` is what keeps it honest: only
-creatures actually spawned somewhere are considered, which silently drops
-the 16 unspawned placeholders in `creature_template` - "Programmer Vendor",
-"Eric's AAA Special Vendor", the `[UNUSED]` rows - without needing a name
-blocklist. Eight of the 13 have peer stock to copy from; the other five have
-none in either peer either, and for those the open question is which half is
-wrong, the flag or the missing stock.
+**"Nothing stocks it" has two sources, and checking only the first is wrong.**
+A creature either owns `npc_vendor` rows or points at a shared list through
+`creature_template.vendor_id` and `npc_vendor_template`
+(`ObjectMgr::LoadVendorTemplates`). 83 of this realm's vendor-flagged
+creatures use the template path and own no `npc_vendor` row at all, so an
+`npc_vendor`-only test reports every one of them as selling nothing. That is
+what the first version of this check did: it produced 17 rows over 13
+creatures, and 12 of those 13 - including all three the pfQuest lead had
+pointed at - were fully stocked through a template. Nida Winterhoof (3014)
+resolves to template 301401's 10 items, which is exactly the list mangoszero
+carries on her directly.
+
+Reading through `v._creature_current` instead of raw `creature_template` is
+the other half of the correction: both the flag and `vendor_id` are per patch
+revision, and Lanie Reed (2941) is a vendor at patches 0-1 and a flight
+master from patch 3 on, so a `MAX(npc_flags)` over her revisions invents a
+vendor this realm never shows.
+
+Corrected, the check finds **one** creature: Myizz Luckycatch (2834, Booty
+Bay), flagged gossip + vendor + trainer in both his revisions with no
+`npc_vendor` row, no `vendor_id`, and nothing in pfQuest either - mangoszero
+sells six fish on him, AzerothCore and tortoise-wow nothing. Which half is
+wrong there, the flag or the missing stock, the audit does not say. The join
+to `cmp.zone_creature` keeps the unspawned placeholders out
+("Programmer Vendor", "Eric's AAA Special Vendor", the `[UNUSED]` rows)
+without needing a name blocklist.
+
+The honest summary of this whole line of work: it produced no content fix.
+A reference that shares the realm's lineage pointed at three NPCs, and all
+three turned out to be correctly stocked by a mechanism neither the
+reference nor the first check modelled.
