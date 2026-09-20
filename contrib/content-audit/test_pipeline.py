@@ -1236,6 +1236,67 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_vendor_and_trainer_relations_include_template_lists():
+    """A creature's stock and spell list have two sources in this schema -
+    its own npc_vendor/npc_trainer rows, and the shared list named by
+    creature_template.vendor_id/trainer_id - and the core reads both
+    (WorldSession::SendListInventory calls GetVendorItems() and
+    GetVendorTemplateItems() side by side). n_rel must carry both too.
+
+    Reading only the per-creature tables was worth 492 vendor pairs and
+    29990 trainer pairs on this corpus, and it is what made this realm look
+    like it had far shorter trainer lists than every peer.
+
+    Fixtures verified on the corpus: Nida Winterhoof (3014) sells nothing of
+    her own and resolves to vendor template 301401's ten items at the served
+    patch, item 3371 among them. The duplicate guard matters as much as the
+    branch: npc_trainer_template holds 2404 rows over 1393 distinct
+    (entry, spell) pairs, so an undeduplicated join inflated the trainer
+    relation by roughly 20000 rows.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM v.n_rel WHERE kind='vendor' AND npc=3014 AND target=3371"
+    )
+    assert rows[0][0] == "1", (
+        "v.n_rel does not carry template-sourced vendor pair (3014, 3371) exactly once "
+        "(got %s) - the npc_vendor_template branch is missing or duplicating"
+        % rows[0][0]
+    )
+    total = corpus_sql("SELECT COUNT(*) FROM v.n_rel WHERE kind='vendor' AND npc=3014")
+    assert total[0][0] == "10", (
+        "creature 3014 should sell her template's ten items, n_rel has %s" % total[0][0]
+    )
+
+    templated = corpus_sql(
+        "SELECT COUNT(*) FROM v.n_rel r JOIN v._creature_current ct ON ct.entry = r.npc "
+        "JOIN v.npc_trainer_template nt ON nt.entry = ct.trainer_id AND nt.spell = r.target "
+        "WHERE r.kind='trainer'"
+    )
+    assert int(templated[0][0]) > 20000, (
+        "only %s trainer relations come from npc_trainer_template - the branch that "
+        "carries ~30000 of them is gone" % templated[0][0]
+    )
+
+    dupes = corpus_sql(
+        "SELECT COUNT(*) FROM (SELECT npc, target FROM v.n_rel WHERE kind='trainer' "
+        "GROUP BY npc, target HAVING COUNT(*) > 1) d"
+    )
+    assert int(dupes[0][0]) <= 5, (
+        "%s duplicate trainer pairs in v.n_rel - npc_trainer's own five are expected, "
+        "more means the template branch lost its DISTINCT" % dupes[0][0]
+    )
+
+    stocked = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings WHERE topic='relations' AND entity_id=3014 "
+        "AND field LIKE 'vendor:%' AND note LIKE 'this realm lacks%'"
+    )
+    assert stocked[0][0] == "0", (
+        "%s vendor findings still say creature 3014 lacks an item her template sells"
+        % stocked[0][0]
+    )
+    print("PASS test_vendor_and_trainer_relations_include_template_lists")
+
+
 def test_xp_self_consistency_keeps_its_peer_columns_empty():
     """The xp_self_consistency check compares this realm's stored RewXP
     against a formula over the quest's own inputs. No peer votes on it, so
@@ -1591,6 +1652,7 @@ TESTS = [
     test_multi_patch_quest_finding_names_its_revision,
     test_vendor_flag_without_stock_is_reported_and_stays_single_source,
     test_xp_self_consistency_keeps_its_peer_columns_empty,
+    test_vendor_and_trainer_relations_include_template_lists,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,

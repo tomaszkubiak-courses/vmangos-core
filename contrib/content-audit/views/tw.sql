@@ -155,7 +155,31 @@ CREATE OR REPLACE VIEW n_rel AS
 SELECT 'questgiver' AS kind, CAST(id AS UNSIGNED) AS npc, CAST(quest AS UNSIGNED) AS target FROM creature_questrelation
 UNION ALL SELECT 'questender', id, quest FROM creature_involvedrelation
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
+-- This fork carries the same two-source vendor and trainer model as v (see
+-- views/v.sql): creature_template.vendor_id / trainer_id name shared lists
+-- in npc_vendor_template (2353 rows) and npc_trainer_template (220 rows),
+-- used by 556 creatures here, and the core reads the shared list alongside
+-- the creature's own rather than instead of it. Reading only npc_vendor /
+-- npc_trainer understates this source the same way it understated v.
+-- It has no patch dimension (see this file's header), so these branches
+-- read creature_template directly where v.sql reads _creature_current.
+--
+-- The NOT EXISTS keeps (kind, npc, target) unique when a creature owns a
+-- direct row for something its template also carries, and the DISTINCT
+-- covers the other duplicate source: npc_trainer_template lists the same
+-- spell more than once for a template (2404 rows, 1393 distinct entry+spell
+-- pairs), which without it inflated the trainer relation by 20k rows.
+UNION ALL SELECT DISTINCT 'vendor', ct.entry, nt.item
+    FROM creature_template ct
+    JOIN npc_vendor_template nt ON nt.entry = ct.vendor_id
+    WHERE ct.vendor_id <> 0
+      AND NOT EXISTS (SELECT 1 FROM npc_vendor nv WHERE nv.entry = ct.entry AND nv.item = nt.item)
 UNION ALL SELECT 'trainer',    entry, spell FROM npc_trainer
+UNION ALL SELECT DISTINCT 'trainer', ct.entry, nt.spell
+    FROM creature_template ct
+    JOIN npc_trainer_template nt ON nt.entry = ct.trainer_id
+    WHERE ct.trainer_id <> 0
+      AND NOT EXISTS (SELECT 1 FROM npc_trainer nt2 WHERE nt2.entry = ct.entry AND nt2.spell = nt.spell)
 UNION ALL SELECT DISTINCT 'link', c1.id, c2.id
     FROM creature_linking l
     JOIN creature c1 ON c1.guid = l.guid

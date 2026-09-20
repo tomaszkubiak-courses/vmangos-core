@@ -218,7 +218,39 @@ CREATE OR REPLACE VIEW n_rel AS
 SELECT 'questgiver' AS kind, CAST(id AS UNSIGNED) AS npc, CAST(quest AS UNSIGNED) AS target FROM creature_questrelation WHERE 10 BETWEEN patch_min AND patch_max
 UNION ALL SELECT 'questender', id, quest FROM creature_involvedrelation WHERE 10 BETWEEN patch_min AND patch_max
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor
+-- A vendor's stock and a trainer's spell list have TWO sources in this
+-- schema, and reading only the per-creature table understates both. A
+-- creature_template row can name a shared list through vendor_id /
+-- trainer_id (npc_vendor_template, npc_trainer_template), and the core uses
+-- the two together, never one instead of the other -
+-- WorldSession::SendListInventory (ItemHandler.cpp) reads GetVendorItems() and
+-- GetVendorTemplateItems() side by side. On this realm the template path
+-- carries 492 (creature, item) vendor pairs and 29990 (creature, spell)
+-- trainer pairs over 284 creatures, against 4676 npc_trainer rows in total:
+-- ignoring it is what made this realm look like it had far shorter trainer
+-- lists than every peer, and it reported 55 strong "this realm lacks it"
+-- vendor findings for items the realm does sell. mangoszero has both
+-- template tables but leaves them empty, and AzerothCore has no vendor
+-- template table at all, so no peer view needs this branch.
+--
+-- Two duplicate guards, both needed, because cmp.trainer_spell_count counts
+-- rows: the NOT EXISTS covers a creature owning a direct row for something
+-- its template also carries, and the DISTINCT covers the template table
+-- repeating a spell (npc_trainer_template holds 2404 rows over 1393 distinct
+-- entry+spell pairs - without it the trainer relation came out ~20000 rows
+-- too large). Five duplicate (npc, spell) pairs survive and they are
+-- npc_trainer's own: 4676 rows over 4671 distinct pairs.
+UNION ALL SELECT DISTINCT 'vendor', ct.entry, nt.item
+    FROM _creature_current ct
+    JOIN npc_vendor_template nt ON nt.entry = ct.vendor_id
+    WHERE ct.vendor_id <> 0
+      AND NOT EXISTS (SELECT 1 FROM npc_vendor nv WHERE nv.entry = ct.entry AND nv.item = nt.item)
 UNION ALL SELECT 'trainer',    entry, spell FROM npc_trainer
+UNION ALL SELECT DISTINCT 'trainer', ct.entry, nt.spell
+    FROM _creature_current ct
+    JOIN npc_trainer_template nt ON nt.entry = ct.trainer_id
+    WHERE ct.trainer_id <> 0
+      AND NOT EXISTS (SELECT 1 FROM npc_trainer nt2 WHERE nt2.entry = ct.entry AND nt2.spell = nt.spell)
 UNION ALL SELECT DISTINCT 'link', c1.id, c2.id
     FROM creature_linking l
     JOIN creature c1 ON c1.guid = l.guid
