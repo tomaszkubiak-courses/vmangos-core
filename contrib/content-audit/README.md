@@ -453,3 +453,27 @@ new - the old comparison could not see it at all, because this realm's
 `PrevQuestId` was never compared with anything. Worked example: quests 163
 -> 5 ("Raven Hill" to "Jitters' Growling Gut"), where this realm has the
 auto-offer and all three peers gate it as a prerequisite.
+
+## Race masks, and the convention behind them
+
+`req_race` compared `quest_template.RequiredRaces` against AzerothCore's
+`AllowableRaces`, which is a WotLK mask: 1101 is Alliance plus Draenei, 690
+is Horde plus Blood Elf. 2438 of the 2756 AzerothCore values that reached a
+finding carried a post-vanilla bit, so a quest this realm and mangoszero
+both restrict to Alliance read as three different values. A mask naming all
+eight vanilla races (255) also gates nothing that 0 does not - 17 `strong`
+findings were exactly that pair. Both are normalised in the views now: the
+value is masked to the eight vanilla bits, and a full mask becomes 0.
+
+Masking is plainly correct and it exposes something the raw comparison was
+hiding. This realm sets `RequiredRaces` on 628 of its 4433 quests;
+mangoszero sets it on 2431 of 4248 and AzerothCore on 4919 of 9464. So
+"this realm leaves the column 0 where both peers restrict the quest"
+becomes 1986 `strong` findings - one realm-wide convention restated 1986
+times, which buries every other quest finding exactly the way per-spell
+trainer rows did before the relations topic collapsed them.
+
+`report.py` collapses that one direction into a counted line per zone. The
+rows stay in `cmp.findings`, the count is printed, and the opposite
+direction - this realm restricting where the peers do not - stays in the
+table, because that is a real per-quest claim rather than a convention.

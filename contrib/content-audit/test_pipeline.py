@@ -1237,6 +1237,62 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_race_masks_are_compared_on_vanilla_bits_and_the_convention_collapses():
+    """AzerothCore's AllowableRaces is a WotLK mask: 1101 is Alliance plus
+    Draenei, 690 is Horde plus Blood Elf. Comparing it raw made a quest this
+    realm and mangoszero both restrict to Alliance read as three different
+    values - 2438 of the 2756 ac values that reached a finding carried a
+    post-vanilla bit. A mask naming all eight vanilla races (255) gates
+    nothing that 0 does not, so it normalises to 0 as well.
+
+    Masking is correct and it has a consequence the report has to handle:
+    this realm populates RequiredRaces on 628 of 4433 quests against 2431 of
+    4248 in mangoszero, so "this realm leaves it 0 where both peers restrict"
+    becomes 1986 strong findings - one realm-wide convention, not 1986
+    defects. report.py collapses that direction into a counted line and
+    leaves the opposite direction (this realm restricts, the peers do not) in
+    the table, because that one is a real per-quest claim.
+    """
+    for src in ("v", "mz", "tw", "ac"):
+        rows = corpus_sql(
+            "SELECT COUNT(*) FROM %s.n_quest WHERE req_race & ~255 <> 0 OR req_race = 255" % src
+        )
+        assert rows[0][0] == "0", (
+            "%s.n_quest has %s race values outside the eight vanilla bits (or a "
+            "full 255 mask) - the normalisation is gone" % (src, rows[0][0])
+        )
+
+    alliance = corpus_sql(
+        "SELECT COUNT(*) FROM ac.quest_template q JOIN ac.n_quest n ON n.entry = q.ID "
+        "WHERE q.AllowableRaces = 1101 AND n.req_race <> 77"
+    )
+    assert alliance[0][0] == "0", (
+        "%s AzerothCore quests with AllowableRaces 1101 do not read as 77 (Alliance) "
+        "after masking" % alliance[0][0]
+    )
+
+    subprocess.run([sys.executable, os.path.join(HERE, "report.py"), "12"], check=True)
+    repo_root = os.path.abspath(os.path.join(HERE, "..", ".."))
+    report_dir = os.path.join(repo_root, CFG["REPORT_DIR"])
+    written = [f for f in os.listdir(report_dir) if f.startswith("12-")]
+    with open(os.path.join(report_dir, written[0]), encoding="utf-8") as handle:
+        text = handle.read()
+    assert "req_race findings collapsed" in text, (
+        "Elwynn's report no longer collapses the race-convention findings"
+    )
+
+    collapsed = corpus_sql(
+        "SELECT entity_id FROM cmp.findings WHERE zone=12 AND field='req_race' "
+        "AND v_value='0' AND mz_value NOT IN ('0') AND ac_value NOT IN ('0') LIMIT 1"
+    )
+    assert collapsed, "zone 12 no longer has a collapsed race-convention finding to check"
+    quests = text.split("## 3. Quests", 1)[1].split("## 4.", 1)[0]
+    assert "| req_race | 0 |" not in quests, (
+        "a collapsed race-convention row is still rendered in the quests table"
+    )
+    print("PASS test_race_masks_are_compared_on_vanilla_bits_and_the_convention_collapses")
+
+
 def test_quest_chain_edges_are_spelling_independent():
     """"Quest A unlocks quest B" has three spellings in this schema family -
     NextQuestId on A, PrevQuestId on B, and the auto-offer column
@@ -1755,6 +1811,7 @@ TESTS = [
     test_vendor_and_trainer_relations_include_template_lists,
     test_pooled_spawn_count_finding_says_so,
     test_quest_chain_edges_are_spelling_independent,
+    test_race_masks_are_compared_on_vanilla_bits_and_the_convention_collapses,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,

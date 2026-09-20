@@ -57,11 +57,12 @@ JOIN cmp.areas a ON a.src = 'ac' AND a.kind = 'gobject' AND a.id = g.guid;
 -- exists elsewhere to suppress, reintroduced through the back door. -1
 -- disagreeing with v's real level is an honest, real disagreement (a fixed
 -- vanilla level versus a WotLK scaling marker), not a manufactured one.
+-- req_race: masked to the vanilla race bits, see views/v.sql.
 CREATE OR REPLACE VIEW n_quest AS
 SELECT CAST(q.ID AS UNSIGNED) AS entry, q.LogTitle AS title, CAST(q.QuestLevel AS SIGNED) AS lvl,
        q.MinLevel AS min_lvl, q.QuestSortID AS zone_or_sort,
        CAST(0 AS SIGNED) AS prev, CAST(q.RewardNextQuest AS SIGNED) AS next, CAST(0 AS SIGNED) AS excl_group,
-       CAST(q.AllowableRaces AS UNSIGNED) AS req_race, CAST(0 AS UNSIGNED) AS req_class,
+       CAST(IF(q.AllowableRaces & 255 = 255, 0, q.AllowableRaces & 255) AS UNSIGNED) AS req_race, CAST(0 AS UNSIGNED) AS req_class,
        q.RewardMoney AS rew_money_max_level, CAST(NULL AS UNSIGNED) AS rew_xp
 FROM quest_template q;
 

@@ -78,10 +78,11 @@ SELECT a.kind, CAST(g.id AS UNSIGNED) AS entry, a.zone, a.area, CAST(g.map AS UN
 FROM gameobject g
 JOIN cmp.areas a ON a.src = 'tw' AND a.kind = 'gobject' AND a.id = g.guid;
 
+-- req_race: masked to the vanilla race bits, see views/v.sql.
 CREATE OR REPLACE VIEW n_quest AS
 SELECT CAST(entry AS UNSIGNED) AS entry, Title AS title, CAST(QuestLevel AS UNSIGNED) AS lvl, MinLevel AS min_lvl,
        ZoneOrSort AS zone_or_sort, CAST(PrevQuestId AS SIGNED) AS prev, CAST(NextQuestId AS SIGNED) AS next,
-       CAST(ExclusiveGroup AS SIGNED) AS excl_group, CAST(RequiredRaces AS UNSIGNED) AS req_race,
+       CAST(ExclusiveGroup AS SIGNED) AS excl_group, CAST(IF(RequiredRaces & 255 = 255, 0, RequiredRaces & 255) AS UNSIGNED) AS req_race,
        CAST(RequiredClasses AS UNSIGNED) AS req_class,
        RewMoneyMaxLevel AS rew_money_max_level, CAST(RewXP AS UNSIGNED) AS rew_xp
 FROM quest_template;

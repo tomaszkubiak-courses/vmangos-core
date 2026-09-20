@@ -120,10 +120,19 @@ FROM gameobject g
 JOIN cmp.areas a ON a.src = 'v' AND a.kind = 'gobject' AND a.id = g.guid
 WHERE 10 BETWEEN g.patch_min AND g.patch_max;
 
+-- req_race is compared on the eight vanilla race bits only, and a mask
+-- naming every one of them is normalised to 0 (2026-09-20). AzerothCore's
+-- AllowableRaces is a WotLK mask: 2438 of the 2756 values that reached a
+-- finding carried a post-vanilla bit - 1101 is Alliance plus Draenei, 690 is
+-- Horde plus Blood Elf - so comparing it raw made a quest this realm and
+-- mangoszero both restrict to Alliance read as three different values. 255
+-- (all eight vanilla races) and 0 (no restriction) gate nothing differently
+-- in Player::SatisfyQuestRace, so they must not read as a disagreement
+-- either; 17 strong findings were exactly that pair.
 CREATE OR REPLACE VIEW n_quest AS
 SELECT CAST(entry AS UNSIGNED) AS entry, Title AS title, CAST(QuestLevel AS UNSIGNED) AS lvl, MinLevel AS min_lvl,
        ZoneOrSort AS zone_or_sort, CAST(PrevQuestId AS SIGNED) AS prev, CAST(NextQuestId AS SIGNED) AS next,
-       CAST(ExclusiveGroup AS SIGNED) AS excl_group, CAST(RequiredRaces AS UNSIGNED) AS req_race,
+       CAST(ExclusiveGroup AS SIGNED) AS excl_group, CAST(IF(RequiredRaces & 255 = 255, 0, RequiredRaces & 255) AS UNSIGNED) AS req_race,
        CAST(RequiredClasses AS UNSIGNED) AS req_class,
        RewMoneyMaxLevel AS rew_money_max_level, CAST(RewXP AS UNSIGNED) AS rew_xp
 FROM _quest_current;
