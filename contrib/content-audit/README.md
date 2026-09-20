@@ -420,3 +420,36 @@ the count. A corrected effective count would have to model nested pools
 (`pool_pool` has 5669 rows here) and per-member chances, and a subtly wrong
 formula is precisely the failure mode this pipeline keeps producing; the
 reader can see both sides and decide. Nothing is suppressed.
+
+## "Quest A unlocks quest B" has three spellings
+
+The `quests` topic compared a raw column called `next`, and that comparison
+was wrong twice over. This realm's `next` was `quest_template.NextQuestId`;
+AzerothCore's was `quest_template.RewardNextQuest`, which is the WotLK
+auto-offer column - this family's `NextQuestInChain`, a different fact -
+while AzerothCore's actual `PrevQuestID`/`NextQuestID` live in
+`quest_template_addon`, 9464 rows nothing here read. And even against the
+right column, the same edge is spelled on either end: this realm writes
+`NextQuestId` on the predecessor, the peers overwhelmingly write
+`PrevQuestId` on the successor.
+
+Measured on the old shape: 280 `strong` `next` findings, 257 of them this
+realm holding a link both peers reported as 0 - and 193 of those 257 (75%)
+were carried by mangoszero on the successor's `PrevQuestId`. The same edge,
+reported as a defect because it was read off the wrong end.
+
+`n_quest_chain` (one per source) collapses all three spellings into a
+`(prev, next)` edge, and `diffs/03_quests.sql` compares edges the way the
+relations topic compares vendor items: one finding per edge, a direction
+note, and a source that lacks either quest abstaining rather than voting
+"no". Including the auto-offer column is deliberate - measured on a
+prerequisite-only version, 36 of its 129 "this realm lacks it" edges were
+ones this realm spells with `NextQuestInChain`, and 17 of 144 the other way.
+A finding now means no link of any kind on that side.
+
+Result: 238 `strong` chain findings, 135 "this realm has it; neither peer
+does" and 103 "this realm lacks it; both peers have it". The second group is
+new - the old comparison could not see it at all, because this realm's
+`PrevQuestId` was never compared with anything. Worked example: quests 163
+-> 5 ("Raven Hill" to "Jitters' Growling Gut"), where this realm has the
+auto-offer and all three peers gate it as a prerequisite.
