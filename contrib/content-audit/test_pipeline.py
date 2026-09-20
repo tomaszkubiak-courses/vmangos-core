@@ -1237,6 +1237,70 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_battleground_player_loot_is_named_not_missing():
+    """cmp.n_loot_eff walks creature, gameobject and item loot. It cannot see
+    that battleground_template.player_loot_id names a reference_loot_template
+    the core installs on player corpses, so Alterac Valley's sixteen turn-in
+    items read as having no source in this realm at all.
+
+    They are all 'lineage' rather than 'strong' - the peers model the same
+    items on creatures and agree with each other - so the label already holds
+    the line. This pins the note that names the mechanism, because the block
+    is large (1322 findings on 15 items in one zone) and it has already sent
+    one investigation chasing a content gap that does not exist.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*), SUM(note LIKE 'obtainable here from battleground player loot%') "
+        "FROM cmp.findings f WHERE f.topic='quest_item_drops' AND EXISTS ("
+        "SELECT 1 FROM v.battleground_template bt JOIN v.reference_loot_template rl "
+        "ON rl.entry = bt.player_loot_id WHERE bt.player_loot_id <> 0 AND rl.item = f.entity_id)"
+    )
+    total, noted = int(rows[0][0]), int(rows[0][1])
+    assert total > 0, "no findings left on a battleground player-loot item - check the fixture"
+    assert noted == total, (
+        "%d of %d battleground player-loot findings carry the note naming the mechanism"
+        % (noted, total)
+    )
+
+    strong = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings f WHERE f.topic='quest_item_drops' "
+        "AND f.strength='strong' AND EXISTS ("
+        "SELECT 1 FROM v.battleground_template bt JOIN v.reference_loot_template rl "
+        "ON rl.entry = bt.player_loot_id WHERE bt.player_loot_id <> 0 AND rl.item = f.entity_id)"
+    )
+    assert strong[0][0] == "0", (
+        "%s battleground player-loot findings are 'strong' - they were all 'lineage', so "
+        "either the peers stopped agreeing or the lineage label was lost" % strong[0][0]
+    )
+    print("PASS test_battleground_player_loot_is_named_not_missing")
+
+
+def test_azerothcore_votes_on_both_spell_reward_slots():
+    """AzerothCore splits the spell reward the same way this family does:
+    RewardDisplaySpell is shown and taught (RewSpell here), RewardSpell is
+    cast at turn-in (RewSpellCast). Reading only RewardSpell made it vote
+    "no taught spell" on the 158 quests that set both.
+    """
+    rows = corpus_sql(
+        "SELECT COUNT(*) FROM ac.quest_template q WHERE q.RewardDisplaySpell > 0 "
+        "AND NOT EXISTS (SELECT 1 FROM ac.n_quest_rew r WHERE r.quest = q.ID "
+        "AND r.kind='spell' AND r.id = q.RewardDisplaySpell)"
+    )
+    assert rows[0][0] == "0", (
+        "%s AzerothCore quests have a RewardDisplaySpell that never reaches n_quest_rew"
+        % rows[0][0]
+    )
+    both = corpus_sql(
+        "SELECT COUNT(*) FROM ac.quest_template q WHERE q.RewardDisplaySpell > 0 "
+        "AND q.RewardSpell > 0 AND q.RewardDisplaySpell <> q.RewardSpell"
+    )
+    assert int(both[0][0]) > 0, (
+        "no AzerothCore quest sets two different spell reward slots any more - "
+        "this test no longer discriminates, pick a new assertion"
+    )
+    print("PASS test_azerothcore_votes_on_both_spell_reward_slots")
+
+
 def test_race_masks_are_compared_on_vanilla_bits_and_the_convention_collapses():
     """AzerothCore's AllowableRaces is a WotLK mask: 1101 is Alliance plus
     Draenei, 690 is Horde plus Blood Elf. Comparing it raw made a quest this
@@ -1812,6 +1876,8 @@ TESTS = [
     test_pooled_spawn_count_finding_says_so,
     test_quest_chain_edges_are_spelling_independent,
     test_race_masks_are_compared_on_vanilla_bits_and_the_convention_collapses,
+    test_battleground_player_loot_is_named_not_missing,
+    test_azerothcore_votes_on_both_spell_reward_slots,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,

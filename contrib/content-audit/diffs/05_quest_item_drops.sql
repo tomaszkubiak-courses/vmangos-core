@@ -239,7 +239,28 @@ FROM (
            MIN(tw_value) AS tw_value,
            MIN(ac_value) AS ac_value,
            MIN(strength) AS strength,
-           CONCAT('quests ', GROUP_CONCAT(DISTINCT quest ORDER BY quest SEPARATOR ',')) AS note_full
+           -- Battleground player loot, 2026-09-20. cmp.n_loot_eff walks
+           -- creature, gameobject and item loot; it has no idea that
+           -- battleground_template.player_loot_id names a
+           -- reference_loot_template the core installs on PLAYER corpses
+           -- (Player::SetPlayerSkinRefLootId), so every item sourced that
+           -- way reads here as having no source at all. Alterac Valley's
+           -- player_loot_id 1 holds the sixteen turn-in items - the medals,
+           -- the flesh, Storm Crystal, the racial trophies - and 1322
+           -- findings in that one zone rest on them. They are all 'lineage'
+           -- rather than 'strong' (the peers model the same items on
+           -- creatures and agree with each other), so the label was already
+           -- holding the line; this names the actual mechanism so a reader
+           -- does not chase a content gap that is not one. No peer schema
+           -- has a loot column on battleground_template at all, so there is
+           -- nothing to compare and nothing to gain from modelling it
+           -- further.
+           CONCAT(
+               IF(EXISTS (SELECT 1 FROM v.battleground_template bt
+                          JOIN v.reference_loot_template rl ON rl.entry = bt.player_loot_id
+                          WHERE bt.player_loot_id <> 0 AND rl.item = cmp.quest_item_drop_rows.item),
+                  'obtainable here from battleground player loot, which no peer models; ', ''),
+               'quests ', GROUP_CONCAT(DISTINCT quest ORDER BY quest SEPARATOR ',')) AS note_full
     FROM cmp.quest_item_drop_rows
     GROUP BY zone, item, tbl, entry
 ) g;
