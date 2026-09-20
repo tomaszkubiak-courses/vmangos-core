@@ -179,6 +179,7 @@ def test_areas_table_populated_and_named():
 
 NORMALISED_VIEWS = [
     "n_creature",
+    "n_quest_chain",
     "n_spawn",
     "n_quest",
     "n_quest_obj",
@@ -1236,6 +1237,64 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_quest_chain_edges_are_spelling_independent():
+    """"Quest A unlocks quest B" has three spellings in this schema family -
+    NextQuestId on A, PrevQuestId on B, and the auto-offer column
+    (NextQuestInChain here, RewardNextQuest in AzerothCore) - and sources
+    pick differently between them. n_quest_chain collapses all three into one
+    (prev, next) edge so the comparison is about the fact, not the
+    convention.
+
+    Fixtures verified on the corpus, each covering one spelling reaching the
+    same view:
+
+    - 163 -> 5 ("Raven Hill" to "Jitters' Growling Gut"): this realm spells
+      it NextQuestInChain on 163, mangoszero spells it PrevQuestId on 5.
+      Both must produce the edge.
+    - AzerothCore's half must come from quest_template_addon, not
+      quest_template: its PrevQuestID/NextQuestID live there (9464 rows) and
+      quest_template.RewardNextQuest is the auto-offer column.
+
+    The old raw-column comparison put v.NextQuestId beside
+    ac.RewardNextQuest and produced 280 strong findings, 257 of them this
+    realm holding a link both peers read as 0 while 193 of those 257 in fact
+    carried the same edge on the successor's PrevQuestId.
+    """
+    for src in ("v", "mz", "ac"):
+        rows = corpus_sql(
+            "SELECT COUNT(*) FROM %s.n_quest_chain WHERE prev=163 AND next=5" % src
+        )
+        assert rows[0][0] == "1", (
+            "%s.n_quest_chain does not carry edge 163->5 exactly once (got %s) - "
+            "one of the three spellings is not reaching the view" % (src, rows[0][0])
+        )
+
+    ac_only_addon = corpus_sql(
+        "SELECT COUNT(*) FROM ac.n_quest_chain c JOIN ac.quest_template_addon a "
+        "ON a.ID = c.next AND ABS(a.PrevQuestID) = c.prev"
+    )
+    assert int(ac_only_addon[0][0]) > 1000, (
+        "only %s AzerothCore chain edges come from quest_template_addon - the addon "
+        "table is the only place its PrevQuestID/NextQuestID live" % ac_only_addon[0][0]
+    )
+
+    findings = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings WHERE topic='quests' AND field='next'"
+    )
+    assert findings[0][0] == "0", (
+        "%s raw-column 'next' findings remain - that comparison was replaced by "
+        "the chain: edges" % findings[0][0]
+    )
+    noted = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings WHERE topic='quests' AND field LIKE 'chain:%' "
+        "AND strength='strong' AND note = ''"
+    )
+    assert noted[0][0] == "0", (
+        "%s strong chain findings carry no direction note" % noted[0][0]
+    )
+    print("PASS test_quest_chain_edges_are_spelling_independent")
+
+
 def test_pooled_spawn_count_finding_says_so():
     """A spawn_count finding on an entity whose spawn points are pooled must
     say so: a pooled point is a candidate, not a spawn, and pool_template's
@@ -1695,6 +1754,7 @@ TESTS = [
     test_xp_self_consistency_keeps_its_peer_columns_empty,
     test_vendor_and_trainer_relations_include_template_lists,
     test_pooled_spawn_count_finding_says_so,
+    test_quest_chain_edges_are_spelling_independent,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,

@@ -159,3 +159,18 @@ CREATE OR REPLACE VIEW n_rel AS
 SELECT 'questgiver' AS kind, CAST(id AS SIGNED) AS npc, CAST(quest AS SIGNED) AS target FROM creature_queststarter
 UNION ALL SELECT 'questender', id, quest FROM creature_questender
 UNION ALL SELECT 'vendor',     entry, item FROM npc_vendor;
+
+-- Quest chain edges; see views/v.sql for why the raw column cannot be
+-- compared directly. This schema keeps PrevQuestID/NextQuestID in
+-- quest_template_addon (9464 rows), not quest_template - quest_template's
+-- RewardNextQuest is the WotLK auto-offer column, which is this family's
+-- NextQuestInChain and a different fact.
+CREATE OR REPLACE VIEW n_quest_chain AS
+SELECT DISTINCT CAST(ABS(PrevQuestID) AS UNSIGNED) AS prev, CAST(ID AS UNSIGNED) AS next
+FROM quest_template_addon WHERE PrevQuestID <> 0
+UNION
+SELECT DISTINCT CAST(ID AS UNSIGNED), CAST(ABS(NextQuestID) AS UNSIGNED)
+FROM quest_template_addon WHERE NextQuestID <> 0
+UNION
+SELECT DISTINCT CAST(ID AS UNSIGNED), CAST(RewardNextQuest AS UNSIGNED)
+FROM quest_template WHERE RewardNextQuest <> 0;

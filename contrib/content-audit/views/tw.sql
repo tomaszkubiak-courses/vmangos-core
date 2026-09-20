@@ -184,3 +184,16 @@ UNION ALL SELECT DISTINCT 'link', c1.id, c2.id
     FROM creature_linking l
     JOIN creature c1 ON c1.guid = l.guid
     JOIN creature c2 ON c2.guid = l.master_guid;
+
+-- Quest chain edges; see views/v.sql for why the raw column cannot be
+-- compared directly. This schema has no patch dimension on quest_template
+-- (mz) / has flattened it (tw), so the edges come straight off the table.
+CREATE OR REPLACE VIEW n_quest_chain AS
+SELECT DISTINCT CAST(ABS(PrevQuestId) AS UNSIGNED) AS prev, CAST(entry AS UNSIGNED) AS next
+FROM quest_template WHERE PrevQuestId <> 0
+UNION
+SELECT DISTINCT CAST(entry AS UNSIGNED), CAST(ABS(NextQuestId) AS UNSIGNED)
+FROM quest_template WHERE NextQuestId <> 0
+UNION
+SELECT DISTINCT CAST(entry AS UNSIGNED), CAST(NextQuestInChain AS UNSIGNED)
+FROM quest_template WHERE NextQuestInChain <> 0;

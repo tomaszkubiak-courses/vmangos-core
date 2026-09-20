@@ -65,26 +65,22 @@ FROM (
            CAST(CASE fld.field WHEN 'exists'    THEN IF(qv.entry IS NULL, NULL, '1')
                                WHEN 'lvl'       THEN qv.lvl
                                WHEN 'min_lvl'   THEN qv.min_lvl
-                               WHEN 'req_race'  THEN qv.req_race
-                               WHEN 'next'      THEN qv.next END AS CHAR) AS v,
+                               WHEN 'req_race'  THEN qv.req_race END AS CHAR) AS v,
            CAST(CASE fld.field WHEN 'exists'    THEN IF(qmz.entry IS NULL, NULL, '1')
                                WHEN 'lvl'       THEN qmz.lvl
                                WHEN 'min_lvl'   THEN qmz.min_lvl
-                               WHEN 'req_race'  THEN qmz.req_race
-                               WHEN 'next'      THEN qmz.next END AS CHAR) AS mz,
+                               WHEN 'req_race'  THEN qmz.req_race END AS CHAR) AS mz,
            CAST(CASE fld.field WHEN 'exists'    THEN IF(qtw.entry IS NULL, NULL, '1')
                                WHEN 'lvl'       THEN qtw.lvl
                                WHEN 'min_lvl'   THEN qtw.min_lvl
-                               WHEN 'req_race'  THEN qtw.req_race
-                               WHEN 'next'      THEN qtw.next END AS CHAR) AS tw,
+                               WHEN 'req_race'  THEN qtw.req_race END AS CHAR) AS tw,
            CAST(CASE fld.field WHEN 'exists'    THEN IF(qac.entry IS NULL, NULL, '1')
                                WHEN 'lvl'       THEN qac.lvl
                                WHEN 'min_lvl'   THEN qac.min_lvl
-                               WHEN 'req_race'  THEN qac.req_race
-                               WHEN 'next'      THEN qac.next END AS CHAR) AS ac
+                               WHEN 'req_race'  THEN qac.req_race END AS CHAR) AS ac
     FROM cmp.zone_quest zq
     CROSS JOIN (SELECT 'exists' AS field UNION ALL SELECT 'lvl' UNION ALL SELECT 'min_lvl'
-                UNION ALL SELECT 'req_race' UNION ALL SELECT 'next') fld
+                UNION ALL SELECT 'req_race') fld
     LEFT JOIN v.n_quest  qv  ON qv.entry  = zq.quest
     LEFT JOIN mz.n_quest qmz ON qmz.entry = zq.quest
     LEFT JOIN tw.n_quest qtw ON qtw.entry = zq.quest
@@ -131,3 +127,88 @@ LEFT JOIN mz.n_quest_obj omz ON omz.quest = o.quest AND omz.kind = o.kind AND om
 LEFT JOIN tw.n_quest_obj otw ON otw.quest = o.quest AND otw.kind = o.kind AND otw.target = o.target
 LEFT JOIN ac.n_quest_obj oac ON oac.quest = o.quest AND oac.kind = o.kind AND oac.target = o.target
 WHERE cmp.strength(ov.cnt, omz.cnt, oac.cnt) <> '';
+
+-- Quest chain edges, replacing the old `next` field (2026-09-20).
+--
+-- The old comparison put this realm's NextQuestId beside mangoszero's
+-- NextQuestId and AzerothCore's RewardNextQuest, and it was wrong twice
+-- over. RewardNextQuest is the WotLK auto-offer column - this family's
+-- NextQuestInChain, a different fact - while AzerothCore's actual
+-- NextQuestID lives in quest_template_addon, which nothing here read. And
+-- even against the right column, "A unlocks B" is spelled on either end:
+-- this realm writes NextQuestId on A, the peers overwhelmingly write
+-- PrevQuestId on B. Measured on the old shape: 257 of the 280 strong `next`
+-- findings were this realm holding a link both peers read as 0, and 193 of
+-- those 257 (75%) were carried by mangoszero on the successor's PrevQuestId
+-- - the same edge, reported as a defect because it was read off the wrong
+-- end.
+--
+-- n_quest_chain (one per source, see views/v.sql) collapses both spellings
+-- into the same (prev, next) edge, so what is compared here is the fact and
+-- not the convention. One finding per edge, the same per-target shape the
+-- relations topic uses for vendor/questgiver rows.
+--
+-- A source that does not have BOTH quests cannot express an edge between
+-- them: it abstains (NULL), exactly as a source missing an NPC abstains on
+-- that NPC's vendor list in diffs/02_relations.sql. Only a source holding
+-- both quests and not the edge is saying no.
+--
+-- The finding is filed against the predecessor, in the predecessor's zone.
+INSERT INTO cmp.findings
+    (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
+SELECT zq.zone, 'quests', 'quest', e.prev, CONCAT('chain:', e.next),
+       CASE WHEN NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.prev)
+              OR NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.next) THEN NULL
+            WHEN cv.prev IS NULL THEN '0' ELSE '1' END,
+       CASE WHEN NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.prev)
+              OR NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.next) THEN NULL
+            WHEN cmz.prev IS NULL THEN '0' ELSE '1' END,
+       CASE WHEN NOT EXISTS (SELECT 1 FROM tw.n_quest q WHERE q.entry = e.prev)
+              OR NOT EXISTS (SELECT 1 FROM tw.n_quest q WHERE q.entry = e.next) THEN NULL
+            WHEN ctw.prev IS NULL THEN '0' ELSE '1' END,
+       CASE WHEN NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.prev)
+              OR NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.next) THEN NULL
+            WHEN cac.prev IS NULL THEN '0' ELSE '1' END,
+       cmp.strength(
+           CASE WHEN NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.prev)
+                  OR NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.next) THEN NULL
+                WHEN cv.prev IS NULL THEN '0' ELSE '1' END,
+           CASE WHEN NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.prev)
+                  OR NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.next) THEN NULL
+                WHEN cmz.prev IS NULL THEN '0' ELSE '1' END,
+           CASE WHEN NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.prev)
+                  OR NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.next) THEN NULL
+                WHEN cac.prev IS NULL THEN '0' ELSE '1' END),
+       CASE WHEN cmp.strength(
+                     CASE WHEN NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.prev)
+                            OR NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.next) THEN NULL
+                          WHEN cv.prev IS NULL THEN '0' ELSE '1' END,
+                     CASE WHEN NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.prev)
+                            OR NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.next) THEN NULL
+                          WHEN cmz.prev IS NULL THEN '0' ELSE '1' END,
+                     CASE WHEN NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.prev)
+                            OR NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.next) THEN NULL
+                          WHEN cac.prev IS NULL THEN '0' ELSE '1' END) <> 'strong' THEN ''
+            WHEN cv.prev IS NULL THEN 'this realm lacks it; both peers have it'
+            ELSE 'this realm has it; neither peer does' END
+FROM (
+    SELECT prev, next FROM v.n_quest_chain
+    UNION SELECT prev, next FROM mz.n_quest_chain
+    UNION SELECT prev, next FROM tw.n_quest_chain
+    UNION SELECT prev, next FROM ac.n_quest_chain
+) e
+JOIN cmp.zone_quest zq ON zq.quest = e.prev
+LEFT JOIN v.n_quest_chain  cv  ON cv.prev  = e.prev AND cv.next  = e.next
+LEFT JOIN mz.n_quest_chain cmz ON cmz.prev = e.prev AND cmz.next = e.next
+LEFT JOIN tw.n_quest_chain ctw ON ctw.prev = e.prev AND ctw.next = e.next
+LEFT JOIN ac.n_quest_chain cac ON cac.prev = e.prev AND cac.next = e.next
+WHERE cmp.strength(
+        CASE WHEN NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.prev)
+               OR NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.next) THEN NULL
+             WHEN cv.prev IS NULL THEN '0' ELSE '1' END,
+        CASE WHEN NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.prev)
+               OR NOT EXISTS (SELECT 1 FROM mz.n_quest q WHERE q.entry = e.next) THEN NULL
+             WHEN cmz.prev IS NULL THEN '0' ELSE '1' END,
+        CASE WHEN NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.prev)
+               OR NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.next) THEN NULL
+             WHEN cac.prev IS NULL THEN '0' ELSE '1' END) <> '';

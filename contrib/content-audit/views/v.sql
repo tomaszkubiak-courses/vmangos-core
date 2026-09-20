@@ -255,3 +255,45 @@ UNION ALL SELECT DISTINCT 'link', c1.id, c2.id
     FROM creature_linking l
     JOIN creature c1 ON c1.guid = l.guid
     JOIN creature c2 ON c2.guid = l.master_guid;
+
+-- Quest chain edges, normalised (2026-09-20).
+--
+-- "Quest A unlocks quest B" is spelled two ways in this schema family, and
+-- comparing the raw column compares a convention rather than a fact: this
+-- realm writes it on the predecessor as NextQuestId, both peers overwhelm-
+-- ingly write it on the successor as PrevQuestId. Measured before this view
+-- existed: of the 257 strong `next` findings where this realm had a link and
+-- both peers read 0, 193 (75%) were carried by mangoszero on the successor's
+-- PrevQuestId and 188 by AzerothCore on its own - the same edge, reported as
+-- a defect because it was read off the wrong end.
+--
+-- A negative NextQuestId/PrevQuestId means "any quest of the exclusive
+-- group", not a different quest, so the id is taken through ABS() on every
+-- source; the sign is a modifier on the edge, not part of its identity.
+--
+-- AzerothCore keeps these two columns in quest_template_addon, not
+-- quest_template - 9464 rows the pipeline never read, which is why ac.n_quest
+-- carried RewardNextQuest (the WotLK auto-offer column, this schema's
+-- NextQuestInChain) under the name `next` and a hardcoded 0 for `prev`.
+--
+-- THREE spellings, not two, and the third is the auto-offer column:
+-- NextQuestInChain here, RewardNextQuest in AzerothCore. It is a different
+-- mechanic from a prerequisite - the quest giver hands the next quest over
+-- immediately rather than gating it - but it is the same designer's chain,
+-- and the sources pick differently between the two. Measured on the
+-- prerequisite-only version of this view: 36 of its 129 "this realm lacks
+-- it" edges were ones this realm spells with NextQuestInChain, and 17 of
+-- its 144 "this realm has it" edges were ones a peer spells with its own
+-- auto-offer column. So this view answers "are these two quests linked in a
+-- chain at all, however this schema spells it", and a finding on it means no
+-- source-side link of any kind - a stronger claim than any single column
+-- supports.
+CREATE OR REPLACE VIEW n_quest_chain AS
+SELECT DISTINCT CAST(ABS(PrevQuestId) AS UNSIGNED) AS prev, CAST(entry AS UNSIGNED) AS next
+FROM _quest_current WHERE PrevQuestId <> 0
+UNION
+SELECT DISTINCT CAST(entry AS UNSIGNED), CAST(ABS(NextQuestId) AS UNSIGNED)
+FROM _quest_current WHERE NextQuestId <> 0
+UNION
+SELECT DISTINCT CAST(entry AS UNSIGNED), CAST(NextQuestInChain AS UNSIGNED)
+FROM _quest_current WHERE NextQuestInChain <> 0;
