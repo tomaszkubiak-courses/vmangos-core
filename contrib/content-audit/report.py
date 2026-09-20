@@ -370,6 +370,28 @@ def render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids):
         to_appendix_a = [r for r in suppressed if r["id"] in appendix_a_ids]
         to_section1 = [r for r in suppressed if r["id"] not in appendix_a_ids]
 
+    # 2026-09-20: one realm-wide convention, not N defects. This realm sets
+    # quest_template.RequiredRaces on 628 of its 4433 quests; mangoszero sets
+    # it on 2431 of 4248 and AzerothCore on 4919 of 9464. Once the race masks
+    # are compared on the vanilla bits alone (see views/v.sql), every quest
+    # where this realm leaves the field 0 and both peers restrict it becomes a
+    # 'strong' finding - 1986 of them corpus-wide, which buries every other
+    # quest finding in the report exactly the way the per-spell trainer rows
+    # did before diffs/02_relations.sql collapsed them.
+    #
+    # Collapsed in rendering only: the rows stay in cmp.findings, the count is
+    # printed, and a quest where this realm restricts and the peers differ is
+    # NOT collapsed - that direction is a real per-quest claim.
+    race_convention = []
+    if topic == "quests":
+        race_convention = [
+            r for r in shown
+            if r["field"] == "req_race" and r["v"] == "0"
+            and r["mz"] not in (None, "NULL", "0")
+            and r["ac"] not in (None, "NULL", "0")
+        ]
+        shown = [r for r in shown if r not in race_convention]
+
     strong = sum(1 for r in shown if r["strength"] == "strong")
     lineage = sum(1 for r in shown if r["strength"] == "lineage")
     weak = len(shown) - strong - lineage
@@ -395,6 +417,18 @@ def render_topic(topic, heading, rows, names, absent_ids, appendix_a_ids):
                 "and %d point at a gap both peers have that this realm lacks."
                 % (realm_has, realm_lacks)
             )
+
+    if race_convention:
+        lines.append("")
+        lines.append(
+            "%d req_race finding%s collapsed: this realm leaves RequiredRaces at 0 "
+            "where both peers restrict the quest by race. It populates that column on "
+            "roughly one quest in seven against more than half in either peer, so this "
+            "is one realm-wide convention rather than %d separate defects. The rows are "
+            "still in cmp.findings."
+            % (len(race_convention), "" if len(race_convention) == 1 else "s",
+               len(race_convention))
+        )
 
     if topic == "creatures" and moved:
         lines.append("")
