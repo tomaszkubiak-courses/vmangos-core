@@ -356,3 +356,43 @@ The honest summary of this whole line of work: it produced no content fix.
 A reference that shares the realm's lineage pointed at three NPCs, and all
 three turned out to be correctly stocked by a mechanism neither the
 reference nor the first check modelled.
+
+## A vendor's stock and a trainer's list each have two tables
+
+`npc_vendor` and `npc_trainer` are only half of what this schema stores. A
+`creature_template` row can instead name a shared list through `vendor_id`
+or `trainer_id`, resolved against `npc_vendor_template` and
+`npc_trainer_template`, and the core reads the shared list *alongside* the
+creature's own rather than instead of it -
+`WorldSession::SendListInventory` calls `GetVendorItems()` and
+`GetVendorTemplateItems()` side by side, and `ObjectMgr::LoadVendorTemplates`
+loads the second map.
+
+The normalising views read only the per-creature tables until 2026-09-20,
+and both relation kinds were understated by it:
+
+| relation | own rows | template rows this realm uses | after |
+|---|---|---|---|
+| vendor | 13269 | 492 | 13761 |
+| trainer | 4676 | 29990 (284 creatures) | 34666 |
+
+The trainer number is the one that matters. `diffs/02_relations.sql`'s
+comment on the trainer topic records a conclusion drawn from the old view -
+"v has far fewer, shorter trainer lists than mz/tw/ac", judged in Task 4 to
+be a genuine content difference - and it was an artefact: seven eighths of
+this realm's trainer data lives in the template table the view did not read.
+On the vendor side it produced 55 `strong` "this realm lacks it; both peers
+have it" findings for items the realm does sell, which is exactly the set a
+pfQuest cross-check had flagged as confirmed gaps.
+
+tortoise-wow is a VMaNGOS fork and carries the same model (2353 vendor and
+220 trainer template rows over 556 creatures), so its view gained the same
+two branches, reading `creature_template` directly since that fork has no
+patch dimension. mangoszero has both template tables but leaves them empty,
+and AzerothCore has no vendor template table at all, so neither peer view
+needed the branch.
+
+Both branches carry a `NOT EXISTS` against the per-creature table and a
+`DISTINCT`. The second is not decoration: `npc_trainer_template` holds 2404
+rows over 1393 distinct `(entry, spell)` pairs, and without it the trainer
+relation came out about 20000 rows too large.

@@ -20,10 +20,16 @@ UNION ALL SELECT 'ac', kind FROM ac.n_rel GROUP BY kind;
 
 -- (a) Trainer relations, one finding per trainer NPC rather than per spell.
 -- Under the plan's original per-spell shape this kind alone produced 28446
--- of 35651 relation findings (80%) on this corpus, restating one fact - v
--- has far fewer, shorter trainer lists than mz/tw/ac - tens of thousands of
--- times and burying every other relation finding in the report (Task 4
--- already judged the size gap a genuine content difference, not a bug).
+-- of 35651 relation findings (80%) on this corpus, restating one apparent
+-- fact - v has far fewer, shorter trainer lists than mz/tw/ac - tens of
+-- thousands of times and burying every other relation finding in the report.
+--
+-- That "fact" was an artefact of the view, corrected 2026-09-20: v.n_rel
+-- read npc_trainer and not the npc_trainer_template lists that
+-- creature_template.trainer_id names, which is where 29990 of this realm's
+-- 34666 trainer relations live. Task 4 judged the size gap a genuine content
+-- difference on the old numbers; it is not. Per-NPC rather than per-spell is
+-- still the right shape for the finding, for the readability reason above.
 --
 -- ac abstains on trainer entirely (Task 9 fix round 2, item 1; see the
 -- comment on views/ac.sql's n_rel): its real trainer data lives in tables
