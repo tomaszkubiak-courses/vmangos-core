@@ -199,8 +199,24 @@ SELECT 'mz', entry, cmp.vanilla_quest_xp(lvl, rew_money_max_level),
 FROM mz.n_quest
 UNION ALL
 -- AzerothCore cannot supply a vanilla figure: RewardXPDifficulty indexes
--- QuestXP.dbc, which is not available here, and WotLK rebalanced quest
--- experience regardless. It votes on the boolean only.
+-- QuestXP.dbc, and WotLK rebalanced quest experience regardless. It votes
+-- on the boolean only.
+--
+-- 2026-09-20: QuestXP.dbc is not merely absent from this corpus, it does
+-- not exist in this client. The 1.12.1 client ships QuestInfo.dbc and
+-- QuestSort.dbc and nothing else quest-shaped (checked in the extracted
+-- dbc directory), because vanilla sends quest experience from the server
+-- rather than looking it up client-side. So the sub-61 branch of
+-- cmp.vanilla_quest_xp above - the transcribed one - cannot be validated
+-- against client data at all, and the 249 xp_self_consistency findings
+-- stay "the formula disagrees with the stored value" rather than "the
+-- stored value is wrong". Settling them needs a reference from outside
+-- this machine.
+--
+-- The money_max_level <= 0 guard in that function is not hiding anything
+-- either, though an earlier note called it that: money_max_level IS the
+-- formula's input, so a quest with 0 there has nothing to check against,
+-- not a check being withheld. 188 quests are in that state.
 SELECT 'ac', ID, CAST(NULL AS DOUBLE),
        CASE WHEN RewardXPDifficulty > 0 THEN 1 ELSE 0 END
 FROM ac.quest_template;
