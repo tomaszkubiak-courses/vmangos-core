@@ -1398,6 +1398,18 @@ def test_quest_chain_edges_are_spelling_independent():
         "table is the only place its PrevQuestID/NextQuestID live" % ac_only_addon[0][0]
     )
 
+    patch_annotated = corpus_sql(
+        "SELECT note FROM cmp.findings WHERE topic='quests' AND entity_id=933 "
+        "AND field='chain:934'"
+    )
+    assert patch_annotated, "fixture chain finding 933 -> 934 no longer exists"
+    assert "patch revisions" in patch_annotated[0][0], (
+        "the Crown of the Earth edge 933 -> 934 does not name its patch revisions: %r "
+        "- this realm serves a patch-1 route through 7383 while the peers carry the "
+        "patch-0 route through 934, and without the note the edge reads as a missing "
+        "prerequisite" % patch_annotated[0][0]
+    )
+
     findings = corpus_sql(
         "SELECT COUNT(*) FROM cmp.findings WHERE topic='quests' AND field='next'"
     )

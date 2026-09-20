@@ -179,6 +179,7 @@ SELECT zq.zone, 'quests', 'quest', e.prev, CONCAT('chain:', e.next),
            CASE WHEN NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.prev)
                   OR NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.next) THEN NULL
                 WHEN cac.prev IS NULL THEN '0' ELSE '1' END),
+       CONCAT(
        CASE WHEN cmp.strength(
                      CASE WHEN NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.prev)
                             OR NOT EXISTS (SELECT 1 FROM v.n_quest q WHERE q.entry = e.next) THEN NULL
@@ -190,7 +191,21 @@ SELECT zq.zone, 'quests', 'quest', e.prev, CONCAT('chain:', e.next),
                             OR NOT EXISTS (SELECT 1 FROM ac.n_quest q WHERE q.entry = e.next) THEN NULL
                           WHEN cac.prev IS NULL THEN '0' ELSE '1' END) <> 'strong' THEN ''
             WHEN cv.prev IS NULL THEN 'this realm lacks it; both peers have it'
-            ELSE 'this realm has it; neither peer does' END
+            ELSE 'this realm has it; neither peer does' END,
+       -- The same patch-revision annotation the field comparisons carry, and
+       -- the reason it is here: judging this block found the Crown of the
+       -- Earth chain (929 -> 933 -> 7383 -> 935), where this realm serves a
+       -- patch-1 revision that routes through 7383 while both peers, having
+       -- no patch dimension, carry only the patch-0 route through 934. The
+       -- edge 933 -> 934 reads as a missing prerequisite and is nothing of
+       -- the kind. 68 of the 238 strong chain findings (29%) touch a quest
+       -- with more than one revision, so this is not a one-off.
+       CASE WHEN (SELECT COUNT(*) FROM v.quest_template qp
+                   WHERE qp.entry = e.prev AND qp.patch <= 10) > 1
+              OR (SELECT COUNT(*) FROM v.quest_template qn
+                   WHERE qn.entry = e.next AND qn.patch <= 10) > 1
+            THEN '; one end of this edge has several patch revisions here and the peers carry one version'
+            ELSE '' END)
 FROM (
     SELECT prev, next FROM v.n_quest_chain
     UNION SELECT prev, next FROM mz.n_quest_chain
