@@ -19,6 +19,59 @@ UNION ALL
 SELECT 'ac', kind, zone, entry, COUNT(*), MIN(resp_min), MAX(resp_max)
 FROM ac.n_spawn GROUP BY kind, zone, entry;
 
+-- Spawn pools, recorded as context on the count (2026-09-20).
+--
+-- A pooled spawn point is a candidate, not a spawn: pool_template.max_limit
+-- says how many members of a pool are up at once, so counting rows in
+-- `creature`/`gameobject` overstates a pooled entity's real density, and it
+-- overstates it by a different factor in every source. Measured here:
+-- 29466 of this realm's 56665 gameobject spawns are pooled (52%), against
+-- 13346 of 42008 in mangoszero (32%) and 32865 of 96628 in AzerothCore
+-- (34%). 78 of the 175 strong gobject spawn_count findings sit on an entity
+-- this realm pools - nearly half of them are a pooled count compared with
+-- an unpooled one.
+--
+-- This records the fact rather than trying to correct for it. A corrected
+-- count would have to model nested pools (pool_pool has 5669 rows here) and
+-- per-member chances, and a subtly wrong effective-count formula is exactly
+-- the failure this pipeline keeps producing; a reader who can see that both
+-- sides pool differently can decide for themselves, and no finding is
+-- suppressed either way.
+--
+-- ponytail: attributes a pooled spawn to its primary `id` only, so a pooled
+-- random-pick spawn (id2..id5) is undercounted in this note. Unpivot the way
+-- n_spawn does if that ever matters - it does not for a context line.
+CREATE OR REPLACE VIEW cmp.spawn_pooled AS
+SELECT 'v' AS src, 'creature' AS kind, a.zone, CAST(c.id AS UNSIGNED) AS entry, COUNT(DISTINCT c.guid) AS pooled_n
+FROM v.pool_creature p JOIN v.creature c ON c.guid = p.guid
+JOIN cmp.areas a ON a.src = 'v' AND a.kind = 'creature' AND a.id = c.guid
+GROUP BY a.zone, c.id
+UNION ALL
+SELECT 'v', 'gobject', a.zone, g.id, COUNT(DISTINCT g.guid)
+FROM v.pool_gameobject p JOIN v.gameobject g ON g.guid = p.guid
+JOIN cmp.areas a ON a.src = 'v' AND a.kind = 'gobject' AND a.id = g.guid
+GROUP BY a.zone, g.id
+UNION ALL
+SELECT 'mz', 'creature', a.zone, c.id, COUNT(DISTINCT c.guid)
+FROM mz.pool_creature p JOIN mz.creature c ON c.guid = p.guid
+JOIN cmp.areas a ON a.src = 'mz' AND a.kind = 'creature' AND a.id = c.guid
+GROUP BY a.zone, c.id
+UNION ALL
+SELECT 'mz', 'gobject', a.zone, g.id, COUNT(DISTINCT g.guid)
+FROM mz.pool_gameobject p JOIN mz.gameobject g ON g.guid = p.guid
+JOIN cmp.areas a ON a.src = 'mz' AND a.kind = 'gobject' AND a.id = g.guid
+GROUP BY a.zone, g.id
+UNION ALL
+SELECT 'ac', 'creature', a.zone, c.id, COUNT(DISTINCT c.guid)
+FROM ac.pool_creature p JOIN ac.creature c ON c.guid = p.guid
+JOIN cmp.areas a ON a.src = 'ac' AND a.kind = 'creature' AND a.id = c.guid
+GROUP BY a.zone, c.id
+UNION ALL
+SELECT 'ac', 'gobject', a.zone, g.id, COUNT(DISTINCT g.guid)
+FROM ac.pool_gameobject p JOIN ac.gameobject g ON g.guid = p.guid
+JOIN cmp.areas a ON a.src = 'ac' AND a.kind = 'gobject' AND a.id = g.guid
+GROUP BY a.zone, g.id;
+
 -- Every source populates n_spawn, so a (kind, zone, entry) combination
 -- missing from v's aggregate is a genuine zero spawn count there, not an
 -- abstention - COALESCE(av.n, 0) is correct for v, not a stand-in for NULL.
@@ -58,7 +111,11 @@ SELECT k.zone, 'spawns', k.kind, k.entry, 'spawn_count',
        cmp.apply_lineage(
            cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5),
            pl.k1 IS NOT NULL),
-       ''
+       CASE WHEN COALESCE(pv.pooled_n, 0) + COALESCE(pmz.pooled_n, 0) + COALESCE(pac.pooled_n, 0) = 0 THEN ''
+            ELSE CONCAT('pooled spawn points, not all up at once - this realm ',
+                        COALESCE(pv.pooled_n, 0), ' of ', COALESCE(av.n, 0),
+                        ', mangoszero ', COALESCE(pmz.pooled_n, 0),
+                        ', azerothcore ', COALESCE(pac.pooled_n, 0)) END
 FROM (SELECT DISTINCT kind, zone, entry FROM cmp.spawn_agg) k
 LEFT JOIN cmp.spawn_agg av  ON av.src  = 'v'  AND av.kind  = k.kind AND av.zone  = k.zone AND av.entry  = k.entry
 LEFT JOIN cmp.spawn_agg amz ON amz.src = 'mz' AND amz.kind = k.kind AND amz.zone = k.zone AND amz.entry = k.entry
@@ -66,6 +123,9 @@ LEFT JOIN cmp.spawn_agg atw ON atw.src = 'tw' AND atw.kind = k.kind AND atw.zone
 LEFT JOIN cmp.spawn_agg aac ON aac.src = 'ac' AND aac.kind = k.kind AND aac.zone = k.zone AND aac.entry = k.entry
 LEFT JOIN cmp.peer_lineage pl
   ON pl.kind = 'spawn_count' AND pl.k1 = k.kind AND pl.k2 = CAST(k.zone AS CHAR) AND pl.k3 = CAST(k.entry AS CHAR)
+LEFT JOIN cmp.spawn_pooled pv  ON pv.src  = 'v'  AND pv.kind  = k.kind AND pv.zone  = k.zone AND pv.entry  = k.entry
+LEFT JOIN cmp.spawn_pooled pmz ON pmz.src = 'mz' AND pmz.kind = k.kind AND pmz.zone = k.zone AND pmz.entry = k.entry
+LEFT JOIN cmp.spawn_pooled pac ON pac.src = 'ac' AND pac.kind = k.kind AND pac.zone = k.zone AND pac.entry = k.entry
 WHERE cmp.strength_mag(COALESCE(av.n, 0), amz.n, aac.n, 0.50, 5) <> '';
 
 -- resp_min of 0 means "no respawn" rather than "respawns instantly", and a

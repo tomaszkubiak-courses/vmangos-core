@@ -396,3 +396,27 @@ Both branches carry a `NOT EXISTS` against the per-creature table and a
 `DISTINCT`. The second is not decoration: `npc_trainer_template` holds 2404
 rows over 1393 distinct `(entry, spell)` pairs, and without it the trainer
 relation came out about 20000 rows too large.
+
+## A pooled spawn point is not a spawn
+
+`pool_template.max_limit` decides how many members of a spawn pool are up at
+once, so counting rows in `creature`/`gameobject` overstates a pooled
+entity's density - and it overstates it by a different factor in each
+source. Measured 2026-09-20: 29466 of this realm's 56665 gameobject spawns
+are pooled (52%), against 13346 of 42008 in mangoszero (32%) and 32865 of
+96628 in AzerothCore (34%). Creature spawns are barely pooled anywhere (140
+rows here).
+
+That lands squarely on the `spawns` topic's gameobject half. Copper Vein
+(1731) in Ashenvale is the clearest case: 62 spawn points here, every one
+pooled, against 38 unpooled in mangoszero and 34 in AzerothCore. The raw
+comparison reads as "this realm has 63% more copper than its peers"; what it
+actually shows is a different way of spelling the same node density.
+
+`diffs/06_spawns.sql` records the fact in the finding's note - "pooled spawn
+points, not all up at once - this realm 62 of 62, mangoszero 0, azerothcore
+34" - on 53 of the 175 strong gobject findings. It does not try to correct
+the count. A corrected effective count would have to model nested pools
+(`pool_pool` has 5669 rows here) and per-member chances, and a subtly wrong
+formula is precisely the failure mode this pipeline keeps producing; the
+reader can see both sides and decide. Nothing is suppressed.

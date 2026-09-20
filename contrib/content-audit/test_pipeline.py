@@ -1236,6 +1236,47 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
     print("PASS test_quest_objective_finding_note_records_the_genuine_gap")
 
 
+def test_pooled_spawn_count_finding_says_so():
+    """A spawn_count finding on an entity whose spawn points are pooled must
+    say so: a pooled point is a candidate, not a spawn, and pool_template's
+    max_limit decides how many are up at once.
+
+    Fixture verified on the corpus: Copper Vein (gameobject 1731) in
+    Ashenvale (zone 331) - this realm has 62 spawn points and every one of
+    them is pooled, against 38 unpooled in mangoszero and 34 in
+    AzerothCore, so the finding's raw 62-vs-38 is not a density difference
+    at all. 53 of the 175 strong gobject spawn_count findings carry this
+    note.
+
+    The counter-assertion matters as much: an entity nobody pools must get
+    no note, or the annotation says nothing.
+    """
+    rows = corpus_sql(
+        "SELECT v_value, note FROM cmp.findings WHERE topic='spawns' "
+        "AND field='spawn_count' AND zone=331 AND entity_kind='gobject' AND entity_id=1731"
+    )
+    assert rows, "fixture spawn_count finding (zone 331, gobject 1731) no longer exists"
+    v_value, note = rows[0]
+    assert note.startswith("pooled spawn points"), (
+        "gobject 1731 in zone 331 has %s spawn points, all pooled, and its note is %r"
+        % (v_value, note)
+    )
+    assert "this realm 62 of 62" in note, (
+        "the pool counts in the note no longer match the corpus: %r" % note
+    )
+
+    unpooled = corpus_sql(
+        "SELECT COUNT(*) FROM cmp.findings f WHERE f.topic='spawns' AND f.field='spawn_count' "
+        "AND f.note <> '' AND NOT EXISTS (SELECT 1 FROM cmp.spawn_pooled sp "
+        "WHERE sp.kind = f.entity_kind AND sp.zone = f.zone AND sp.entry = f.entity_id)"
+    )
+    assert unpooled[0][0] == "0", (
+        "%s spawn_count findings carry a pool note for an entity no source pools"
+        % unpooled[0][0]
+    )
+    print("PASS test_pooled_spawn_count_finding_says_so")
+
+
 def test_vendor_and_trainer_relations_include_template_lists():
     """A creature's stock and spell list have two sources in this schema -
     its own npc_vendor/npc_trainer rows, and the shared list named by
@@ -1653,6 +1694,7 @@ TESTS = [
     test_vendor_flag_without_stock_is_reported_and_stays_single_source,
     test_xp_self_consistency_keeps_its_peer_columns_empty,
     test_vendor_and_trainer_relations_include_template_lists,
+    test_pooled_spawn_count_finding_says_so,
     test_report_renders_for_pilot_zones,
     test_report_suppresses_absent_creature_relations,
     test_report_resolves_creature_names,
