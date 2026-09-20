@@ -115,6 +115,13 @@ UNION ALL SELECT ID, 'rep',    RewardFactionID2, CAST(NULL AS SIGNED) FROM quest
 UNION ALL SELECT ID, 'rep',    RewardFactionID3, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID3 > 0
 UNION ALL SELECT ID, 'rep',    RewardFactionID4, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID4 > 0
 UNION ALL SELECT ID, 'rep',    RewardFactionID5, CAST(NULL AS SIGNED) FROM quest_template WHERE RewardFactionID5 > 0
+-- Two spell-reward slots here as well (2026-09-20), the same pair v.sql
+-- documents: RewardDisplaySpell is the spell shown and taught (this
+-- family's RewSpell) and RewardSpell is the one cast at turn-in (RewSpellCast).
+-- Reading only RewardSpell made this source silently vote "no taught spell"
+-- on the 158 quests that set both and the 4 that set only the display slot,
+-- against v and mz which have unioned both slots since Task 12's fix round.
+UNION ALL SELECT ID, 'spell',  RewardDisplaySpell, 1 FROM quest_template WHERE RewardDisplaySpell > 0
 UNION ALL SELECT ID, 'spell',  RewardSpell, 1 FROM quest_template WHERE RewardSpell > 0
 UNION ALL SELECT ID, 'money',  0, RewardMoney FROM quest_template WHERE RewardMoney > 0;
 

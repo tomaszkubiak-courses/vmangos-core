@@ -477,3 +477,28 @@ trainer rows did before the relations topic collapsed them.
 rows stay in `cmp.findings`, the count is printed, and the opposite
 direction - this realm restricting where the peers do not - stays in the
 table, because that is a real per-quest claim rather than a convention.
+
+## Two smaller holes from the same sweep
+
+**AzerothCore has two spell-reward slots too.** `RewardDisplaySpell` is the
+spell shown and taught (this family's `RewSpell`); `RewardSpell` is the one
+cast at turn-in (`RewSpellCast`). `ac.n_quest_rew` read only the second, so
+it voted "no taught spell" on the 158 quests that set both and the 4 that
+set only the display slot - while v and mz have unioned both slots since
+Task 12. Fixed; `quest_rewards` moves 372 to 375 strong.
+
+**Battleground player loot has no source the audit can see.**
+`cmp.n_loot_eff` walks creature, gameobject and item loot.
+`battleground_template.player_loot_id` names a `reference_loot_template`
+the core installs on *player* corpses, and Alterac Valley's holds the
+sixteen turn-in items - the medals, the flesh, Storm Crystal, the racial
+trophies. 1322 findings in that one zone rest on those 15 items and every
+one of them reads as "this realm has no source for it".
+
+All 1322 are already `lineage` rather than `strong` - the peers model the
+same items on creatures and agree with each other - so the label was
+holding the line. They now carry a note naming the mechanism instead, since
+this block has already sent one investigation chasing a content gap that
+does not exist. No peer schema has a loot column on `battleground_template`
+at all, so there is nothing to compare and nothing to gain from modelling
+it further.
