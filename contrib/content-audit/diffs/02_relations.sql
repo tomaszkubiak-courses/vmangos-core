@@ -169,27 +169,33 @@ WHERE cmp.strength(
 -- creature_template.npc_flags bit 0x4 is UNIT_NPC_FLAG_VENDOR
 -- (src/game/Objects/UnitDefines.h): the client shows a "Browse Goods" gossip
 -- option and the core accepts CMSG_LIST_INVENTORY for that NPC. With no
--- npc_vendor row the player gets an empty vendor window - a visible defect
+-- stock behind it the player gets an empty vendor window - a visible defect
 -- that needs no reference database to establish.
 --
--- Why this exists even though topic (b) already compares vendor stock
--- item by item: a peer comparison can only speak where a peer has the NPC
--- and the item, and the audit's own vendor findings are the least
--- trustworthy block it produces (no independent vanilla reference - pfQuest,
--- the reference used for loot, is generated FROM a VMaNGOS database and so
--- shares this realm's lineage, which makes its agreement inheritance rather
--- than evidence). This check needs none of that.
+-- "No stock" has TWO sources to check, not one, and the first version of
+-- this block checked only npc_vendor. A creature_template row can instead
+-- carry vendor_id, naming a shared list in npc_vendor_template
+-- (ObjectMgr::LoadVendorTemplates); 83 of this realm's vendor-flagged
+-- creatures stock themselves that way and own no npc_vendor row at all. The
+-- npc_vendor-only test reported 13 of them as selling nothing while every
+-- one had a full template list - Nida Winterhoof (3014) resolves to template
+-- 301401's 10 items, exactly what mangoszero carries on her directly. Same
+-- defect shape as the six Task 12 fixed: comparing a column without reading
+-- how the core actually uses it.
+--
+-- Reading through v._creature_current rather than creature_template is the
+-- second half of the same correction. Both flags and vendor_id are per patch
+-- revision, and the realm serves one revision: Lanie Reed (2941) is a vendor
+-- at patches 0 and 1 and a flight master from patch 3 onward, so a
+-- MAX(npc_flags) over her revisions invents a vendor this realm never
+-- shows. The npc_vendor and npc_vendor_template probes stay unfiltered by
+-- patch on purpose - neither table has a patch dimension.
 --
 -- The join to cmp.zone_creature is also the filter that keeps the check
 -- honest: it only sees creatures that are actually spawned somewhere, which
--- drops the 16 unspawned placeholder vendors in the template table
--- ("Programmer Vendor", "[UNUSED] ...", "Eric's AAA Special Vendor") without
--- naming any of them.
---
--- Both halves are deliberately unfiltered by patch - MAX(npc_flags) over the
--- entry's revisions, and an unqualified npc_vendor probe: an NPC that
--- sells nothing at ANY patch is the case being reported, and a per-patch
--- shortage is topic (b)'s business.
+-- drops the unspawned placeholder vendors in the template table
+-- ("Programmer Vendor", "[UNUSED] ...", "Eric's AAA Special Vendor")
+-- without naming any of them.
 INSERT INTO cmp.findings
     (zone, topic, entity_kind, entity_id, field, v_value, mz_value, tw_value, ac_value, strength, note)
 SELECT z.zone, 'relations', 'creature', ct.entry, 'vendor_flag_no_stock',
@@ -198,8 +204,10 @@ SELECT z.zone, 'relations', 'creature', ct.entry, 'vendor_flag_no_stock',
        (SELECT COUNT(*) FROM tw.npc_vendor n WHERE n.entry = ct.entry),
        (SELECT COUNT(*) FROM ac.npc_vendor n WHERE n.entry = ct.entry),
        'strong',
-       'flagged as a vendor by this realm own creature_template, with no npc_vendor row at any patch'
-FROM (SELECT entry, MAX(npc_flags) AS npc_flags FROM v.creature_template GROUP BY entry) ct
+       'flagged as a vendor by this realm own creature_template, with no npc_vendor row and no vendor template'
+FROM v._creature_current ct
 JOIN cmp.zone_creature z ON z.entry = ct.entry
 WHERE (ct.npc_flags & 4) > 0
-  AND NOT EXISTS (SELECT 1 FROM v.npc_vendor nv WHERE nv.entry = ct.entry);
+  AND NOT EXISTS (SELECT 1 FROM v.npc_vendor nv WHERE nv.entry = ct.entry)
+  AND NOT EXISTS (SELECT 1 FROM v.npc_vendor_template nt
+                  WHERE ct.vendor_id <> 0 AND nt.entry = ct.vendor_id);

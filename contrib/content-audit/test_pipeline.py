@@ -1238,55 +1238,66 @@ def test_quest_objective_finding_note_records_the_genuine_gap():
 
 def test_vendor_flag_without_stock_is_reported_and_stays_single_source():
     """A creature its own creature_template flags as a vendor
-    (UNIT_NPC_FLAG_VENDOR, npc_flags & 4) while npc_vendor has no row for it
-    at any patch is a finding on this realm alone - no peer decides it.
+    (UNIT_NPC_FLAG_VENDOR, npc_flags & 4) with no stock behind the flag is a
+    finding on this realm alone - no peer decides it.
 
-    Fixture verified on the corpus before writing this: Nida Winterhoof
-    (3014, Mulgore) carries npc_flags 6 (questgiver + vendor) in all three of
-    her patch revisions and has zero npc_vendor rows, while mangoszero
-    stocks her with 10 items and AzerothCore with 11. Thirteen spawned
-    creatures are in this state corpus-wide.
+    Both halves of "no stock" are pinned here, because the first version of
+    the check only knew the first one and was wrong about 13 of the 14
+    creatures it reported:
 
-    The second half is the part that can rot silently: the check must never
-    reach the sixteen unspawned placeholder vendors in creature_template
-    ("Programmer Vendor", "[UNUSED] ..."), which it avoids only because it
-    joins cmp.zone_creature. Creature 130 is one of them and is asserted
-    absent.
+    - npc_vendor, the per-creature list. Myizz Luckycatch (2834, Booty Bay)
+      is the fixture: npc_flags 21 (gossip + vendor + trainer) in both of
+      his patch revisions, no npc_vendor row, vendor_id 0. He is the only
+      creature in this state on the corpus.
+    - npc_vendor_template, reached through creature_template.vendor_id
+      (ObjectMgr::LoadVendorTemplates). Nida Winterhoof (3014) is the
+      counter-fixture: no npc_vendor row of her own, vendor_id 301401, 10
+      items in that template - a fully stocked vendor that must NOT be
+      reported.
+
+    Creature 130 ("Programmer Vendor") is asserted absent as well: it is
+    flagged, unstocked and unspawned, and only the cmp.zone_creature join
+    keeps it out.
     """
     rows = corpus_sql(
-        "SELECT v_value, mz_value, ac_value, strength FROM cmp.findings "
-        "WHERE topic='relations' AND field='vendor_flag_no_stock' AND entity_id=3014"
+        "SELECT v_value, strength FROM cmp.findings "
+        "WHERE topic='relations' AND field='vendor_flag_no_stock' AND entity_id=2834"
     )
     assert rows, (
-        "fixture creature 3014 no longer produces a vendor_flag_no_stock finding - "
-        "either the check is gone or the realm finally stocks her"
+        "fixture creature 2834 no longer produces a vendor_flag_no_stock finding - "
+        "either the check is gone or the realm finally stocks him"
     )
-    v_value, mz_value, ac_value, strength = rows[0]
-    assert (v_value, strength) == ("0", "strong"), (
-        "vendor_flag_no_stock on 3014 reads v=%r strength=%r, expected ('0', 'strong')"
-        % (v_value, strength)
-    )
-    assert int(mz_value) > 0 and int(ac_value) > 0, (
-        "the peer columns are context on this finding and both peers stock 3014 - "
-        "got mz=%r ac=%r" % (mz_value, ac_value)
+    assert tuple(rows[0]) == ("0", "strong"), (
+        "vendor_flag_no_stock on 2834 reads %r, expected ('0', 'strong')" % (tuple(rows[0]),)
     )
 
-    # Every row the check writes must really have no npc_vendor row: this is
-    # the assertion that fails if the NOT EXISTS is ever widened or dropped.
-    flagged = [r[0] for r in corpus_sql(
-        "SELECT entity_id FROM cmp.findings "
+    reported = [r[0] for r in corpus_sql(
+        "SELECT DISTINCT entity_id FROM cmp.findings "
         "WHERE topic='relations' AND field='vendor_flag_no_stock'"
     )]
-    assert flagged, "the vendor_flag_no_stock check produced nothing at all"
-    stocked = corpus_sql(
-        "SELECT COUNT(*) FROM v.npc_vendor WHERE entry IN (%s)" % ",".join(flagged)
+    assert "3014" not in reported, (
+        "creature 3014 stocks itself through npc_vendor_template and must not be "
+        "reported as selling nothing - the vendor_id half of the check has been lost"
     )
-    assert stocked[0][0] == "0", (
-        "%s npc_vendor rows exist for creatures reported as having none" % stocked[0][0]
-    )
-    assert "130" not in flagged, (
+    assert "130" not in reported, (
         "creature 130 ('Programmer Vendor') is unspawned and must not be reported - "
         "the cmp.zone_creature join that filters it out has been lost"
+    )
+
+    # Every reported creature must really have neither kind of stock: this is
+    # what fails if either NOT EXISTS is widened or dropped.
+    ids = ",".join(reported)
+    direct = corpus_sql("SELECT COUNT(*) FROM v.npc_vendor WHERE entry IN (%s)" % ids)
+    assert direct[0][0] == "0", (
+        "%s npc_vendor rows exist for creatures reported as having none" % direct[0][0]
+    )
+    templated = corpus_sql(
+        "SELECT COUNT(*) FROM v._creature_current ct JOIN v.npc_vendor_template nt "
+        "ON nt.entry = ct.vendor_id WHERE ct.entry IN (%s)" % ids
+    )
+    assert templated[0][0] == "0", (
+        "%s vendor template rows exist for creatures reported as having none"
+        % templated[0][0]
     )
     print("PASS test_vendor_flag_without_stock_is_reported_and_stays_single_source")
 
