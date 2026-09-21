@@ -13108,7 +13108,10 @@ void Player::AddQuest(Quest const* pQuest, Object* questGiver)
         }
 
         // starting initial DB quest script
-        if (pQuest->GetQuestStartScript() != 0)
+        // A shared quest arrives here with the sharing player as its quest giver.
+        // The script commands expect the creature or object that hands the quest
+        // out, so running it on a player only makes every command fail.
+        if (pQuest->GetQuestStartScript() != 0 && questGiver->GetTypeId() != TYPEID_PLAYER)
             if (WorldObject* pQuestGiver = questGiver->ToWorldObject())
                 GetMap()->ScriptsStart(sQuestStartScripts, pQuest->GetQuestStartScript(), pQuestGiver->GetObjectGuid(), GetObjectGuid());
 
