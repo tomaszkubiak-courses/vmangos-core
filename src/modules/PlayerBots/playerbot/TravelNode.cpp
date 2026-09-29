@@ -1939,7 +1939,7 @@ TravelPath TravelNodeMap::getFullPath(WorldPosition startPos, WorldPosition endP
 
 bool TravelNodeMap::cropUselessNode(TravelNode* startNode)
 {
-    if (!startNode->isLinked() || startNode->isImportant())
+    if (!startNode->isLinked() || startNode->isImportant() || startNode->isPortal())
         return false;
 
     std::vector<TravelNode*> ignore = { startNode };
