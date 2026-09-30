@@ -364,6 +364,12 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
                     units.insert(pullTarget);
                 }
             }
+
+            // If the enemy player can't be reached (e.g. under the map)
+            if (!EnemyPlayersValue::IsReachable(enemyPlayer, playerToCheckAgainst))
+            {
+                return false;
+            }
         }
 
         // Get the current attackers of the player
