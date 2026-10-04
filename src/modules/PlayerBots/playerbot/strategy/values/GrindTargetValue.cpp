@@ -198,6 +198,17 @@ Unit* GrindTargetValue::FindTargetForGrinding(int assistCount)
             continue;
         }
 
+        // The xp test further down only looks at creatures, so any enemy player in sight was a
+        // grind target. A grey player gives neither xp nor honor, and once it releases it comes
+        // back to the same spot: a level 58 bot killed one level 15 bot 34 times and a level 22
+        // one 24 times in three hours at the zeppelin towers. Fighting back is the attackers'
+        // business, not this one's.
+        if (!bot->InBattleGround() && unit->GetObjectGuid().IsPlayer() && unit->GetLevel() <= MaNGOS::XP::GetGrayLevel(bot->GetLevel()))
+        {
+            logGrind(unit, "ignored (grey player).");
+            continue;
+        }
+
         Creature* creature = dynamic_cast<Creature*>(unit);
         if (creature && creature->GetCreatureInfo() && creature->GetCreatureInfo()->rank > CREATURE_ELITE_NORMAL && !AI_VALUE(bool, "can fight elite") &&
             !AI_VALUE2(bool, "trigger active", "in vehicle"))
