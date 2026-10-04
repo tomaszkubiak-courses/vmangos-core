@@ -171,6 +171,12 @@ Unit* GrindTargetValue::FindTargetForGrinding(int assistCount)
         }
 #endif
 
+        if (ai->IsIgnoredGrindTarget(unit->GetObjectGuid()))
+        {
+            logGrind(unit, "ignored (picked repeatedly without a kill).");
+            continue;
+        }
+
         if (abs(bot->GetPositionZ() - unit->GetPositionZ()) > sPlayerbotAIConfig.spellDistance)
         {
             logGrind(unit, "ignored (to far above/below).");

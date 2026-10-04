@@ -413,6 +413,13 @@ public:
     // took it again - 8 of the 9 most dropped quests in a nine hour run were also among the
     // most accepted, and one pair ran 33 drops against 25 accepts.
     bool RecentlyDroppedQuest(uint32 questId) const;
+    // Grind targets the bot keeps picking without ever killing. "attack anything" only runs
+    // with no target, so picking the same unit again means the last attack came to nothing;
+    // the nearest mob stays nearest, and a bot re-picked one it could not reach every 17
+    // seconds for almost eight hours without moving. NoteGrindTargetPick counts repeats and
+    // IsIgnoredGrindTarget keeps the unit out of the grind target for a while.
+    void NoteGrindTargetPick(ObjectGuid guid);
+    bool IsIgnoredGrindTarget(ObjectGuid guid) const;
     // Travel points this bot has died at repeatedly. A bot that dies on the way somewhere
     // corpse runs straight back and dies again; one drowned 16 times in 15 minutes fetching
     // the same fishing spot.
@@ -875,6 +882,10 @@ protected:
     bool shouldLogOut = false;
     // Quest ids this bot dropped, with the time it happened. See RecentlyDroppedQuest().
     std::map<uint32, time_t> m_droppedQuests;
+    // See NoteGrindTargetPick().
+    ObjectGuid m_lastGrindTarget;
+    uint32 m_lastGrindTargetPicks = 0;
+    std::map<ObjectGuid, time_t> m_ignoredGrindTargets;
 
     // Places this bot died on its way to a travel target. See RememberDeadlyTravelPoint().
     struct DeadlyTravelPoint
