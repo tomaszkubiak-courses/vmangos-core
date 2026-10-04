@@ -104,6 +104,12 @@ bool FishAction::isUseful()
     if (!fishSpot)
         return false;
 
+    // The core refuses the cast in combat, and nothing about standing in the spot changes
+    // that, so the action re-fired every tick: one bot failed "You are in combat" 30 times in
+    // five seconds while a player killed it.
+    if (bot->IsInCombat())
+        return false;
+
     if (!AI_VALUE(bool, "can fish"))
         return false;
 
