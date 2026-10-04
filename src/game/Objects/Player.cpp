@@ -5194,6 +5194,7 @@ void Player::RepopAtGraveyard()
         {
             GetTransport()->RemovePassenger(this);
             ResurrectPlayer(1.0f);
+            SpawnCorpseBones();
         }
 
         // World of Warcraft Client Patch 1.8.0 (2005-10-11)

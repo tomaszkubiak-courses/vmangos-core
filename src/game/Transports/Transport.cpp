@@ -170,7 +170,10 @@ bool ShipTransport::TeleportTransport(uint32 newMapid, float x, float y, float z
                 }
 
                 if (!player->IsAlive())
+                {
                     player->ResurrectPlayer(1.0f);
+                    player->SpawnCorpseBones();
+                }
 
                 player->RemoveSpellsCausingAura(SPELL_AURA_MOD_CONFUSE);
                 player->RemoveSpellsCausingAura(SPELL_AURA_MOD_FEAR);
