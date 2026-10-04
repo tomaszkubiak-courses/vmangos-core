@@ -1305,12 +1305,17 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
         // up and down, and the Addled Lepers at the Gnomeregan Vator landing killed it there,
         // because it could not chase or flee. In the 2026-10-02 run, 1034 of the 2542 move
         // failures came from that one shaft, from bots of level 28 to 58, and they caused 15 of
-        // the 18 repops that found a corpse already present. A ship carries its passengers to a
-        // dock, so waiting aboard is still right there. An elevator stops at a landing, and the
-        // landing has a travel node next to it. Step off onto that node, but only while the
+        // the 18 repops that found a corpse already present. An elevator stops at a landing, and
+        // the landing has a travel node next to it. Step off onto that node, but only while the
         // platform stands within reach of it. Mid-shaft there is no node in range, so the bot
         // keeps riding to the next stop.
-        if (dynamic_cast<ElevatorTransport*>(transport))
+        //
+        // A ship is the same once it has docked. Waiting aboard only helps a bot whose path
+        // still rides the ship; this one never gets off at either end. A bot rode Proudmore's
+        // Treasure between Menethil and Theramore for thirteen hours on 2026-10-03, its only
+        // trace an "on transport" failure each time the ship stood at Menethil. A ship only
+        // stands still at its stops, so the step-off is limited to those.
+        if (dynamic_cast<ElevatorTransport*>(transport) || !transport->IsMoving())
         {
             for (TravelNode* node : sTravelNodeMap.getNodes(startPos, 15.0f))
             {
