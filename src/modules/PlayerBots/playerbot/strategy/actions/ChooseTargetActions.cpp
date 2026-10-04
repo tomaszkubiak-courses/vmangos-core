@@ -57,6 +57,8 @@ bool ai::AttackAnythingAction::Execute(Event& event)
         Unit* grindTarget = GetTarget();
         if (grindTarget)
         {
+            ai->NoteGrindTargetPick(grindTarget->GetObjectGuid());
+
             std::string grindName = grindTarget->GetName();
             if (!grindName.empty())
             {

@@ -3227,6 +3227,36 @@ bool PlayerbotAI::RecentlyDroppedQuest(uint32 questId) const
     return time(nullptr) < it->second + dropCooldown;
 }
 
+// Three picks is about fifty seconds of trying. Ten minutes lets the unit wander, die to
+// someone else or the bot move on before it is offered again.
+static uint32 const grindRepickLimit = 3;
+static time_t const grindIgnoreTime = 10 * MINUTE;
+
+void PlayerbotAI::NoteGrindTargetPick(ObjectGuid guid)
+{
+    if (guid != m_lastGrindTarget)
+    {
+        m_lastGrindTarget = guid;
+        m_lastGrindTargetPicks = 0;
+    }
+
+    if (++m_lastGrindTargetPicks < grindRepickLimit)
+        return;
+
+    time_t const now = time(nullptr);
+    for (auto it = m_ignoredGrindTargets.begin(); it != m_ignoredGrindTargets.end();)
+        it = now >= it->second + grindIgnoreTime ? m_ignoredGrindTargets.erase(it) : std::next(it);
+
+    m_ignoredGrindTargets[guid] = now;
+    m_lastGrindTargetPicks = 0;
+}
+
+bool PlayerbotAI::IsIgnoredGrindTarget(ObjectGuid guid) const
+{
+    auto const it = m_ignoredGrindTargets.find(guid);
+    return it != m_ignoredGrindTargets.end() && time(nullptr) < it->second + grindIgnoreTime;
+}
+
 void PlayerbotAI::DropQuest(uint32 questIdToDrop)
 {
     for (uint16 slot = 0; slot < MAX_QUEST_LOG_SIZE; ++slot)
