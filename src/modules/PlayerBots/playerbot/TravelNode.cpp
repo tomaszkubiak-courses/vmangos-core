@@ -128,12 +128,17 @@ float TravelNodePath::getCost(Unit* unit, uint32 cGold)
             uint32 triggerId = getPathObject();
             AreaTriggerEntry const* atEntry = sAreaTriggerStore.LookupEntry(pathObject);
             AreaTriggerTeleport const* at = sObjectMgr.GetAreaTriggerTeleport(pathObject);
-            if (atEntry && at && atEntry->map_id == bot->GetMapId())
+            // box_x/y/z are the trigger's extents, not its position, so the map looked up from
+            // them was always null and the condition was never checked. Routes to Kalimdor ran
+            // through the Gnomeregan Transpolyporter, which needs a Goblin Transponder no bot
+            // carries: 2504 failed moves at the trigger and 190 deaths to the Addled Lepers
+            // around it in one run. The condition is checked whatever map the bot is on now,
+            // since a route is planned before the bot reaches the trigger's map.
+            if (atEntry && at && at->requiredCondition)
             {
-                Map* map = WorldPosition(atEntry->map_id, atEntry->box_x, atEntry->box_y, atEntry->box_z).getMap(bot->GetInstanceId());
-                if (map)
-                    if (at && at->requiredCondition && !IsConditionSatisfied(at->requiredCondition, bot, map, nullptr, (ConditionSource)CONDITION_FROM_AREATRIGGER_TELEPORT))
-                        return -1;
+                Map* map = atEntry->map_id == bot->GetMapId() ? bot->GetMap() : sMapMgr.FindMap(atEntry->map_id, 0);
+                if (!IsConditionSatisfied(at->requiredCondition, bot, map, nullptr, (ConditionSource)CONDITION_FROM_AREATRIGGER_TELEPORT))
+                    return -1;
             }
         }
 
