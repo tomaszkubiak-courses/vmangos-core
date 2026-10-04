@@ -152,6 +152,25 @@ bool CastCustomSpellAction::Execute(Event& event)
     if ((pSpellInfo->Targets & TARGET_FLAG_ITEM) || (pSpellInfo->Targets & TARGET_FLAG_SELF))
         target = bot;
 
+    // A spell whose every effect lands on the caster goes on the bot, whatever unit or object
+    // the command named. Every crafting recipe is one - Linen Bandage, Smelt Copper, Spotted
+    // Yellowtail - and the DBC leaves their Targets at 0, so the line above misses them. The
+    // bot's selected unit or the forge in the command then became the target and the cast
+    // failed with "Invalid target" or "Target is hostile": a war effort bot failed to make a
+    // bandage 200 times in a row. A spell focus is found by range, not by targeting it.
+    bool casterOnly = true;
+    for (uint32 i = 0; i < MAX_EFFECT_INDEX; ++i)
+    {
+        if (pSpellInfo->Effect[i] && (pSpellInfo->EffectImplicitTargetA[i] != TARGET_UNIT_CASTER || pSpellInfo->EffectImplicitTargetB[i]))
+            casterOnly = false;
+    }
+
+    if (casterOnly)
+    {
+        target = bot;
+        gameObjectTarget = nullptr;
+    }
+
     WorldObject* woTarget = nullptr;
     if (gameObjectTarget)
         woTarget = gameObjectTarget;
