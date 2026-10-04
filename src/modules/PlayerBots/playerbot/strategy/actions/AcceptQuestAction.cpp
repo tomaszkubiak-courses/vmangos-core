@@ -247,6 +247,15 @@ bool QuestDetailsAction::Execute(Event& event)
         return false;
 
     quest = qInfo->GetQuestId();
+
+    // The core sends quest details unasked - after a turn-in, or when an npc offers a
+    // single quest - so this path accepts quests the bot never chose. It has to honour
+    // the drop cooldown like QuestAction::AcceptQuest does, or a quest the bot just
+    // failed is taken straight back. Scalding Mornbrew Delivery failed its timer 495
+    // times in one run with only a handful of logged accepts; this path logged none.
+    if (ai->RecentlyDroppedQuest(quest))
+        return false;
+
     if (!bot->CanTakeQuest(qInfo, false))
     {
         // can't take quest
@@ -256,7 +265,13 @@ bool QuestDetailsAction::Execute(Event& event)
 
     if (bot->CanAddQuest(qInfo, false))
     {
-        bot->AddQuest(qInfo, requester);
+        // AddQuest takes a player quest giver to be a sharer and copies that player's
+        // remaining time on a timed quest. The master, or nobody, is not the giver; the
+        // packet names the real one.
+        Object* questGiver = bot->GetObjectByTypeMask(guid, TYPEMASK_CREATURE_GAMEOBJECT_PLAYER_OR_ITEM);
+        bot->AddQuest(qInfo, questGiver);
+
+        sPlayerbotAIConfig.logEvent(ai, "QuestDetailsAction", qInfo->GetTitle(), std::to_string(quest));
 
         if (bot->CanCompleteQuest(quest))
             bot->CompleteQuest(quest);
