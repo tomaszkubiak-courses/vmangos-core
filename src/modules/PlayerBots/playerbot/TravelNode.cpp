@@ -1800,6 +1800,7 @@ TravelNodeRoute TravelNodeMap::getRoute(WorldPosition startPos, WorldPosition en
 
                     if (!hasPath)
                     {
+                        route.cleanTempNodes();
                         endPath.clear();
                         badEndNodes.push_back(endNode);
                         break;
@@ -1850,6 +1851,7 @@ TravelNodeRoute TravelNodeMap::getRoute(WorldPosition startPos, WorldPosition en
                 return route;
             }           
 
+            route.cleanTempNodes();
             badStartNodes.push_back(startNode);
         }
     }
@@ -1881,10 +1883,10 @@ TravelNodeRoute TravelNodeMap::getRoute(WorldPosition startPos, WorldPosition en
             for (auto& endNode : endNodes)
             {
                 TravelNodeRoute route = getRoute(botNode, endNode, bot);
-                route.addTempNodes({botNode});
 
                 if (!route.isEmpty())
                 {
+                    route.addTempNodes({botNode});
                     std::vector<WorldPosition> routePoints;
                     for (auto& p : route.getNodes())
                         routePoints.push_back(*p->getPosition());
@@ -1892,6 +1894,8 @@ TravelNodeRoute TravelNodeMap::getRoute(WorldPosition startPos, WorldPosition en
                     return route;
                 }
             }
+
+            delete botNode;
         }
     }
 
