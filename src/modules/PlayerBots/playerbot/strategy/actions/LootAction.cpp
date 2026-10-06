@@ -439,13 +439,18 @@ bool StoreLootAction::Execute(Event& event)
         if (!proto)
             continue;
 
-        LootItem* lootItem = loot->LootItemInSlot(itemindex, bot->GetGUIDLow());
+        QuestItem* questItem = nullptr;
+        LootItem* lootItem = loot->LootItemInSlot(itemindex, bot->GetGUIDLow(), &questItem);
 
         if (!lootItem)
             continue;
 
-        //have no right to loot
-        if (lootItem->is_blocked || lootItem->GetSlotTypeForSharedLoot(ALL_PERMISSION, bot, loot ? loot->GetLootTarget() : nullptr) == MAX_LOOT_SLOT_TYPE)
+        // Have no right to loot - the same test WorldSession::HandleAutostoreLootItemOpcode
+        // makes. Loot::FillQuestLoot sets is_blocked on every quest drop it hands a player,
+        // so a quest item has to be told apart by its slot, not by the flag: testing the flag
+        // alone skipped every quest-only drop, and in a 13 hour run no bot looted a single
+        // one - not one Tough Wolf Meat from 628 Ragged Young Wolves killed for it.
+        if ((!questItem && lootItem->is_blocked) || !lootItem->AllowedForPlayer(bot, loot->GetLootTarget()))
         {
             sLog.outDebug("[BOT LOOT] %s: skip item=%u (no right: blocked=%u)", bot->GetName(), itemid, lootItem->is_blocked ? 1 : 0);
             continue;
