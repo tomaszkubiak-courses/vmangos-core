@@ -80,7 +80,7 @@ void LootObject::Refresh(Player* bot, ObjectGuid guid, bool debug)
             }
         }
 
-        if (creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE))
+        if (CanSkinNow(bot, creature))
         {
             // Skinning is the only gathering skill that applies to a corpse in vanilla;
             // herbalism and mining on creatures arrived with later expansions.
@@ -229,6 +229,18 @@ LootObject::LootObject(const LootObject& other)
     skillId = other.skillId;
     reqSkillValue = other.reqSkillValue;
     reqItem = other.reqItem;
+}
+
+// The corpse tests Spell::CheckCast makes before a skinning cast. This core flags a corpse
+// skinnable the moment it dies, while it still holds its loot, so the flag alone sent bots to
+// skin corpses the cast then refused with "Creature must be looted first" - 152k times in an
+// 11 hour run. Someone else's kill also stays closed until its skinning timer runs out.
+bool LootObject::CanSkinNow(Player* bot, Creature* creature)
+{
+    if (!creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE) || !creature->IsSkinnableBy(bot))
+        return false;
+
+    return creature->GetCreatureType() == CREATURE_TYPE_CRITTER || (!creature->lootForSkin && creature->loot.isLooted());
 }
 
 bool LootObject::IsLootPossible(Player* bot)
