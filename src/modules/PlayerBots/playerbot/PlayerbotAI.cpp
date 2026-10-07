@@ -4626,6 +4626,25 @@ bool PlayerbotAI::CanCastSpell(std::string name, Unit* target, uint8 effectMask,
     return CanCastSpell(aiObjectContext->GetValue<uint32>("spell id", name)->Get(), target, 0, true, itemTarget, ignoreRange, ignoreInCombat, ignoreMount, checkResult);
 }
 
+// Spell::CheckCast tests power against the cost Spell::prepare fills in, so on a Spell
+// built only to be checked that test always passes; and prepare's refusal of a second
+// spell while one is still being cast is not part of CheckCast at all. Both were left to
+// the real cast, which failed: over a 13 hour run 606k thunder clap and 520k sinister
+// strike casts were refused for missing rage or energy, and about 600k shadow bolt,
+// lightning bolt, smite and other casts because a cast was already under way.
+static SpellCastResult CheckBotCast(Player* bot, Spell* spell)
+{
+    if (bot->IsNonMeleeSpellCasted(false, true, true))
+        return SPELL_FAILED_SPELL_IN_PROGRESS;
+
+    SpellEntry const* spellInfo = spell->m_spellInfo;
+    if (!spell->m_CastItem && spellInfo->powerType < MAX_POWERS && !bot->HasCheatOption(PLAYER_CHEAT_NO_POWER) &&
+        bot->GetPower(Powers(spellInfo->powerType)) < Spell::CalculatePowerCost(spellInfo, bot, spell, nullptr, false))
+        return SPELL_FAILED_NO_POWER;
+
+    return spell->CheckCast(true);
+}
+
 bool PlayerbotAI::CanCastSpell(uint32 spellid, Unit* target, uint8 effectMask, bool checkHasSpell, Item* itemTarget, bool ignoreRange, bool ignoreInCombat, bool ignoreMount, SpellCastResult* checkResult)
 {
     if (!spellid)
@@ -4801,7 +4820,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, Unit* target, uint8 effectMask, b
     spell->SetCastItem(itemTarget ? itemTarget : aiObjectContext->GetValue<Item*>("item for spell", spellid)->Get());
     spell->m_targets.setItemTarget(spell->m_CastItem);
 
-    SpellCastResult result = spell->CheckCast(true);
+    SpellCastResult result = CheckBotCast(bot, spell);
     delete spell;
 	//if (oldSel)
 	//	bot->SetSelectionGuid(oldSel);
@@ -4929,7 +4948,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, GameObject* goTarget, uint8 effec
     spell->SetCastItem(aiObjectContext->GetValue<Item*>("item for spell", spellid)->Get());
     spell->m_targets.setItemTarget(spell->m_CastItem);
 
-    SpellCastResult result = spell->CheckCast(true);
+    SpellCastResult result = CheckBotCast(bot, spell);
     delete spell;
     //if (oldSel)
     //    bot->SetSelectionGuid(oldSel);
@@ -5037,7 +5056,7 @@ bool PlayerbotAI::CanCastSpell(uint32 spellid, float x, float y, float z, uint8 
     spell->SetCastItem(itemTarget ? itemTarget : aiObjectContext->GetValue<Item*>("item for spell", spellid)->Get());
     spell->m_targets.setItemTarget(spell->m_CastItem);
 
-    SpellCastResult result = spell->CheckCast(true);
+    SpellCastResult result = CheckBotCast(bot, spell);
     delete spell;
 
     if (checkResult)
