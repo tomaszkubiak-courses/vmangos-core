@@ -2658,9 +2658,9 @@ SpellEntry const* GameObject::GetSpellForLock(Player const* player) const
 
         for (auto&& playerSpell : player->GetSpellMap())
             if (SpellEntry const* spellInfo = sSpellMgr.GetSpellEntry(playerSpell.first))
-                for (uint8 i = 0; i < MAX_EFFECT_INDEX; ++i)
-                    if (spellInfo->Effect[i] == SPELL_EFFECT_OPEN_LOCK && ((uint32)spellInfo->EffectMiscValue[i]) == lock->Index[i])
-                        if (player->CalculateSpellEffectValue(nullptr, spellInfo, SpellEffectIndex(i), nullptr) >= int32(lock->Skill[i]))
+                for (uint8 eff = 0; eff < MAX_EFFECT_INDEX; ++eff)
+                    if (spellInfo->Effect[eff] == SPELL_EFFECT_OPEN_LOCK && ((uint32)spellInfo->EffectMiscValue[eff]) == lock->Index[i])
+                        if (player->CalculateSpellEffectValue(nullptr, spellInfo, SpellEffectIndex(eff), nullptr) >= int32(lock->Skill[i]))
                             return spellInfo;
     }
 

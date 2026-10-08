@@ -96,17 +96,10 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     sLog.outDebug("[BOT LOOT] %s: DoLoot target=%lu", bot->GetName(), lootObject.guid.GetRawValue());
 
     Creature* creature = ai->GetCreature(lootObject.guid);
-    // Gate the loot send on the SERVER's exact loot-range rule: a 3D distance check against
-    // GetMaxLootDistance with no bounding-radius slack (Player::SendLoot, Player.cpp:9382 ->
-    // Object _IsWithinDist with SizeFactor::None). The old gate only measured 2D distance and
-    // ignored Z, so while the bot was being dragged along by follow/chase it fired CMSG_LOOT
-    // from a few yards above/below a corpse it had not actually reached (2D=2y but 3D>5y),
-    // and the server replied TOO_FAR. Returning false here keeps MoveToLoot approaching until
-    // the bot is truly standing on the corpse, then it loots.
-    if (creature && !creature->IsWithinDistInMap(bot, bot->GetMaxLootDistance(creature), true, SizeFactor::None))
+    // The server's own range rule, which "can loot" also applies; see LootObject::IsInReach.
+    if (!lootObject.IsInReach(bot))
     {
-        sLog.outDebug("[BOT LOOT] %s: not in 3D loot range (dist2d=%.1f maxLoot=%.1f), keep approaching guid=%lu",
-            bot->GetName(), sServerFacade.GetDistance2d(bot, creature), bot->GetMaxLootDistance(creature), lootObject.guid.GetRawValue());
+        sLog.outDebug("[BOT LOOT] %s: not in loot reach, keep approaching guid=%lu", bot->GetName(), lootObject.guid.GetRawValue());
         return false;
     }
 
@@ -174,6 +167,8 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
             return false;
         }
 
+        LeaveShapeshiftForm();
+
         switch (skill)
         {
         case SKILL_ENGINEERING:
@@ -188,11 +183,11 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     }
 
     GameObject* go = ai->GetGameObject(lootObject.guid);
-    if (go && sServerFacade.GetDistance2d(bot, go) > INTERACTION_DISTANCE)
-        return false;
-
     if (go && (BotGameObjectInUse(go) || go->GetGoState() == GO_STATE_ACTIVE))
         return false;
+
+    // Every gathering and opening cast below is refused in a shapeshift form.
+    LeaveShapeshiftForm();
 
     if (lootObject.skillId == SKILL_MINING)
         return ai->HasSkill(SKILL_MINING) ? ai->CastSpell(MINING, bot) : false;
@@ -269,20 +264,17 @@ uint32 OpenLootAction::GetOpeningSpell(LootObject& lootObject, GameObject* go)
             return spellId;
     }
 
-    for (uint32 spellId = 0; spellId < sServerFacade.GetSpellInfoRows(); spellId++)
-    {
-        if (spellId == MINING || spellId == HERB_GATHERING)
-            continue;
+    // A lock only a key opens is opened by using the key (see DoLoot). There used to be a
+    // second pass here over every spell in the DBC; what it found was a spell the bot does not
+    // know, and when it found nothing the bot still cast Opening, which the server refuses for
+    // a lock it does not fit - 527k "Invalid target" casts at one object in a 31 hour run.
+    return lootObject.reqItem ? sPlayerbotAIConfig.openGoSpell : 0;
+}
 
-		const SpellEntry* pSpellInfo = sServerFacade.LookupSpellInfo(spellId);
-		if (!pSpellInfo)
-            continue;
-
-        if (CanOpenLock(lootObject, pSpellInfo, go))
-            return spellId;
-    }
-
-    return sPlayerbotAIConfig.openGoSpell;
+void OpenLootAction::LeaveShapeshiftForm()
+{
+    if (bot->HasAuraType(SPELL_AURA_MOD_SHAPESHIFT))
+        bot->RemoveSpellsCausingAura(SPELL_AURA_MOD_SHAPESHIFT);
 }
 
 bool OpenLootAction::CanOpenLock(LootObject& lootObject, const SpellEntry* pSpellInfo, GameObject* go)
