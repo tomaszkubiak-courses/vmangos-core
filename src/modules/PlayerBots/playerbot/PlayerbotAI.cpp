@@ -773,7 +773,16 @@ void PlayerbotAI::UpdateAI(uint32 elapsed, bool minimal)
             MANGOS_ASSERT(botPos.fDist(bot) < 500.0f);
         }
     }
-    else if (!HasRealPlayerMaster() && !bot->IsBeingTeleported() && bot->GetTransport() && bot->GetMapId() == bot->GetTransport()->GetMapId() && !WorldPosition(bot).isOnTransport(bot->GetTransport()) && !isMovingToTransport)
+    // A ship under way has no shore to step onto: a bot taken off one mid-crossing lands in open
+    // sea and sinks to the floor of the map. The deck test below is a short downward ray against
+    // the ship's model, which misses when the bot stands more than 40 yards from the ship's origin
+    // or the model lags the ship. In a 31 hour run bots died of fatigue 2 to 20 minutes after
+    // boarding the Moonspray or Proudmore's Treasure, out at sea, with no battleground between,
+    // and this is the only code that takes a bot off a ship. Only a docked ship, or an elevator,
+    // can be walked off.
+    else if (!HasRealPlayerMaster() && !bot->IsBeingTeleported() && bot->GetTransport() && bot->GetMapId() == bot->GetTransport()->GetMapId() &&
+        (dynamic_cast<ElevatorTransport*>(bot->GetTransport()) || !bot->GetTransport()->IsMoving()) &&
+        !WorldPosition(bot).isOnTransport(bot->GetTransport()) && !isMovingToTransport)
     {
         if (HasStrategy("debug move", BotState::BOT_STATE_NON_COMBAT))
         {
