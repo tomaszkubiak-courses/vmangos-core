@@ -124,7 +124,7 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
         return false;
     }
 
-    if (creature && creature->HasFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE) && !creature->HasFlag(UNIT_FIELD_FLAGS, UNIT_FLAG_SKINNABLE))
+    if (creature && creature->HasFlag(UNIT_DYNAMIC_FLAGS, UNIT_DYNFLAG_LOOTABLE) && !LootObject::CanSkinNow(bot, creature))
     {
         if (!lootObject.IsLootPossible(bot)) //Clear loot if bot can't loot it.
         {
@@ -160,6 +160,13 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     if (creature)
     {
         SkillType skill = SKILL_SKINNING;
+        if (!LootObject::CanSkinNow(bot, creature))
+        {
+            AI_VALUE(LootObjectStack*, "available loot")->Remove(lootObject.guid);
+            RESET_AI_VALUE(LootObject, "loot target");
+            return false;
+        }
+
         sLog.outDebug("[BOT LOOT] %s: gather/skin path skill=%u reqValue=%u", bot->GetName(), skill, lootObject.reqSkillValue);
         if (!CanOpenLock(skill, lootObject.reqSkillValue))
         {
