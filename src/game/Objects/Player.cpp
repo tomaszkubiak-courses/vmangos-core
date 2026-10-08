@@ -18934,8 +18934,11 @@ void Player::SetBattleGroundEntryPoint(Player const* leader /*= nullptr*/, bool 
             m_bgData.m_needSave = true;
             return;
         }
-        // If map is dungeon find linked graveyard
-        if (leader->GetMap()->IsDungeon())
+        // If map is dungeon find linked graveyard. Do the same for a leader on a transport: the
+        // transport moves on, and where it stood when the queue was joined is usually open sea by
+        // the time the battleground ends. Bots queue from anywhere, and ones that joined aboard a
+        // ship were sent back into the sea after every match and died there of fatigue.
+        if (leader->GetMap()->IsDungeon() || leader->GetTransport())
         {
             if (WorldSafeLocsEntry const* entry = sObjectMgr.GetClosestGraveYard(leader->GetPositionX(), leader->GetPositionY(), leader->GetPositionZ(), leader->GetMapId(), leader->GetTeam()))
             {
@@ -18944,7 +18947,7 @@ void Player::SetBattleGroundEntryPoint(Player const* leader /*= nullptr*/, bool 
                 return;
             }
             else
-                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "SetBattleGroundEntryPoint: Dungeon map %u has no linked graveyard, setting home location as entry point.", leader->GetMapId());
+                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "SetBattleGroundEntryPoint: no graveyard linked to map %u, setting home location as entry point.", leader->GetMapId());
         }
         // If new entry point is not BG or arena set it
         else if (!leader->GetMap()->IsBattleGround())
