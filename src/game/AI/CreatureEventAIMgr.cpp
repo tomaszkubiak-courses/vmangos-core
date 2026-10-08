@@ -124,10 +124,10 @@ void CreatureEventAIMgr::LoadCreatureEventAI_Events()
                 case EVENT_T_TARGET_HP:
                 case EVENT_T_TARGET_MANA:
                     if (temp.percent_range.percentMax > 100)
-                        sLog.Out(LOG_DBERROR, LOG_LVL_MINIMAL, "CreatureEventAI:  Creature %u is using percentage event(%u) with param2 (MinPercent) > 100. Event will never trigger! ", temp.creature_id, i);
+                        sLog.Out(LOG_DBERROR, LOG_LVL_MINIMAL, "CreatureEventAI:  Creature %u is using percentage event(%u) with param1 (MaxPercent) > 100. Event will never trigger! ", temp.creature_id, i);
 
-                    if (temp.percent_range.percentMax <= temp.percent_range.percentMin)
-                        sLog.Out(LOG_DBERROR, LOG_LVL_MINIMAL, "CreatureEventAI:  Creature %u is using percentage event(%u) with param1 <= param2 (MaxPercent <= MinPercent). Event will never trigger! ", temp.creature_id, i);
+                    if (temp.percent_range.percentMax < temp.percent_range.percentMin)
+                        sLog.Out(LOG_DBERROR, LOG_LVL_MINIMAL, "CreatureEventAI:  Creature %u is using percentage event(%u) with param1 < param2 (MaxPercent < MinPercent). Event will never trigger! ", temp.creature_id, i);
 
                     if ((temp.event_flags & EFLAG_REPEATABLE) && !temp.percent_range.repeatMin && !temp.percent_range.repeatMax)
                     {
