@@ -777,6 +777,10 @@ bool Map::ScriptCommand_SetMovementType(ScriptInfo const& script, WorldObject* s
         case WAYPOINT_MOTION_TYPE:
             if (script.movement.clear)
                 pSource->GetMotionMaster()->Clear(false, true);
+            // Already walking its path, typically because an evade while the script waited reset
+            // it to its default waypoints. MoveWaypoint would refuse and log an error.
+            else if (pSource->GetMotionMaster()->GetCurrentMovementGeneratorType() == WAYPOINT_MOTION_TYPE)
+                break;
             pSource->GetMotionMaster()->MoveWaypoint(script.movement.intParam, 0, 0, 0, 0, script.movement.boolParam);
             break;
         case CONFUSED_MOTION_TYPE:
