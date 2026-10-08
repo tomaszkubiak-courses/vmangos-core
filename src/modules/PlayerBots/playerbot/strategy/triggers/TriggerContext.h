@@ -105,6 +105,7 @@ namespace ai
             creators["melee very high aoe"] = [](PlayerbotAI* ai) { return new RangedVeryHighAoeTrigger(ai); };
 
             creators["has area debuff"] = [](PlayerbotAI* ai) { return new HasAreaDebuffTrigger(ai); };
+            creators["in environmental hazard"] = [](PlayerbotAI* ai) { return new InEnvironmentalHazardTrigger(ai); };
             creators["has aura"] = [](PlayerbotAI* ai) { return new HasAuraTrigger(ai); };
 
             creators["potion cooldown"] = [](PlayerbotAI* ai) { return new PotionCooldownTrigger(ai); };

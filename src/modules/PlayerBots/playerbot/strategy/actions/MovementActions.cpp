@@ -17,6 +17,7 @@
 #include "Entities/Vehicle.h"
 #endif
 #include "playerbot/strategy/generic/CombatStrategy.h"
+#include "playerbot/strategy/triggers/GenericTriggers.h"
 
 using namespace ai;
 
@@ -3713,6 +3714,42 @@ bool SetBehindTargetAction::isPossible()
             {
                 return !(target->GetVictim() && (target->GetVictim()->GetObjectGuid() == bot->GetObjectGuid()));
             }
+        }
+    }
+
+    return false;
+}
+
+// Step out of lava, slime or a damaging trap to the nearest spot clear of all three, trying
+// rings of growing radius; for a trap, start with the direction straight away from it.
+bool LeaveEnvironmentalHazardAction::Execute(Event& event)
+{
+    float const bx = bot->GetPositionX(), by = bot->GetPositionY(), bz = bot->GetPositionZ();
+
+    float reach = 0.0f;
+    float awayAngle = bot->GetOrientation();
+    if (GameObject* trap = InEnvironmentalHazardTrigger::FindDamagingTrap(bot, bx, by, bz, reach))
+        awayAngle = trap->GetAngle(bot);
+
+    for (float radius : { 4.0f, 8.0f, 12.0f, 18.0f, 25.0f })
+    {
+        for (int step = 0; step < 8; ++step)
+        {
+            // 0, +45, -45, +90, -90, ... degrees off the way out
+            float const offset = (step + 1) / 2 * (M_PI_F / 4) * (step % 2 ? 1.0f : -1.0f);
+            float const angle = awayAngle + offset;
+            float x = bx + cos(angle) * std::max(radius, reach);
+            float y = by + sin(angle) * std::max(radius, reach);
+            float z = bot->GetMap()->GetHeight(x, y, bz + 5.0f);
+            if (z <= INVALID_HEIGHT || std::abs(z - bz) > radius)
+                continue;
+
+            float trapReach;
+            if (InEnvironmentalHazardTrigger::IsHazardousLiquid(bot, x, y, z) || InEnvironmentalHazardTrigger::FindDamagingTrap(bot, x, y, z, trapReach))
+                continue;
+
+            if (MoveTo(bot->GetMapId(), x, y, z, false, true))
+                return true;
         }
     }
 
