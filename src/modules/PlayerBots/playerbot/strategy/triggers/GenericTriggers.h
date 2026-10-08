@@ -995,6 +995,20 @@ namespace ai
         virtual bool IsActive() override;
     };
 
+    // Standing in lava, slime or a damaging trap such as a campfire. That damage comes without
+    // an aura, so "has area debuff" never sees it, and bots stood still and burned to death.
+    class InEnvironmentalHazardTrigger : public Trigger
+    {
+    public:
+        InEnvironmentalHazardTrigger(PlayerbotAI* ai) : Trigger(ai, "in environmental hazard", 1) {}
+        virtual bool IsActive() override;
+
+        // The unowned damaging trap whose reach covers the position, and that reach.
+        static GameObject* FindDamagingTrap(Player* bot, float x, float y, float z, float& reach);
+        // Lava or slime at the position.
+        static bool IsHazardousLiquid(Player* bot, float x, float y, float z);
+    };
+
     // racials
 
     class BerserkingTrigger : public BoostTrigger

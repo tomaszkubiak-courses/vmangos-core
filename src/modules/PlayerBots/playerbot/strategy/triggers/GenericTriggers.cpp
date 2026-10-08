@@ -5,6 +5,10 @@
 #include "playerbot/PlayerbotAIConfig.h"
 #include "playerbot/strategy/values/PositionValue.h"
 #include "playerbot/strategy/values/AoeValues.h"
+#include "playerbot/strategy/values/NearestGameObjects.h"
+#include "Maps/GridNotifiers.h"
+#include "Maps/GridNotifiersImpl.h"
+#include "Maps/CellImpl.h"
 
 #include <regex>
 
@@ -872,6 +876,68 @@ bool IsFallingFarTrigger::IsActive()
 bool HasAreaDebuffTrigger::IsActive()
 {
     return AI_VALUE2(bool, "has area debuff", "self target");
+}
+
+GameObject* InEnvironmentalHazardTrigger::FindDamagingTrap(Player* bot, float x, float y, float z, float& reach)
+{
+    std::list<GameObject*> objects;
+    AnyGameObjectInObjectRangeCheck check(bot, 15.0f);
+    MaNGOS::GameObjectListSearcher<AnyGameObjectInObjectRangeCheck> searcher(objects, check);
+    Cell::VisitAllObjects(bot, searcher, 15.0f);
+
+    for (GameObject* go : objects)
+    {
+        // A trap someone placed is a player's or a creature's to spring; world traps such as
+        // campfires burn everyone who stands in them.
+        if (go->GetGoType() != GAMEOBJECT_TYPE_TRAP || go->GetOwnerGuid())
+            continue;
+
+        SpellEntry const* spell = sServerFacade.LookupSpellInfo(go->GetGOInfo()->trap.spellId);
+        if (!spell)
+            continue;
+
+        float trapReach = float(go->GetGOInfo()->trap.radius);
+        bool damaging = false;
+        for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+        {
+            if (spell->Effect[i] != SPELL_EFFECT_ENVIRONMENTAL_DAMAGE && spell->Effect[i] != SPELL_EFFECT_SCHOOL_DAMAGE)
+                continue;
+
+            damaging = true;
+            trapReach = std::max(trapReach, Spells::GetSpellRadius(sSpellRadiusStore.LookupEntry(spell->EffectRadiusIndex[i])));
+        }
+
+        if (!damaging)
+            continue;
+
+        // A yard and a half of margin: the bot is measured from its centre, the damage reaches
+        // its edge.
+        trapReach += 1.5f;
+        if (go->GetDistance(x, y, z) < trapReach)
+        {
+            reach = trapReach;
+            return go;
+        }
+    }
+
+    return nullptr;
+}
+
+bool InEnvironmentalHazardTrigger::IsHazardousLiquid(Player* bot, float x, float y, float z)
+{
+    GridMapLiquidData liquid;
+    GridMapLiquidStatus status = bot->GetMap()->GetTerrain()->getLiquidStatus(x, y, z + 0.01f, MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME, &liquid);
+    return status & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER | LIQUID_MAP_WATER_WALK);
+}
+
+bool InEnvironmentalHazardTrigger::IsActive()
+{
+    if (!bot->IsAlive() || bot->GetTransport() || bot->IsTaxiFlying() || bot->IsBeingTeleported())
+        return false;
+
+    float reach;
+    return IsHazardousLiquid(bot, bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ()) ||
+        FindDamagingTrap(bot, bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), reach);
 }
 
 bool ReturnToStayPositionTrigger::IsActive()

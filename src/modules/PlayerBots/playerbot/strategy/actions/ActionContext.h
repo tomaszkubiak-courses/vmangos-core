@@ -103,6 +103,7 @@ namespace ai
             creators["reset travel target"] = [](PlayerbotAI* ai) { return new ResetTargetAction(ai); };
             creators["move to travel target"] = [](PlayerbotAI* ai) { return new MoveToTravelTargetAction(ai); };
             creators["move out of collision"] = [](PlayerbotAI* ai) { return new MoveOutOfCollisionAction(ai); };
+            creators["leave environmental hazard"] = [](PlayerbotAI* ai) { return new LeaveEnvironmentalHazardAction(ai); };
             creators["move random"] = [](PlayerbotAI* ai) { return new MoveRandomAction(ai); };
             creators["attack"] = [](PlayerbotAI* ai) { return new MeleeAction(ai); };
             creators["melee"] = [](PlayerbotAI* ai) { return new MeleeAction(ai); };

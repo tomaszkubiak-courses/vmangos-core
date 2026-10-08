@@ -65,6 +65,10 @@ void AvoidAoeStrategy::InitCombatTriggers(std::list<TriggerNode*>& triggers)
     triggers.push_back(new TriggerNode(
         "has area debuff",
         NextAction::array(0, new NextAction("flee", ACTION_EMERGENCY + 5), NULL)));
+
+    triggers.push_back(new TriggerNode(
+        "in environmental hazard",
+        NextAction::array(0, new NextAction("leave environmental hazard", ACTION_EMERGENCY + 6), NULL)));
 }
 
 void AvoidAoeStrategy::InitReactionTriggers(std::list<TriggerNode*>& triggers)

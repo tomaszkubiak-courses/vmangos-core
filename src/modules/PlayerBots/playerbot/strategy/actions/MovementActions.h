@@ -208,6 +208,13 @@ namespace ai
         virtual bool isUseful() override;
     };
 
+    class LeaveEnvironmentalHazardAction : public MovementAction
+    {
+    public:
+        LeaveEnvironmentalHazardAction(PlayerbotAI* ai) : MovementAction(ai, "leave environmental hazard") {}
+        virtual bool Execute(Event& event) override;
+    };
+
     class MoveRandomAction : public MovementAction
     {
     public:
