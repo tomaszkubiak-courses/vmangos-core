@@ -42,19 +42,9 @@ bool FarFromCurrentLootTrigger::IsActive()
         }
     }
 
-    // Must agree with OpenLootAction::DoLoot's loot-range rule, or the bot deadlocks: for a
-    // creature corpse the server validates loot with a 3D distance check (Player::SendLoot),
-    // but the plain "distance" value here is 2D and ignores Z. On sloped ground the bot read
-    // "close enough" (2D <= 5) and so never fired "move to loot", yet "open loot" failed the
-    // 3D gate -> it sat a few yards off a corpse it could not loot. Use the same 3D rule so
-    // the bot keeps approaching until it is genuinely on the corpse, then loots.
-    if (Creature* creature = GetBotAI(bot)->GetCreature(loot.guid))
-    {
-        if (sServerFacade.GetDeathState(creature) == CORPSE)
-            return !creature->IsWithinDistInMap(bot, bot->GetMaxLootDistance(creature), true, SizeFactor::None);
-    }
-
-    return AI_VALUE2(float, "distance", "loot target") > INTERACTION_DISTANCE;
+    // Must agree with "can loot" and OpenLootAction::DoLoot, or the bot either sits short of
+    // a target it cannot loot or keeps firing a loot action the server refuses.
+    return !loot.IsInReach(bot);
 }
 
 bool CanLootTrigger::IsActive()

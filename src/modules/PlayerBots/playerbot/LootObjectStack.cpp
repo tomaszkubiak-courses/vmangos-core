@@ -108,6 +108,17 @@ void LootObject::Refresh(Player* bot, ObjectGuid guid, bool debug)
     GameObject* go = ai->GetGameObject(guid);
     if (go && sServerFacade.isSpawned(go) && !BotGameObjectInUse(go))
     {
+        // Only chests (herbs and ore veins among them) and goobers hand out loot. Traps, buttons
+        // and battleground banners carry locks too, and bots kept casting at them: hunter traps
+        // ("Item is gone"), "DANGER! Do Not Open!" and the Alliance banners in a 31 hour run.
+        if ((go->GetGoType() != GAMEOBJECT_TYPE_CHEST && go->GetGoType() != GAMEOBJECT_TYPE_GOOBER) ||
+            go->HasFlag(GAMEOBJECT_FLAGS, GO_FLAG_NO_INTERACT))
+        {
+            if (debug)
+                ai->TellDebug(ai->GetMaster(), "Go is not a lootable type.", "debug loot");
+            return;
+        }
+
         bool isQuestItemOnly = false;
 
 #ifdef MANGOSBOT_TWO
@@ -192,11 +203,17 @@ void LootObject::Refresh(Player* bot, ObjectGuid guid, bool debug)
                         reqSkillValue = std::max((uint32)1, lockInfo->Skill[i]);
                         this->guid = guid;
                     }
+                    else if (KnowsOpeningSpell(bot, lockInfo->Index[i]))
+                    {
+                        if (debug)
+                            ai->TellDebug(ai->GetMaster(), "Go opens with a known spell.", "debug loot");
+                        this->guid = guid;
+                    }
                     break;
-                case LOCK_KEY_NONE:
-                    if (debug)
-                        ai->TellDebug(ai->GetMaster(), "Go has open lock.", "debug loot");
-                    this->guid = guid;
+                // LOCK_KEY_NONE is an unused slot, not an open lock. Spell::CanOpenLock skips it,
+                // and a lock with nothing but empty slots can never be opened. Counting it as open
+                // sent bots to cast Opening at such objects 527k times in a 31 hour run.
+                default:
                     break;
             }
         }
@@ -241,6 +258,46 @@ bool LootObject::CanSkinNow(Player* bot, Creature* creature)
         return false;
 
     return creature->GetCreatureType() == CREATURE_TYPE_CRITTER || (!creature->lootForSkin && creature->loot.isLooted());
+}
+
+// Whether the bot has an Opening-type spell for a lock type that needs no skill. Every
+// character starts with these, so this only fails for lock types no player spell opens.
+bool LootObject::KnowsOpeningSpell(Player* bot, uint32 lockType)
+{
+    for (auto const& spell : bot->GetSpellMap())
+    {
+        if (spell.second.state == PLAYERSPELL_REMOVED || spell.second.disabled)
+            continue;
+
+        SpellEntry const* spellInfo = sServerFacade.LookupSpellInfo(spell.first);
+        if (!spellInfo)
+            continue;
+
+        for (int i = 0; i < MAX_EFFECT_INDEX; ++i)
+            if (spellInfo->Effect[i] == SPELL_EFFECT_OPEN_LOCK && uint32(spellInfo->EffectMiscValue[i]) == lockType)
+                return true;
+    }
+
+    return false;
+}
+
+// Close enough for the server to accept the loot request or the opening cast. A corpse is
+// measured in 3D with no bounding radius (Player::SendLoot); an object by its interaction
+// box, as Spell::CheckRange does. Comparing a plain 2D distance instead had bots fire the
+// loot action from below or beside the target and fail, 174k times for corpses alone.
+bool LootObject::IsInReach(Player* bot)
+{
+    WorldObject* wo = GetWorldObject(bot);
+    if (!wo)
+        return false;
+
+    if (Creature* creature = wo->ToCreature())
+        return creature->IsWithinDistInMap(bot, bot->GetMaxLootDistance(creature), true, SizeFactor::None);
+
+    if (GameObject* go = wo->ToGameObject())
+        return go->IsAtInteractDistance(bot);
+
+    return false;
 }
 
 bool LootObject::IsLootPossible(Player* bot)

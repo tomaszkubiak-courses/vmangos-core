@@ -36,10 +36,13 @@ namespace ai
         {
             LootObject loot = AI_VALUE(LootObject, "loot target");
 
+            // Not while a cast is under way: the bot's own gathering or skinning cast is still
+            // running when the node is offered again, and a second cast is refused with
+            // "Another action is in progress".
             return !loot.IsEmpty() &&
-                    loot.GetWorldObject(bot) &&    
+                    !bot->IsNonMeleeSpellCasted(false, true, true) &&
                     loot.IsLootPossible(bot) &&
-                    sServerFacade.IsDistanceLessOrEqualThan(AI_VALUE2(float, "distance", "loot target"), INTERACTION_DISTANCE);
+                    loot.IsInReach(bot);
         }
     };
 }

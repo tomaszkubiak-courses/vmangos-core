@@ -23,6 +23,7 @@ namespace ai
         uint32 GetOpeningSpell(LootObject& lootObject, GameObject* go);
         bool CanOpenLock(LootObject& lootObject, const SpellEntry* pSpellInfo, GameObject* go);
         bool CanOpenLock(uint32 skillId, uint32 reqSkillValue);
+        void LeaveShapeshiftForm();
     };
 
     class StoreLootAction : public Action
