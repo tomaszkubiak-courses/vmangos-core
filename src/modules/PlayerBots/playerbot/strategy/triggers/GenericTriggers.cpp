@@ -933,7 +933,27 @@ bool InEnvironmentalHazardTrigger::IsHazardousLiquid(Player* bot, float x, float
 bool InEnvironmentalHazardTrigger::IsActive()
 {
     if (!bot->IsAlive() || bot->GetTransport() || bot->IsTaxiFlying() || bot->IsBeingTeleported())
+    {
+        highSeaSince = 0;
         return false;
+    }
+
+    // Deep water starts the fatigue timer, and a minute later the bot dies. Bots ended up there
+    // stepping off ships under way or walking the sea floor towards an unreachable point, and
+    // then sank: 25 fatigue deaths in an 18 hour run, at z -131 to -500 in the straits between
+    // Teldrassil and Darkshore, off Theramore and off Durotar. A short swim across a deep
+    // channel is fine, so only a bot still out there after 20 seconds counts.
+    if (bot->IsInHighSea() && !ai->HasRealPlayerMaster())
+    {
+        time_t const now = time(nullptr);
+        if (!highSeaSince)
+            highSeaSince = now;
+
+        if (now - highSeaSince >= 20)
+            return true;
+    }
+    else
+        highSeaSince = 0;
 
     float reach;
     return IsHazardousLiquid(bot, bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ()) ||

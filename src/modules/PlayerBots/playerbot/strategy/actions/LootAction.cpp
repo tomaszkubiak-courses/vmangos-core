@@ -192,24 +192,11 @@ bool OpenLootAction::DoLoot(LootObject& lootObject)
     if (lootObject.skillId == SKILL_MINING)
         return ai->HasSkill(SKILL_MINING) ? ai->CastSpell(MINING, bot) : false;
 
+    // A herb a quest also wants is still a herb. Sending it to the opening spell search below
+    // found nothing, since that search skips Herb Gathering: 1981 failed attempts at Peacebloom
+    // in an 18 hour run.
     if (lootObject.skillId == SKILL_HERBALISM)
-    {
-        // herb-like quest objects
-        bool isForQuest = false;
-        if (go && sObjectMgr.IsGameObjectForQuests(lootObject.guid.GetEntry()))
-        {
-            if (go->ActivateToQuest(bot))
-            {
-                std::list<uint32> lootItems = GAI_VALUE2(std::list<uint32>, "entry loot list", -1*int32(go->GetEntry()));
-                isForQuest = !lootItems.empty() || go->getLootState() != GO_READY;
-            }
-        }
-
-        if (!isForQuest)
-        {
-            return ai->HasSkill(SKILL_HERBALISM) ? ai->CastSpell(HERB_GATHERING, bot) : false;
-        }
-    }
+        return ai->HasSkill(SKILL_HERBALISM) ? ai->CastSpell(HERB_GATHERING, bot) : false;
 
     uint32 spellId = GetOpeningSpell(lootObject);
     if (!spellId)

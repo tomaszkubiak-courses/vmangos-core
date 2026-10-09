@@ -344,8 +344,9 @@ bool LootObject::IsLootPossible(Player* bot)
                 }
             }
             
-            // herb-like quest objects
-            if (skillId == SKILL_HERBALISM && reqSkillValue == 1)
+            // herb-like quest objects. Only Herb Gathering opens a herb lock, so a bot without
+            // herbalism falls through to the skill check below and is turned away.
+            if (skillId == SKILL_HERBALISM && reqSkillValue == 1 && ai->HasSkill(SKILL_HERBALISM))
             {
                 if (sObjectMgr.IsGameObjectForQuests(guid.GetEntry()))
                 {
