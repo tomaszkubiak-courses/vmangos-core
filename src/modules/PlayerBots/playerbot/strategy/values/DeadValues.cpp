@@ -267,6 +267,13 @@ bool ShouldSpiritHealerValue::Calculate()
         return true;
     }
 
+    // A corpse in deep water is where fatigue killed the bot, and reviving on it starts the same
+    // fatigue timer over: four bots died three times each at the same spot at sea that way.
+    GridMapLiquidData liquid;
+    if (corpse->GetMapId() == bot->GetMapId() && bot->GetMap()->GetTerrain()->getLiquidStatus(corpse->GetPositionX(), corpse->GetPositionY(), corpse->GetPositionZ() + 0.01f, MAP_ALL_LIQUIDS, &liquid) &&
+        (liquid.type_flags & MAP_LIQUID_TYPE_DEEP_WATER))
+        return true;
+
     uint32 deadTime = time(nullptr) - corpse->GetGhostTime();
 
     //Dead for a long time

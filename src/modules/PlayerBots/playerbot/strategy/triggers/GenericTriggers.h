@@ -997,6 +997,7 @@ namespace ai
 
     // Standing in lava, slime or a damaging trap such as a campfire. That damage comes without
     // an aura, so "has area debuff" never sees it, and bots stood still and burned to death.
+    // Also open sea: a bot left in deep water for a while has lost its way and fatigue kills it.
     class InEnvironmentalHazardTrigger : public Trigger
     {
     public:
@@ -1007,6 +1008,9 @@ namespace ai
         static GameObject* FindDamagingTrap(Player* bot, float x, float y, float z, float& reach);
         // Lava or slime at the position.
         static bool IsHazardousLiquid(Player* bot, float x, float y, float z);
+
+    private:
+        time_t highSeaSince = 0;
     };
 
     // racials

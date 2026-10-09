@@ -3726,6 +3726,20 @@ bool LeaveEnvironmentalHazardAction::Execute(Event& event)
 {
     float const bx = bot->GetPositionX(), by = bot->GetPositionY(), bz = bot->GetPositionZ();
 
+    // Open sea has no shore within a few yards, and the bots found out there were walking the
+    // sea floor where no path leads anywhere. Fatigue would send the ghost to the closest
+    // graveyard a minute later anyway; go there alive instead.
+    if (bot->IsInHighSea())
+    {
+        WorldSafeLocsEntry const* grave = sObjectMgr.GetClosestGraveYard(bx, by, bz, bot->GetMapId(), bot->GetTeam());
+        if (!grave)
+            return false;
+
+        bot->GetMotionMaster()->Clear();
+        AI_VALUE(LastMovement&, "last movement").clear();
+        return bot->TeleportTo(grave->map_id, grave->x, grave->y, grave->z, bot->GetOrientation());
+    }
+
     float reach = 0.0f;
     float awayAngle = bot->GetOrientation();
     if (GameObject* trap = InEnvironmentalHazardTrigger::FindDamagingTrap(bot, bx, by, bz, reach))
