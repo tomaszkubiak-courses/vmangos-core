@@ -179,10 +179,15 @@ namespace ai
             
             if (!ai->HasRealPlayerMaster())
             {
-                if (Group* group = bot->GetGroup())
+                // RemoveFromGroup, not Group::RemoveMember: only it deletes a group the bot
+                // leaves with one member or none, and a bare RemoveMember left the disbanded
+                // group registered and empty for the rest of the run. A battleground raid is
+                // owned by its battleground, which would be left pointing at a deleted group.
+                Group* group = bot->GetGroup();
+                if (group && !group->isBGGroup())
                 {
                     sLog.outDetail("Repop: Removing bot #%d %s:%d <%s> from group", bot->GetGUIDLow(), bot->GetTeam() == ALLIANCE ? "A" : "H", bot->GetLevel(), bot->GetName());
-                    group->RemoveMember(bot->GetObjectGuid(), 0);
+                    Player::RemoveFromGroup(group, bot->GetObjectGuid());
                 }
             }
 
