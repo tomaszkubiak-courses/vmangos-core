@@ -1288,6 +1288,22 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
         return false;
     }
 
+    // A path that ends where the bot already stands, short of endPos, moves nothing. The
+    // navmesh walk returns just {start} when it finds no first step, and a node route to a
+    // destination with no travel node near it ends at the nearest node, which the bot reaches
+    // and then stands on. Dispatching either is a MovePoint onto the bot's own spot that
+    // reports success, so no caller ever gave up: bots stood on a portal node pathfinding to
+    // a fishing spot 1400 yards away five times a second, and beside loot they never reached
+    // for hours.
+    if (!bot->GetTransport() &&
+        movePath.getBack().getMapId() == startPos.getMapId() &&
+        movePath.getBack().distance(startPos) < sPlayerbotAIConfig.tooCloseDistance &&
+        movePath.getBack().distance(endPos) > sPlayerbotAIConfig.tooCloseDistance)
+    {
+        lastMove.clear();
+        return false;
+    }
+
 
     TravelNodePathType pathType = TravelNodePathType::none;
     uint32 entry = 0;
@@ -3590,6 +3606,14 @@ bool MoveToLootAction::Execute(Event& event)
     bool los = sServerFacade.IsWithinLOSInMap(bot, wo);
     float dist = sServerFacade.GetDistance2d(bot, wo);
     bool moved = los ? MoveNear(wo, sPlayerbotAIConfig.contactDistance) : MoveTo(WorldPosition(wo));
+
+    // Without a way there the bot would pick the same loot again every tick.
+    if (!moved)
+    {
+        AI_VALUE(LootObjectStack*, "available loot")->Remove(loot.guid);
+        RESET_AI_VALUE(LootObject, "loot target");
+    }
+
     sLog.outDebug("[BOT LOOT] %s: MoveToLoot guid=%lu dist=%.1f los=%d via=%s result=%d",
         bot->GetName(), loot.guid.GetRawValue(), dist, los ? 1 : 0, los ? "MoveNear" : "MoveTo", moved ? 1 : 0);
     return moved;
