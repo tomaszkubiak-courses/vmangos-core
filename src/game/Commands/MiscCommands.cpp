@@ -840,6 +840,15 @@ bool ChatHandler::HandleInstanceGroupUnbindCommand(char* args)
         return false;
     }
 
+    // The command disbands and deletes the group, and a battleground raid belongs to its
+    // battleground, which would be left holding a freed pointer.
+    if (pGroup->isBGGroup())
+    {
+        SendSysMessage("Cannot unbind a battleground raid.");
+        SetSentErrorMessage(true);
+        return false;
+    }
+
     for (GroupReference* itr = pGroup->GetFirstMember(); itr != nullptr; itr = itr->next())
     {
         if (Player* pMember = itr->getSource())
@@ -852,6 +861,8 @@ bool ChatHandler::HandleInstanceGroupUnbindCommand(char* args)
     }
 
     pGroup->Disband();
+    sObjectMgr.RemoveGroup(pGroup);
+    delete pGroup;
 
     SendSysMessage("Group unbound. Disbanding.");
     return true;
