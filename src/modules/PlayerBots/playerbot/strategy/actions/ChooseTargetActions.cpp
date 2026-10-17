@@ -47,7 +47,8 @@ bool AttackAnythingAction::isUseful()
         target->GetLevel() < bot->GetLevel() + 3.0)
         return true;
 
-    if (AI_VALUE(bool, "travel target traveling") && CanFreeMoveValue::CanFreeMoveTo(ai, *AI_VALUE(TravelTarget*,"travel target")->GetPosition())) //Bot is traveling
+    if (AI_VALUE(bool, "travel target traveling") && CanFreeMoveValue::CanFreeMoveTo(ai, *AI_VALUE(TravelTarget*,"travel target")->GetPosition()) &&
+        sServerFacade.IsDistanceGreaterThan(AI_VALUE2(float, "distance", "travel target"), sPlayerbotAIConfig.sightDistance)) 
         return false;
 
     return true;
