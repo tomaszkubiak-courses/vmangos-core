@@ -72,8 +72,11 @@ namespace ai
                 return false;
         }
 
-        if (bot->GetGroupInvite())
-            bot->GetGroupInvite()->RemoveInvite(bot);
+        // Decline the pending invite the way the client does. Removing just this bot's entry
+        // left a group that was never created holding nothing but its leader's own invite, which
+        // nothing ever deletes; the leader kept a pointer to it and could neither invite nor be
+        // invited again. One bot stayed that way for 54 hours.
+        bot->UninviteFromGroup();
 
         bool invite = Invite(master, bot);
 
