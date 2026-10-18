@@ -1295,10 +1295,18 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
     // reports success, so no caller ever gave up: bots stood on a portal node pathfinding to
     // a fishing spot 1400 yards away five times a second, and beside loot they never reached
     // for hours.
+    //
+    // A destination within tooCloseDistance needs the second test. MoveNear puts the point it
+    // walks to beside the loot, which for a bot five or six yards out is under five yards
+    // away, so a {start} path to it passed the first test and the bot stood still: one bot
+    // made 470,000 moves at a copper vein ten yards below its ledge over sixteen hours. A
+    // path that ends no closer to endPos than the bot already stands makes no progress at
+    // any distance.
     if (!bot->GetTransport() &&
         movePath.getBack().getMapId() == startPos.getMapId() &&
         movePath.getBack().distance(startPos) < sPlayerbotAIConfig.tooCloseDistance &&
-        movePath.getBack().distance(endPos) > sPlayerbotAIConfig.tooCloseDistance)
+        (movePath.getBack().distance(endPos) > sPlayerbotAIConfig.tooCloseDistance ||
+         movePath.getBack().distance(endPos) >= totalDistance - sPlayerbotAIConfig.targetPosRecalcDistance))
     {
         lastMove.clear();
         return false;
