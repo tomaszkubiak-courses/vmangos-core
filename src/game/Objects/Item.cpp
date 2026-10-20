@@ -504,7 +504,10 @@ void Item::DeleteAllFromDB()
         stmt.PExecute(GetGUIDLow());
     }
 
-    if (HasSavedLoot())
+    // An item removed while the character loads - conjured after 15 minutes offline, limited to
+    // another zone, broken - goes before Player::_LoadItemLoot has read its loot, so its loot
+    // state is still NONE. The generated_loot column read with the item says the rows exist.
+    if (HasSavedLoot() || HasGeneratedLootSecondary())
     {
         stmt = CharacterDatabase.CreateStatement(delLoot, "DELETE FROM `item_loot` WHERE `guid` = ?");
         stmt.PExecute(GetGUIDLow());
