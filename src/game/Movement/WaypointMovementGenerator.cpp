@@ -491,12 +491,17 @@ void FlightPathMovementGenerator::Reset(Player & player, float modSpeed)
 
     Movement::MoveSplineInit init(player, "FlightPathMovementGenerator::Reset");
     uint32 end = GetPathAtMapEnd();
-    for (uint32 i = GetCurrentNode(); i != end; ++i)
+    // Launch replaces the first vertex with the current position. A flight resumed at login on
+    // its last leg would keep only that one and be rejected, so start a node earlier.
+    uint32 first = GetCurrentNode();
+    if (first > 0 && end - first == 1)
+        --first;
+    for (uint32 i = first; i != end; ++i)
     {
         G3D::Vector3 vertice((*i_path)[i].x, (*i_path)[i].y, (*i_path)[i].z);
         init.Path().push_back(vertice);
     }
-    init.SetFirstPointId(GetCurrentNode());
+    init.SetFirstPointId(first);
     init.SetFly();
     init.SetVelocity(modSpeed * PLAYER_FLIGHT_SPEED);
     init.Launch();
