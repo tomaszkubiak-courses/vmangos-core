@@ -1132,7 +1132,10 @@ bool Player::CheckMirrorTimerDeactivation(MirrorTimer::Type timer) const
     switch (timer)
     {
         case MirrorTimer::FATIGUE:
-            return (!(m_environmentFlags & ENVIRONMENT_FLAG_LIQUID) || (!IsAlive() && !HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST)));
+            // A ship sails through deep water, so leaving the liquid area never ends a timer
+            // started by a player who stepped off and climbed back aboard. Activation already
+            // excludes transports and taxis; stop it there too.
+            return (!(m_environmentFlags & ENVIRONMENT_FLAG_LIQUID) || GetTransport() || IsTaxiFlying() || (!IsAlive() && !HasFlag(PLAYER_FLAGS, PLAYER_FLAGS_GHOST)));
         case MirrorTimer::BREATH:
             return (!(m_environmentFlags & ENVIRONMENT_FLAG_LIQUID) || !IsAlive());
         case MirrorTimer::FEIGNDEATH:
