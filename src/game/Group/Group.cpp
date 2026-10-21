@@ -1584,8 +1584,16 @@ bool Group::_addMember(ObjectGuid guid, char const* name, bool isAssistant, uint
 
     if (player)
     {
+        // Joining one group answers an invite to another the way a decline does. Removing only
+        // the invite left that group behind when it was never created and this was its last
+        // invite - an invite leader entering a battleground did that, and nothing deletes it.
         if (Group* invitedGroup = player->GetGroupInvite())
-            invitedGroup->RemoveInvite(player);
+        {
+            if (invitedGroup == this)
+                invitedGroup->RemoveInvite(player);
+            else
+                player->UninviteFromGroup();
+        }
         player->SetGroupInvite(nullptr);
 
         //if player is in group and he is being added to BG raid group, then call SetBattleGroundRaid()
