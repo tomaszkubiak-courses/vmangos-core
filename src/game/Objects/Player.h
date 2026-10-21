@@ -1231,8 +1231,8 @@ class Player final: public Unit
         bool SaveAura(SpellAuraHolder const* holder, AuraSaveStruct& saveStruct);
         void _LoadAuras(std::unique_ptr<QueryResult> result, uint32 timediff);
         void _LoadBoundInstances(std::unique_ptr<QueryResult> result);
-        bool _LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff, bool& hasEpicMount);
-        void _LoadItemLoot(std::unique_ptr<QueryResult> result);
+        bool _LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff, bool& hasEpicMount, std::vector<uint32>& discardedItems);
+        void _LoadItemLoot(std::unique_ptr<QueryResult> result, std::vector<uint32> const& discardedItems);
         void _LoadQuestStatus(std::unique_ptr<QueryResult> result);
         void _LoadGroup(std::unique_ptr<QueryResult> result);
         void _LoadSkills(std::unique_ptr<QueryResult> result);
