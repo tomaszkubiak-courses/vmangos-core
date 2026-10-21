@@ -15234,12 +15234,13 @@ bool Player::LoadFromDB(ObjectGuid guid, SqlQueryHolder* holder)
     m_reputationMgr.LoadFromDB(holder->TakeResult(PLAYER_LOGIN_QUERY_LOADREPUTATION));
 
     bool hasEpicMount = false; // Needed for riding skill replacement in patch 1.12.
-    bool hasItems = _LoadInventory(holder->TakeResult(PLAYER_LOGIN_QUERY_LOADINVENTORY), timeDiff, hasEpicMount);
+    std::vector<uint32> discardedItems;
+    bool hasItems = _LoadInventory(holder->TakeResult(PLAYER_LOGIN_QUERY_LOADINVENTORY), timeDiff, hasEpicMount, discardedItems);
 
     if (!hasItems && m_playedTime[PLAYED_TIME_TOTAL] == 0)
         AddStartingItems();
 
-    _LoadItemLoot(holder->TakeResult(PLAYER_LOGIN_QUERY_LOADITEMLOOT));
+    _LoadItemLoot(holder->TakeResult(PLAYER_LOGIN_QUERY_LOADITEMLOOT), discardedItems);
 
     // update items with duration and realtime
     UpdateItemDuration(timeDiff, true);
@@ -15687,7 +15688,7 @@ void Player::LoadCorpse()
     }
 }
 
-bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff, bool& hasEpicMount)
+bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff, bool& hasEpicMount, std::vector<uint32>& discardedItems)
 {
     //       0             1                  2      3         4        5      6             7                   8           9     10   11    12         13              14
     //SELECT creator_guid, gift_creator_guid, count, duration, charges, flags, enchantments, random_property_id, durability, text, bag, slot, item_guid, item_id, generated_loot
@@ -15761,6 +15762,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
             {
                 sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Player::_LoadInventory: Player %s has broken item (id: #%u) in inventory, deleted.", GetName(), item_id);
                 CharacterDatabase.PExecute("DELETE FROM `character_inventory` WHERE `item_guid` = '%u'", item_lowguid);
+                discardedItems.push_back(item_lowguid);
                 item->FSetState(ITEM_REMOVED);
                 item->SaveToDB();                           // it also deletes item object !
                 continue;
@@ -15779,6 +15781,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
             if (IsAlive() && item->IsLimitedToAnotherMapOrZone(GetMapId(), zone))
             {
                 CharacterDatabase.PExecute("DELETE FROM `character_inventory` WHERE `item_guid` = '%u'", item_lowguid);
+                discardedItems.push_back(item_lowguid);
                 item->FSetState(ITEM_REMOVED);
                 item->SaveToDB();                           // it also deletes item object !
                 continue;
@@ -15788,6 +15791,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
             if (timediff > 15 * MINUTE && (item->GetProto()->Flags & ITEM_FLAG_CONJURED))
             {
                 CharacterDatabase.PExecute("DELETE FROM `character_inventory` WHERE `item_guid` = '%u'", item_lowguid);
+                discardedItems.push_back(item_lowguid);
                 item->FSetState(ITEM_REMOVED);
                 item->SaveToDB();                           // it also deletes item object !
                 continue;
@@ -15920,7 +15924,7 @@ bool Player::_LoadInventory(std::unique_ptr<QueryResult> result, uint32 timediff
     return false;
 }
 
-void Player::_LoadItemLoot(std::unique_ptr<QueryResult> result)
+void Player::_LoadItemLoot(std::unique_ptr<QueryResult> result, std::vector<uint32> const& discardedItems)
 {
     //std::unique_ptr<QueryResult> result = CharacterDatabase.PQuery("SELECT guid, item_id, amount, property FROM item_loot WHERE guid = '%u'", GetGUIDLow());
 
@@ -15936,7 +15940,10 @@ void Player::_LoadItemLoot(std::unique_ptr<QueryResult> result)
             if (!item)
             {
                 CharacterDatabase.PExecute("DELETE FROM `item_loot` WHERE `guid` = '%u'", item_guid);
-                sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Player::_LoadItemLoot: Player %s has loot for nonexistent item (GUID: %u) in `item_loot`, deleted.", GetName(), item_guid);
+                // The login queries ran before _LoadInventory, so an item it has just discarded -
+                // a conjured Treat Bag after 15 minutes offline - still shows its loot rows here.
+                if (std::find(discardedItems.begin(), discardedItems.end(), item_guid) == discardedItems.end())
+                    sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "Player::_LoadItemLoot: Player %s has loot for nonexistent item (GUID: %u) in `item_loot`, deleted.", GetName(), item_guid);
                 continue;
             }
 
