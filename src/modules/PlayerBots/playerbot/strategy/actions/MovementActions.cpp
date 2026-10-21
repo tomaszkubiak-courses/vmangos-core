@@ -1475,8 +1475,14 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
     const float IF_AH_MAP = 0.0f;  // Eastern Kingdoms
     const float CHECK_RADIUS = 150.0f;
     
-    if (bot->GetMapId() == (uint32)IF_AH_MAP && 
-        startPos.sqDistance2d(WorldPosition(0, IF_AH_X, IF_AH_Y, 0)) < CHECK_RADIUS * CHECK_RADIUS && 
+    // The roof climb starts on the city floor. Every report from 2026-10-06 to 2026-10-21 started
+    // at z 650 or higher instead: a bot already on the mountain outside the gate, walking a
+    // navmesh route over the peaks to the Wetlands. That climb is steep but real ground, not this bug.
+    const float IF_CITY_CEILING_Z = IF_AH_Z + 60.0f;
+
+    if (bot->GetMapId() == (uint32)IF_AH_MAP &&
+        startPos.sqDistance2d(WorldPosition(0, IF_AH_X, IF_AH_Y, 0)) < CHECK_RADIUS * CHECK_RADIUS &&
+        startPos.z < IF_CITY_CEILING_Z &&
         !movePath.empty())
     {
         // Measure the climb, not the height change. This used to accumulate fabs(dZ), so a bot
