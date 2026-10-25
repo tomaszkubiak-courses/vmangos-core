@@ -1507,29 +1507,11 @@ void PlayerbotAI::HandleTeleportAck()
 	}
 	else if (bot->IsBeingTeleportedFar())
 	{
-        // A battleground map only exists while its instance does. If the bot was queued into a
-        // battleground that has since ended, the worldport ack would ask MapManager to create an
-        // instance that no longer has a BattleGround behind it, which asserts. Abort the teleport
-        // instead and let the bot carry on where it stands.
-        WorldLocation const& loc = bot->GetTeleportDest();
-        MapEntry const* mapEntry = sMapStore.LookupEntry(loc.mapId);
-        if (mapEntry && mapEntry->IsBattleGround())
-        {
-            uint32 bgInstanceId = bot->GetBattleGroundId();
-            if (!bgInstanceId || !sMapMgr.FindMap(loc.mapId, bgInstanceId))
-            {
-                sLog.outError("PlayerbotAI::HandleTeleportAck: bot %s aborted teleport to battleground map %u, instance %u no longer exists",
-                    bot->GetName(), loc.mapId, bgInstanceId);
-                bot->SetSemaphoreTeleportFar(false);
-
-                if (IsRealPlayer())
-                    bot->SendHeartBeat();
-
-                Reset();
-                return;
-            }
-        }
-
+        // A battleground that ended between the invite and this ack needs no handling here: the
+        // core's worldport ack finds no instance for it and sends the bot back where it was
+        // (HandleReturnOnTeleportFail). The far teleport has already taken the bot off its old
+        // map, so clearing the semaphore instead, as a check ported from cmangos did, left the
+        // bot on no map at all.
         bot->GetSession()->BotHandleMoveWorldportAckOpcode(BotEmptyPacket(MSG_MOVE_WORLDPORT_ACK));
 
         // add delay to simulate teleport delay
