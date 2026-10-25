@@ -3617,6 +3617,36 @@ bool MoveToLootAction::Execute(Event& event)
         ai->TellPlayerNoFacing(GetMaster(), out);
     }
 
+    // Every move here can report success without the bot ever getting there. A herb nine
+    // yards below a ledge gets a two point path that ends half a yard closer, so the bot
+    // walked back and forth along the edge 776,000 times in 28 hours; a food crate four yards
+    // from a campfire is walked to, the hazard reaction pulls the bot away, and the next run
+    // walks back. "loot target" outlives the loot stack, so nothing else ever drops it. Give
+    // up once the bot has not come a yard closer in 20 seconds of trying, and keep the loot
+    // off the stack for ten minutes so the next "add loot" does not hand it straight back. A
+    // pause of more than 10 seconds (a fight, another action) starts the count again.
+    {
+        time_t const now = time(nullptr);
+        float const distance = bot->GetDistance(wo);
+        if (loot.guid != progressGuid || now - progressLastRun > 10 || distance < progressBest - 1.0f)
+        {
+            progressGuid = loot.guid;
+            progressBest = distance;
+            progressSince = now;
+        }
+        progressLastRun = now;
+
+        if (now - progressSince > 20)
+        {
+            sLog.outDebug("[BOT LOOT] %s: MoveToLoot gave up guid=%lu (no progress, %.1f away)",
+                bot->GetName(), loot.guid.GetRawValue(), distance);
+            AI_VALUE(LootObjectStack*, "available loot")->Skip(loot.guid, 10 * MINUTE);
+            RESET_AI_VALUE(LootObject, "loot target");
+            progressGuid = ObjectGuid();
+            return false;
+        }
+    }
+
     bool los = sServerFacade.IsWithinLOSInMap(bot, wo);
     float dist = sServerFacade.GetDistance2d(bot, wo);
     bool moved = los ? MoveNear(wo, sPlayerbotAIConfig.contactDistance) : MoveTo(WorldPosition(wo));

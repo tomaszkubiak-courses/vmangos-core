@@ -56,6 +56,8 @@ namespace ai
     public:
         bool Add(ObjectGuid guid);
         void Remove(ObjectGuid guid);
+        // Drops guid and refuses to take it back for the given number of seconds.
+        void Skip(ObjectGuid guid, time_t seconds);
         void Clear();
         bool CanLoot(float maxDistance);
         LootObject GetLoot(float maxDistance = 0);
@@ -66,6 +68,7 @@ namespace ai
     private:
         Player* bot;
         LootTargetList availableLoot;
+        std::map<ObjectGuid, time_t> skippedUntil;
     };
 
 };
