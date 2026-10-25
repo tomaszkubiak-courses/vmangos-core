@@ -172,6 +172,12 @@ namespace ai
     public:
         MoveToLootAction(PlayerbotAI* ai) : MovementAction(ai, "move to loot") {}
         virtual bool Execute(Event& event) override;
+    private:
+        // The closest the bot has come to the loot it is walking to, and since when.
+        ObjectGuid progressGuid;
+        float progressBest = 0.0f;
+        time_t progressSince = 0;
+        time_t progressLastRun = 0;
     };
 
     class MoveOutOfEnemyContactAction : public MovementAction

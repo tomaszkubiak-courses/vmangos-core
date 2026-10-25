@@ -398,6 +398,15 @@ bool LootObject::IsLootPossible(Player* bot)
 
 bool LootObjectStack::Add(ObjectGuid guid)
 {
+    auto skipped = skippedUntil.find(guid);
+    if (skipped != skippedUntil.end())
+    {
+        if (skipped->second > time(0))
+            return false;
+
+        skippedUntil.erase(skipped);
+    }
+
     if (!availableLoot.insert(guid).second)
         return false;
 
@@ -416,6 +425,22 @@ void LootObjectStack::Remove(ObjectGuid guid)
     LootTargetList::iterator i = availableLoot.find(guid);
     if (i != availableLoot.end())
         availableLoot.erase(i);
+}
+
+void LootObjectStack::Skip(ObjectGuid guid, time_t seconds)
+{
+    Remove(guid);
+
+    time_t const now = time(0);
+    for (auto i = skippedUntil.begin(); i != skippedUntil.end(); )
+    {
+        if (i->second <= now)
+            i = skippedUntil.erase(i);
+        else
+            ++i;
+    }
+
+    skippedUntil[guid] = now + seconds;
 }
 
 void LootObjectStack::Clear()
