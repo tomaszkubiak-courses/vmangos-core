@@ -379,6 +379,15 @@ void MotionMaster::MoveTargetedHome()
     Creature* pCreature = m_owner->ToCreature();
     if (!pCreature)
     {
+        // A player charmed by a creature is sent here when the charmer evades, through
+        // EnterEvadeModeHelper - Jailor Eston in Durnholde casts Enslave. Like a charmed
+        // creature, it follows its charmer.
+        if (Unit* charmer = m_owner->GetCharmer())
+        {
+            Mutate(new FollowMovementGenerator<Player>(*charmer, PET_FOLLOW_DIST, PET_FOLLOW_ANGLE));
+            return;
+        }
+
         sLog.Out(LOG_BASIC, LOG_LVL_ERROR, "%s attempt targeted home", m_owner->GetGuidStr().c_str());
         return;
     }
