@@ -479,6 +479,62 @@ bool WorldPosition::isEnemyHomeZoneFor(Team team) const
         || (areaTeam == AREATEAM_HORDE && team == ALLIANCE);
 }
 
+bool WorldPosition::isNearEnemyGuardFor(Team team) const
+{
+    struct GuardSpawn
+    {
+        uint32 mapId;
+        float x, y;
+        bool hostileToAlliance, hostileToHorde;
+    };
+
+    // Spawn data does not change after startup; built once, on first use.
+    static std::vector<GuardSpawn> const guards = []()
+    {
+        std::vector<GuardSpawn> result;
+        FactionTemplateEntry const* alliance = sFactionTemplateStore.LookupEntry(1); // Human
+        FactionTemplateEntry const* horde = sFactionTemplateStore.LookupEntry(2);    // Orc
+        if (!alliance || !horde)
+            return result;
+
+        auto collect = [&](CreatureDataPair const& pair)
+        {
+            CreatureData const& data = pair.second;
+            CreatureInfo const* info = sObjectMgr.GetCreatureTemplate(data.creature_id[0]);
+            if (!info || !(info->flags_extra & CREATURE_FLAG_EXTRA_GUARD))
+                return false;
+
+            FactionTemplateEntry const* faction = sFactionTemplateStore.LookupEntry(info->faction);
+            if (!faction)
+                return false;
+
+            bool const hostileToAlliance = faction->IsHostileTo(*alliance);
+            bool const hostileToHorde = faction->IsHostileTo(*horde);
+            if (hostileToAlliance || hostileToHorde)
+                result.push_back({ data.position.mapId, data.position.x, data.position.y, hostileToAlliance, hostileToHorde });
+            return false;
+        };
+        sObjectMgr.DoCreatureData(collect);
+        return result;
+    }();
+
+    // Guards stand and patrol across a whole town, and a bot walking up to the last one
+    // has already passed the others.
+    float const reach = 60.0f;
+
+    for (GuardSpawn const& guard : guards)
+    {
+        if (guard.mapId != getMapId() || !(team == ALLIANCE ? guard.hostileToAlliance : guard.hostileToHorde))
+            continue;
+
+        float const dx = guard.x - getX(), dy = guard.y - getY();
+        if (dx * dx + dy * dy <= reach * reach)
+            return true;
+    }
+
+    return false;
+}
+
 std::string WorldPosition::getAreaName(const bool fullName, const bool zoneName) const
 {
     if (!isOverworld())

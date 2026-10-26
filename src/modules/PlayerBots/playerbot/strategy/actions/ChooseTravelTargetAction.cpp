@@ -429,6 +429,17 @@ bool ChooseTravelTargetAction::SetBestTarget(Player* requester, TravelTarget* ta
                     continue;
                 }
 
+                // An enemy town inside a contested zone. Mailboxes, fishing water and ore
+                // there drew bots of the other faction into the guards: 418 deaths to
+                // Theramore, Grom'gol, Aerie Peak and Southshore guards in a 25 hour run.
+                // A quest that sends the bot there means it, so quest points are exempt.
+                if (!target->IsForced() && position && !dynamic_cast<QuestTravelDestination*>(destination) && position->isNearEnemyGuardFor(bot->GetTeam()))
+                {
+                    ai->TellDebug(requester, "Skipping " + destination->GetTitle() + " - enemy guards", "debug travel");
+
+                    continue;
+                }
+
                 if (partition != std::prev(partitionedList.end())->first && !urand(0, 10)) //10% chance to skip to a longer partition.
                 {
                     ai->TellDebug(requester, "Skipping range " + PrintPartion(partition), "debug travel");
@@ -703,8 +714,10 @@ bool RefreshTravelTargetAction::Execute(Event& event)
     {
         std::list<uint8> chancesToGoFar = { 10,20,90 }; //Closest map, grid, cell.
         newPosition = oldDestination->GetNextPoint(*target->GetPosition(), chancesToGoFar);
+        if (newPosition && !dynamic_cast<QuestTravelDestination*>(oldDestination) && newPosition->isNearEnemyGuardFor(bot->GetTeam()))
+            newPosition = nullptr;
         if (newPosition && sTravelMgr.IsLocationLevelValid(*newPosition, info, (uint32)oldDestination->GetPurpose()))
-            break;        
+            break;
     }
 
     if (!newPosition)
