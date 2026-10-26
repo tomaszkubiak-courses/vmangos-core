@@ -925,8 +925,12 @@ GameObject* InEnvironmentalHazardTrigger::FindDamagingTrap(Player* bot, float x,
 
 bool InEnvironmentalHazardTrigger::IsHazardousLiquid(Player* bot, float x, float y, float z)
 {
+    // Magma only. This core never damages a player standing in slime - the environmental
+    // mirror timer burns IsInMagma() and nothing else - so slime is no hazard, and counting
+    // it made the Undercity canals one: the reaction stopped every bot walking through them,
+    // 4.1 million times in a 25 hour run.
     GridMapLiquidData liquid;
-    GridMapLiquidStatus status = bot->GetMap()->GetTerrain()->getLiquidStatus(x, y, z + 0.01f, MAP_LIQUID_TYPE_MAGMA | MAP_LIQUID_TYPE_SLIME, &liquid);
+    GridMapLiquidStatus status = bot->GetMap()->GetTerrain()->getLiquidStatus(x, y, z + 0.01f, MAP_LIQUID_TYPE_MAGMA, &liquid);
     return status & (LIQUID_MAP_UNDER_WATER | LIQUID_MAP_IN_WATER | LIQUID_MAP_WATER_WALK);
 }
 

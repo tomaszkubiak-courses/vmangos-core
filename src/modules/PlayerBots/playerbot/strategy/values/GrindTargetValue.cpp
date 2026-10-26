@@ -291,7 +291,7 @@ Unit* GrindTargetValue::FindTargetForGrinding(int assistCount)
         if (!bot->InBattleGround() && GetTargetingPlayerCount(unit) > assistCount)
         {
             logGrind(unit, std::to_string(GetTargetingPlayerCount(unit)) + " bots already targeting).");
-            newdistance =+ GetTargetingPlayerCount(unit) * 5;
+            newdistance += GetTargetingPlayerCount(unit) * 5;
         }
 
         if (group)
