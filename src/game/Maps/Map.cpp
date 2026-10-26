@@ -1411,13 +1411,24 @@ Map::PlayerRelocation(Player* player, float x, float y, float z, float orientati
 
     player->Relocate(x, y, z, orientation);
 
-    if (old_cell.DiffGrid(new_cell) || old_cell.DiffCell(new_cell))
+    // The old cell is worked out from the position, which assumes the player is linked into
+    // that cell's grid. A plain Relocate() of a player in world moves the position without
+    // the grid - the playerbot jump, knockback and transport-follow code all do it - and if
+    // that lands the player in a grid that is not loaded, there is no old grid to stay in.
+    // Treat it as entering the grid, which loads it; the unlink does not touch the grid, it
+    // only drops the player from whichever cell it is really linked into.
+    NGridType* oldGrid = getNGrid(old_cell.GridX(), old_cell.GridY());
+
+    if (!oldGrid || old_cell.DiffGrid(new_cell) || old_cell.DiffCell(new_cell))
     {
         DEBUG_FILTER_LOG(LOG_FILTER_PLAYER_MOVES, "Player %s relocation grid[%u,%u]cell[%u,%u]->grid[%u,%u]cell[%u,%u]", player->GetName(), old_cell.GridX(), old_cell.GridY(), old_cell.CellX(), old_cell.CellY(), new_cell.GridX(), new_cell.GridY(), new_cell.CellX(), new_cell.CellY());
 
-        NGridType* oldGrid = getNGrid(old_cell.GridX(), old_cell.GridY());
-        RemoveFromGrid(player, oldGrid, old_cell);
-        if (!old_cell.DiffGrid(new_cell))
+        if (oldGrid)
+            RemoveFromGrid(player, oldGrid, old_cell);
+        else
+            player->GetGridRef().unlink();
+
+        if (oldGrid && !old_cell.DiffGrid(new_cell))
             AddToGrid(player, oldGrid, new_cell);
         else
             EnsureGridLoadedAtEnter(new_cell, player);
