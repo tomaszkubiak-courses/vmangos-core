@@ -10,6 +10,7 @@
 #include "BotState.h"
 #include "PlayerTalentSpec.h"
 #include <stack>
+#include <functional>
 #include "strategy/IterateItemsMask.h"
 #include "RandomPlayerbotMgr.h"
 
@@ -370,6 +371,22 @@ private:
     void UpdateAIInternal(uint32 elapsed, bool minimal = false) override;
 public:    
     static std::string BotStateToString(BotState state);
+
+    // From cmangos/playerbots 53ebb2d4. Runs action(target) on a thread that may touch target:
+    // inline when target shares this bot's map, otherwise from the world thread messager, which
+    // runs while no map is updating. The deferred action looks target up again by guid.
+    void RunOnOwningThread(Player* target, std::function<void(Player*)> action);
+
+    // The normal summon path: sets the summon point and sends SMSG_SUMMON_REQUEST, so the target
+    // accepts and teleports itself on its own map thread. False when the target cannot accept a
+    // summon (dead, in combat, no session) and the caller has to fall back to a teleport.
+    static bool SendSummonRequest(Player* summoner, Player* target);
+    static bool SendSummonRequest(Player* summoner, Player* target, uint32 mapId, float x, float y, float z);
+
+    // The normal resurrect path for a dead target: ResurrectUsingRequestData teleports it to the
+    // stored spot before resurrecting it, on its own map thread. False if the target is alive or
+    // already has a request pending.
+    static bool SendResurrectRequest(Player* summoner, Player* target, uint32 mapId, float x, float y, float z);
     std::string GetDefaultMovementStrategy();
     void EnsureDefaultMovementStrategy(Player* requester = nullptr);
 	std::string HandleRemoteCommand(std::string command);

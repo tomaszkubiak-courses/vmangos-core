@@ -1390,6 +1390,71 @@ void PlayerbotAI::HandleCommands()
     }
 }
 
+void PlayerbotAI::RunOnOwningThread(Player* target, std::function<void(Player*)> action)
+{
+    if (!target || !action)
+        return;
+
+    // IsSafe() holds when target shares this bot's map and instance and is not mid-teleport, so
+    // this thread owns it.
+    if (target->IsInWorld() && IsSafe(target))
+    {
+        action(target);
+        return;
+    }
+
+    ObjectGuid const targetGuid = target->GetObjectGuid();
+    sWorld.GetMessager().AddMessage([targetGuid, action](World* /*world*/)
+    {
+        Player* p = sObjectMgr.GetPlayer(targetGuid);
+        if (p && p->IsInWorld() && !p->IsBeingTeleported())
+            action(p);
+    });
+}
+
+bool PlayerbotAI::SendSummonRequest(Player* summoner, Player* target)
+{
+    if (!summoner)
+        return false;
+
+    float x, y, z;
+    summoner->GetPosition(x, y, z);
+    return SendSummonRequest(summoner, target, summoner->GetMapId(), x, y, z);
+}
+
+bool PlayerbotAI::SendSummonRequest(Player* summoner, Player* target, uint32 mapId, float x, float y, float z)
+{
+    if (!summoner || !target || !target->GetSession())
+        return false;
+
+    // HandleSummonResponseOpcode refuses dead or fighting players; let the caller teleport them.
+    if (!target->IsAlive() || target->IsInCombat())
+        return false;
+
+    target->SendSummonRequest(summoner->GetObjectGuid(), mapId, summoner->GetZoneId(), x, y, z);
+    return true;
+}
+
+bool PlayerbotAI::SendResurrectRequest(Player* summoner, Player* target, uint32 mapId, float x, float y, float z)
+{
+    if (!summoner || !target || !target->GetSession())
+        return false;
+
+    if (target->IsAlive() || target->IsRessurectRequested())
+        return false;
+
+    // A player resurrector makes ResurrectUsingRequestData teleport the target to this spot first.
+    target->SetResurrectRequestData(summoner->GetObjectGuid(), mapId, summoner->GetInstanceId(), x, y, z, target->GetOrientation(),
+        target->GetMaxHealth(), target->GetMaxPower(POWER_MANA));
+
+    auto packet = std::make_unique<WorldPackets::Spell::ResurrectRequest>();
+    packet->casterGuid = summoner->GetObjectGuid();
+    packet->sickness = false;
+    packet->delayed = false;
+    target->GetSession()->SendPacket(std::move(packet));
+    return true;
+}
+
 void PlayerbotAI::UpdateAIInternal(uint32 elapsed, bool minimal)
 {
     SC_PHASE("UpdateAIInternal.entry", bot ? bot->GetName() : "(null)");

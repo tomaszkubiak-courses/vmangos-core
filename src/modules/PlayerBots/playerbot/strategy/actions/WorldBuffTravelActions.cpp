@@ -147,22 +147,16 @@ static bool SummonPlayerToSummoner(Player* summoner, Player* target, PlayerbotAI
     if (summoner->IsBeingTeleported() || target->IsBeingTeleported())
         return false;
 
-    float x, y, z;
-    summoner->GetPosition(x, y, z);
-
-    if (IsRealPlayer(target))
+    // From cmangos/playerbots 53ebb2d4: a summon request the target accepts on its own thread;
+    // a teleport, from a thread that owns the target, only when it cannot accept one.
+    if (!PlayerbotAI::SendSummonRequest(summoner, target))
     {
-        target->SetSummonPoint(summoner->GetMapId(), x, y, z);
-
-        WorldPacket data(SMSG_SUMMON_REQUEST, 8 + 4 + 4);
-        data << summoner->GetObjectGuid();
-        data << uint32(summoner->GetZoneId());
-        data << uint32(MAX_PLAYER_SUMMON_DELAY * IN_MILLISECONDS);
-        target->GetSession()->SendPacket(&data);
-    }
-    else
-    {
-        target->TeleportTo(summoner->GetMapId(), x, y, z, summoner->GetOrientation());
+        uint32 const destMapId = summoner->GetMapId();
+        float const destX = summoner->GetPositionX(), destY = summoner->GetPositionY(), destZ = summoner->GetPositionZ(), destO = summoner->GetOrientation();
+        summonerAI->RunOnOwningThread(target, [destMapId, destX, destY, destZ, destO](Player* t)
+        {
+            t->TeleportTo(destMapId, destX, destY, destZ, destO);
+        });
     }
 
     return true;
