@@ -66,10 +66,39 @@ Creature* GuidPosition::GetCreature(uint32 instanceId) const
     if (!*this)
         return nullptr;
 
-    if (!getMap(instanceId))
+    Map* map = getMap(instanceId);
+    if (!map)
         return nullptr;
 
-    return getMap(instanceId)->GetAnyTypeCreature(*this);
+    if (Creature* creature = map->GetAnyTypeCreature(*this))
+        return creature;
+
+    return FindSpawnWithOtherEntry(map);
+}
+
+// From cmangos/playerbots 80599a75, adapted: a creature spawn here can name up to five entries
+// and picks one when it spawns, while a GuidPosition built from the spawn data carries the first.
+// 9648 of 66244 spawns name more than one, so for those the lookup by guid missed the creature
+// whenever it had rolled another entry. Try the spawn's other entries under the same counter.
+Creature* GuidPosition::FindSpawnWithOtherEntry(Map* map) const
+{
+    if (GetHigh() != HIGHGUID_UNIT)
+        return nullptr;
+
+    CreatureData const* data = sObjectMgr.GetCreatureData(GetCounter());
+    if (!data)
+        return nullptr;
+
+    for (uint32 entry : data->creature_id)
+    {
+        if (!entry || entry == GetEntry())
+            continue;
+
+        if (Creature* creature = map->GetAnyTypeCreature(ObjectGuid(HIGHGUID_UNIT, entry, GetCounter())))
+            return creature;
+    }
+
+    return nullptr;
 }
 
 Unit* GuidPosition::GetUnit(uint32 instanceId) const
