@@ -5,6 +5,7 @@
 #include "playerbot/PlayerbotAIConfig.h"
 #include "playerbot/strategy/values/PositionValue.h"
 #include "playerbot/strategy/values/AoeValues.h"
+#include "Formulas.h"
 #include "playerbot/strategy/values/NearestGameObjects.h"
 #include "Maps/GridNotifiers.h"
 #include "Maps/GridNotifiersImpl.h"
@@ -151,6 +152,7 @@ bool OutNumberedTrigger::IsActive()
     int32 botLevel = bot->GetLevel();
     float healthMod = bot->GetHealthPercent() / 100.0f;
     uint32 friendPower = 100 + 100 * healthMod, foePower = 0;
+    uint32 grayCount = 0;
     // From cmangos/playerbots 490f9b95: count what is attacking the bot, not every mob that could;
     // a solo bot ran from large groups that were never going to fight it.
     for (auto &attacker : ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("attackers")->Get())
@@ -164,11 +166,23 @@ bool OutNumberedTrigger::IsActive()
 
         int32 dLevel = creature->GetLevel() - botLevel;
 
+        // From cmangos/playerbots beed4ab6: a grey attacker weighs nothing on its own, an
+        // attacker up to three levels above weighs the same as an even one, and each level past
+        // that adds a full share - `dLevel * 200` made one mob two levels up outweigh a solo bot.
+        if (int32(creature->GetLevel()) <= int32(MaNGOS::XP::GetGrayLevel(botLevel)))
+        {
+            grayCount++;
+            continue;
+        }
+
         healthMod = creature->GetHealthPercent() / 100.0f;
 
-        if(dLevel > -10)
-            foePower += std::max(100 + 10 * dLevel, dLevel * 200) * healthMod;
+        uint32 const weight = dLevel > 3 ? 100 + (dLevel - 3) * 100 : 100;
+        foePower += weight * healthMod;
     }
+
+    if (grayCount > 10)
+        foePower += 50 * grayCount;
 
     if (!foePower)
         return false;
@@ -188,7 +202,7 @@ bool OutNumberedTrigger::IsActive()
             friendPower += std::max(200 + 20 * dLevel, dLevel * 200)* healthMod;
     }
 
-    return friendPower < foePower;
+    return foePower > 2 * friendPower;
 }
 
 bool BuffTrigger::IsActive()
