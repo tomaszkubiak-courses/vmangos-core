@@ -3196,29 +3196,6 @@ bool MovementAction::Flee(Unit *target)
         succeeded = MoveNear(fleeTarget);
     }
 
-    if (!ai->HasRealPlayerMaster() && !ai->IsRealPlayer(target))
-    {
-        bool fullDistance = false;
-        if (target->IsPlayer())
-            fullDistance = true;
-        if (WorldPosition(bot).isOverworld())
-            fullDistance = true;
-
-        float distance = fullDistance ? (ai->GetRange("flee") * 2) : ai->GetRange("flee");
-
-        MotionMaster* mm = bot->GetMotionMaster();
-
-        if (mm->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
-        {
-            // Penqle's ChaseMovementGenerator is templated; ServerFacade returns safe defaults.
-            if (sServerFacade.GetChaseTarget(bot) == target && sServerFacade.GetChaseOffset(bot) == distance)
-                return true;
-        }
-
-        mm->MoveChase(target, distance, WorldPosition(bot).getAngleTo(target));
-        return true;
-    }
-
     // Generate a position to flee
     if(!succeeded)
     {
@@ -3263,8 +3240,31 @@ bool MovementAction::Flee(Unit *target)
         float rx, ry, rz;
         if (!manager.CalculateDestination(&rx, &ry, &rz))
         {
-            ai->TellError(GetMaster(), "Nowhere to flee");
-            return false;
+            // From cmangos/playerbots 7f9ab943: keeping the flee distance by chasing the target
+            // was what a bot without a real player master always did, and out in the wild on
+            // rough terrain that chase broke the flee. It is now only the fallback when no flee
+            // point can be found.
+            AI_VALUE(LastMovement&, "last movement").lastFlee = time(0);
+
+            if (ai->HasRealPlayerMaster() || ai->IsRealPlayer(target))
+            {
+                ai->TellError(GetMaster(), "Nowhere to flee");
+                return false;
+            }
+
+            float const distance = fullDistance ? (ai->GetRange("flee") * 2) : ai->GetRange("flee");
+
+            MotionMaster* mm = bot->GetMotionMaster();
+
+            if (mm->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
+            {
+                // Penqle's ChaseMovementGenerator is templated; ServerFacade returns safe defaults.
+                if (sServerFacade.GetChaseTarget(bot) == target && sServerFacade.GetChaseOffset(bot) == distance)
+                    return true;
+            }
+
+            mm->MoveChase(target, distance, WorldPosition(bot).getAngleTo(target));
+            return true;
         }
 
         if(MoveTo(target->GetMapId(), rx, ry, rz))
