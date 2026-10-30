@@ -18,6 +18,12 @@ bool WaitForAttackKeepSafeDistanceAction::Execute(Event& event)
         const float safeDistance = std::max(float(BotGetAttackDistance(target, bot) + ATTACK_DISTANCE), WaitForAttackStrategy::GetSafeDistance());
         const float safeDistanceThreshold = WaitForAttackStrategy::GetSafeDistanceThreshold();
 
+        // From cmangos/playerbots 0b3e77f5: only reposition when actually too close. A bot
+        // already outside the safe distance was sent to the nearest point of the ring around the
+        // target on every pass, walking back towards it.
+        if (WorldPosition(bot).fDist(WorldPosition(target)) > safeDistance)
+            return false;
+
         // Find the best point around the target.
         const WorldPosition bestPoint = GetBestPoint(target, (safeDistance - safeDistanceThreshold), safeDistance);
         if (bestPoint)
