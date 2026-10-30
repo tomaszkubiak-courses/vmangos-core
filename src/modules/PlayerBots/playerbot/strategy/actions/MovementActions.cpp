@@ -857,12 +857,28 @@ TravelPath MovementAction::ResolveMovePath(const WorldPosition& startPosition, c
     // following call for as long as the destination holds. Nothing walks straight up, so refuse
     // to invent a step that rises further than it travels along the ground; the caller treats an
     // empty path as a failed move and picks something else.
+    //
+    // From cmangos/playerbots 8b043a04: nor invent one to another map - a point move ignores the
+    // map and the bot walks towards that map's coordinates on its own - or one further than the
+    // navmesh pathfinder can build, which goes through terrain and under the map. Battlegrounds
+    // keep the long straight step.
     if (outMovePath.empty())
     {
         float const rise = endPosition.getZ() - startPosition.getZ();
         float const ground = sqrt(startPosition.sqDistance2d(endPosition));
 
-        if (startPosition.getMapId() != endPosition.getMapId() || rise < 5.0f || ground >= rise)
+        if (startPosition.getMapId() != endPosition.getMapId() ||
+            (!bot->InBattleGround() && sServerFacade.IsDistanceGreaterThan(totalDistance, sPlayerbotAIConfig.sightDistance * 3)))
+        {
+            if (mover == bot)
+                ai->StopMoving();
+            else
+                mover->StopMoving();
+
+            return outMovePath;
+        }
+
+        if (rise < 5.0f || ground >= rise)
             outMovePath.addPoint(endPosition);
     }
 
