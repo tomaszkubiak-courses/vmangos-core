@@ -46,7 +46,12 @@ namespace ai
         //Short range can we do the action now?
         virtual bool isUseful() override { return rpg->InRange(); }
 
-        virtual bool Execute(Event& event) override { rpg->BeforeExecute();  bool doAction = ai->DoSpecificAction(ActionName(), ActionEvent(event), true); rpg->AfterExecute(doAction, true); DoDelay(); return doAction; }
+        // A sub-action that failed leaves its trigger true, and "rpg" as the next action ranked
+        // it first again on the same target. In a 36 hour run rpg ah buy failed 44736 times and
+        // succeeded 454, rpg end quest failed 14440 and succeeded 10, each failure followed by
+        // another try until the one in ten chance to move on came up. An auction house scan
+        // costs up to 200 ms.
+        virtual bool Execute(Event& event) override { rpg->BeforeExecute();  bool doAction = ai->DoSpecificAction(ActionName(), ActionEvent(event), true); rpg->AfterExecute(doAction, true, doAction ? "rpg" : "rpg cancel"); DoDelay(); return doAction; }
 
         virtual std::string GetRpgActionName() const { return "generic rpg action"; };
     protected:
@@ -131,7 +136,8 @@ namespace ai
     {
     public:
         RpgStartQuestAction(PlayerbotAI* ai, std::string name = "rpg start quest") : RpgSubAction(ai, name) {}
-        virtual bool Execute(Event& event) override { rpg->BeforeExecute();  bool doAction = ai->DoSpecificAction(ActionName(), ActionEvent(event), true); rpg->AfterExecute(doAction, true, ""); DoDelay(); return doAction; }
+        // Moves on after a failure for the same reason as RpgSubAction::Execute.
+        virtual bool Execute(Event& event) override { rpg->BeforeExecute();  bool doAction = ai->DoSpecificAction(ActionName(), ActionEvent(event), true); rpg->AfterExecute(doAction, true, doAction ? "" : "rpg cancel"); DoDelay(); return doAction; }
 
         virtual std::string GetRpgActionName() const override { return "starting a quest at"; };
     private:

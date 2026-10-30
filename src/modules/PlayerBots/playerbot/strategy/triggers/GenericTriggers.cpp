@@ -910,9 +910,13 @@ GameObject* InEnvironmentalHazardTrigger::FindDamagingTrap(Player* bot, float x,
         if (!damaging)
             continue;
 
-        // A yard and a half of margin: the bot is measured from its centre, the damage reaches
-        // its edge.
-        trapReach += 1.5f;
+        // The core springs the trap on a player whose edge is within the radius of the trap's
+        // edge (GameObject::Update, AnyPlayerInObjectRangeCheck), and GetDistance already takes
+        // off the trap's own size, so add the bot's and half a yard for one update of walking.
+        // A flat yard and a half overshot that by about a yard. The reaction stopped bots 880
+        // thousand times in a 36 hour run, most of them at campfires, and in 307 of 318 sampled
+        // campfire stops the bot's edge was 2 yards or more from the fire's, where nothing burns.
+        trapReach += bot->GetObjectBoundingRadius() + 0.5f;
         if (go->GetDistance(x, y, z) < trapReach)
         {
             reach = trapReach;
