@@ -723,7 +723,12 @@ void Engine::ProcessTriggers(bool minimal)
 
     for (std::list<TriggerNode*>::iterator i = triggers.begin(); i != triggers.end(); i++)
     {
-        Trigger* trigger = (*i)->getTrigger();
+        // A refresh of the engine mid-tick can leave an empty node in the list.
+        TriggerNode* node = *i;
+        if (!node)
+            continue;
+
+        Trigger* trigger = node->getTrigger();
         if (trigger) trigger->Reset();
     }
 }
