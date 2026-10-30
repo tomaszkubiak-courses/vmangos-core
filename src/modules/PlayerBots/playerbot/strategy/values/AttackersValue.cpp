@@ -364,12 +364,6 @@ void AttackersValue::AddTargetsOf(Player* player, std::set<Unit*>& targets, std:
                     units.insert(pullTarget);
                 }
             }
-
-            // If the enemy player can't be reached (e.g. under the map)
-            if (!EnemyPlayersValue::IsReachable(enemyPlayer, playerToCheckAgainst))
-            {
-                return false;
-            }
         }
 
         // Get the current attackers of the player
@@ -543,6 +537,12 @@ bool AttackersValue::IsValid(Unit* target, Player* player, Player* owner, bool c
         {
             // If the enemy player is not within sight distance
             if (!enemyPlayer->IsWithinDist(playerToCheckAgainst, EnemyPlayerValue::GetMaxAttackDistance(playerToCheckAgainst), false))
+            {
+                return false;
+            }
+
+            // If the enemy player can't be reached (e.g. under the map)
+            if (!EnemyPlayersValue::IsReachable(enemyPlayer, playerToCheckAgainst))
             {
                 return false;
             }

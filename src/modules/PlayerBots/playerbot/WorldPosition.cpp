@@ -1085,7 +1085,7 @@ std::vector<WorldPosition> WorldPosition::getPathStepFrom(const WorldPosition& s
 
     std::vector<WorldPosition> retvec = fromPointsArray(points);
 
-    if (type == PATHFIND_INCOMPLETE)
+    if (type == PATHFIND_INCOMPLETE && !retvec.empty()) // cmangos/playerbots d3c3d7a6: back() of an empty path
     {
         WorldPosition lastPoint = retvec.back();
 
