@@ -151,7 +151,9 @@ bool OutNumberedTrigger::IsActive()
     int32 botLevel = bot->GetLevel();
     float healthMod = bot->GetHealthPercent() / 100.0f;
     uint32 friendPower = 100 + 100 * healthMod, foePower = 0;
-    for (auto &attacker : ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("possible attack targets")->Get())
+    // From cmangos/playerbots 490f9b95: count what is attacking the bot, not every mob that could;
+    // a solo bot ran from large groups that were never going to fight it.
+    for (auto &attacker : ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("attackers")->Get())
     {
         Creature* creature = ai->GetCreature(attacker);
         if (!creature)

@@ -175,7 +175,7 @@ Unit* EnemyPlayerValue::Calculate()
         Unit* firstTarget = ai->GetUnit(enemyPlayers.front());
         if (firstTarget)
         {
-            bestEnemyPlayerDistance = firstTarget->GetDistance2d(bot);
+            bestEnemyPlayerDistance = firstTarget->GetDistance(bot); // cmangos/playerbots 5d45ec63: 3D, so a player on a ledge above is not the closest
             bestEnemyPlayerHealth = firstTarget->GetHealth();
             bestEnemyPlayer = firstTarget;
         }
@@ -196,7 +196,7 @@ Unit* EnemyPlayerValue::Calculate()
                 if (isMelee)
                 {
                     // Score best enemy player based on lowest distance
-                    const float distanceToEnemyPlayer = target->GetDistance2d(bot);
+                    const float distanceToEnemyPlayer = target->GetDistance(bot);
                     if (distanceToEnemyPlayer < bestEnemyPlayerDistance)
                     {
                         bestEnemyPlayerDistance = distanceToEnemyPlayer;
