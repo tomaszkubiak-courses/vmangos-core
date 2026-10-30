@@ -313,6 +313,8 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
 
                         if (actionExecuted)
                         {
+                            TrackLoop(action);
+
                             LogAction("A:%s - OK", action->getName().c_str());
                             sPlayerbotAIConfig.logActionOutcome(actionName, PlayerbotAIConfig::ActionOutcome::Succeeded);
                             MultiplyAndPush(actionNode->getContinuers(), 0, false, event, "cont");
@@ -1053,4 +1055,43 @@ void Engine::LogValues()
 
     std::string text = ai->GetAiObjectContext()->FormatValues();
     sLog.outDebug( "Values for %s: %s", bot->GetName(), text.c_str());
+}
+
+// From cmangos/playerbots 6823423e. Counts how long the same movement action has been executing
+// without the bot moving five yards, losing or gaining health in combat, or changing target, into
+// "movement loop age"; the "movement loop stuck" trigger acts on it.
+void Engine::TrackLoop(Action* action)
+{
+    Player* bot = ai->GetBot();
+    if (!bot || !action)
+        return;
+
+    AiObjectContext* context = aiObjectContext;
+    WorldPosition pos(bot);
+    Unit* currentTarget = AI_VALUE(Unit*, "current target");
+    ObjectGuid const currentTargetGuid = currentTarget ? currentTarget->GetObjectGuid() : ObjectGuid();
+
+    bool const sameLoop = action->IsMovement() && action->getName() == lastLoopAction && pos.isFinite();
+    float const moved = !sameLoop || lastLoopMap != pos.getMapId() ? 1000000.0f :
+        sqrt((pos.getX() - lastLoopX) * (pos.getX() - lastLoopX) + (pos.getY() - lastLoopY) * (pos.getY() - lastLoopY));
+    bool const hasLife = moved > 5.0f || (bot->IsInCombat() && bot->GetHealth() != lastLoopHealth) || (lastLoopTarget && currentTargetGuid != lastLoopTarget);
+
+    if (hasLife)
+    {
+        lastLoopAction = action->getName();
+        lastLoopStart = time(0);
+        lastLoopMap = pos.getMapId();
+        lastLoopX = pos.getX();
+        lastLoopY = pos.getY();
+        lastLoopHealth = bot->GetHealth();
+        lastLoopTarget = currentTargetGuid;
+        SET_AI_VALUE(int, "movement loop age", 0);
+        return;
+    }
+
+    int const age = int(time(0) - lastLoopStart);
+    SET_AI_VALUE(int, "movement loop age", age);
+
+    if (age >= int(sPlayerbotAIConfig.motionlessGiveUpSec))
+        lastLoopStart = time(0);
 }

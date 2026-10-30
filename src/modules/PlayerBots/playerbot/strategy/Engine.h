@@ -115,6 +115,7 @@ namespace ai
         void ReleaseExternalEvent(const std::string& source);
         // Drops armed entries whose TriggerNode is gone; called from Init().
         void PruneUnhandledExternalEvents();
+        void TrackLoop(Action* action);
 
     private:
         void LogAction(const char* format, ...);
@@ -156,6 +157,15 @@ namespace ai
         // External (packet) triggers whose event is queued but has not reached its action yet,
         // keyed by trigger name (= event source). Exempt from the end-of-tick trigger reset.
         std::map<std::string, Trigger*> unhandledExternalEvents;
+
+        // TrackLoop's record of the movement action now repeating and where it started.
+        std::string lastLoopAction;
+        time_t lastLoopStart = 0;
+        uint32 lastLoopMap = 0;
+        float lastLoopX = 0.0f;
+        float lastLoopY = 0.0f;
+        uint32 lastLoopHealth = 0;
+        ObjectGuid lastLoopTarget;
         // True while DoNextAction is walking `queue`. Reset() must not drain
         // the queue in that window; it sets reinitPending instead and
         // DoNextAction re-inits once the walk is over.

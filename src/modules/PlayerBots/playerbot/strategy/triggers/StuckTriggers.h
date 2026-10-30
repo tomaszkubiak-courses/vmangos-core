@@ -1,5 +1,6 @@
 #pragma once
 #include "playerbot/strategy/Trigger.h"
+#include "playerbot/PlayerbotAIConfig.h"
 #include <Maps/MoveMap.h>
 
 #include "playerbot/BotSlots.h"
@@ -237,6 +238,81 @@ namespace ai
             }
 
             return false;
+        }
+    };
+
+    // From cmangos/playerbots 6823423e: in combat, standing still, and neither the bot's health
+    // nor any attacker's has changed for motionlessGiveUpSec - a stand-off nobody is fighting.
+    class CombatStandoffTrigger : public Trigger
+    {
+    public:
+        CombatStandoffTrigger(PlayerbotAI* ai) : Trigger(ai, "combat standoff", 5) {}
+
+        virtual bool IsActive() override
+        {
+            if (ai->GetState() != BotState::BOT_STATE_COMBAT || ai->HasActivePlayerMaster() ||
+                (ai->GetGroupMaster() && !GetBotAI(ai->GetGroupMaster())) || !ai->AllowActivity(ALL_ACTIVITY) ||
+                bot->IsMoving())
+            {
+                lastSignature = 0;
+                lastChange = time(0);
+                return false;
+            }
+
+            std::list<ObjectGuid> const attackers = AI_VALUE(std::list<ObjectGuid>, "attackers");
+            uint32 signature = (uint32)bot->GetHealthPercent() * 1000;
+            uint32 counted = 0;
+            for (ObjectGuid const& guid : attackers)
+            {
+                if (counted >= 10)
+                    break;
+
+                Unit* attacker = ai->GetUnit(guid);
+                if (!attacker || !attacker->IsAlive())
+                    continue;
+
+                signature += (uint32)(attacker->GetHealthPercent() * 7.0f);
+                counted++;
+            }
+
+            time_t const now = time(0);
+            if (!counted)
+            {
+                lastSignature = 0;
+                lastChange = now;
+                return false;
+            }
+
+            // The signature carries an offset so a real one never equals the reset value.
+            signature += 1;
+            if (signature != lastSignature)
+            {
+                lastSignature = signature;
+                lastChange = now;
+                return false;
+            }
+
+            return (now - lastChange) >= sPlayerbotAIConfig.motionlessGiveUpSec;
+        }
+
+    private:
+        uint32 lastSignature = 0;
+        time_t lastChange = time(0);
+    };
+
+    // From cmangos/playerbots 6823423e: Engine::TrackLoop saw the same movement action run for
+    // motionlessGiveUpSec without the bot moving, losing health or changing target.
+    class MovementLoopStuckTrigger : public Trigger
+    {
+    public:
+        MovementLoopStuckTrigger(PlayerbotAI* ai) : Trigger(ai, "movement loop stuck", 5) {}
+
+        virtual bool IsActive() override
+        {
+            if (ai->HasActivePlayerMaster() || (ai->GetGroupMaster() && !GetBotAI(ai->GetGroupMaster())) || !ai->AllowActivity(ALL_ACTIVITY))
+                return false;
+
+            return AI_VALUE(int, "movement loop age") >= (int)sPlayerbotAIConfig.motionlessGiveUpSec;
         }
     };
 

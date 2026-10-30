@@ -139,6 +139,7 @@ bool PlayerbotAIConfig::Initialize()
     BarGoLink::SetOutputState(config.GetBoolDefault("AiPlayerbot.ShowProgressBars", false));
     globalCoolDown = (uint32) config.GetIntDefault("AiPlayerbot.GlobalCooldown", 500);
     maxWaitForMove = config.GetIntDefault("AiPlayerbot.MaxWaitForMove", 3000);
+    motionlessGiveUpSec = (uint32)config.GetIntDefault("AiPlayerbot.MotionlessGiveUpSec", 30);
     travelTimeSlack = config.GetFloatDefault("AiPlayerbot.TravelTimeSlack", 4.0f);
     travelMapTransferTime = config.GetIntDefault("AiPlayerbot.TravelMapTransferTime", 240000);
     travelTimeMinimum = config.GetIntDefault("AiPlayerbot.TravelTimeMinimum", 60000);
