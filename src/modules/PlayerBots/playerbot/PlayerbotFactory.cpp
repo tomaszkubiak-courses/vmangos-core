@@ -25,6 +25,8 @@
 #endif
 #include "strategy/ItemVisitors.h"
 
+#include <unordered_set>
+
 using namespace ai;
 
 #define PLAYER_SKILL_INDEX(x)       (PLAYER_SKILL_INFO_1_1 + ((x)*3))
@@ -565,6 +567,32 @@ void PlayerbotFactory::AddConsumables()
    }
 }
 
+// From cmangos/playerbots 07c88e78. Every creature entry some world spawn can resolve to; a
+// spawn here names up to MAX_CREATURE_IDS_PER_SPAWN entries.
+static std::unordered_set<uint32> BuildSpawnedCreatureEntries()
+{
+    std::unordered_set<uint32> entries;
+
+    auto worker = [&entries](CreatureDataPair const& dataPair)
+    {
+        for (uint32 entry : dataPair.second.creature_id)
+            if (entry)
+                entries.insert(entry);
+        return false;
+    };
+    sObjectMgr.DoCreatureData(worker);
+
+    return entries;
+}
+
+// Tameable templates without a spawn (test, placeholder and unused rows) can never be tamed by a
+// player, so a hunter bot should not get one as its pet. Built once; no spawn data disables it.
+static bool HasWorldSpawn(uint32 entry)
+{
+    static std::unordered_set<uint32> const spawnedEntries = BuildSpawnedCreatureEntries();
+    return spawnedEntries.empty() || spawnedEntries.count(entry);
+}
+
 void PlayerbotFactory::InitPet()
 {
     // Randomize a new pet (only for hunters)
@@ -593,6 +621,9 @@ void PlayerbotFactory::InitPet()
                 continue;
 
             if ((int)co->level_min > (int)bot->GetLevel())
+                continue;
+
+            if (!HasWorldSpawn(id))
                 continue;
 
 			ids.push_back(id);
