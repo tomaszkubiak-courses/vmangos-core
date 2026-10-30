@@ -91,6 +91,10 @@ void ChaseMovementGenerator<T>::_setTargetLocation(T &owner)
     if (!i_target.isValid() || !i_target->IsInWorld())
         return;
 
+    // The target's coordinates mean nothing on another map; see FollowMovementGenerator.
+    if (owner.FindMap() != i_target->FindMap())
+        return;
+
     if (owner.HasUnitState(UNIT_STATE_CAN_NOT_MOVE | UNIT_STATE_POSSESSED))
         return;
 
@@ -575,6 +579,14 @@ void FollowMovementGenerator<T>::_setTargetLocation(T &owner)
     // Note: Any method that accesses the target's movespline here must be
     // internally locked by the target's spline lock
     if (!i_target.isValid() || !i_target->IsInWorld())
+        return;
+
+    // A ship carries its passengers to the other continent and leaves a follower's target
+    // behind, still in world. The transport switch below would then move the follower to the
+    // target's coordinates on the follower's own map: a bot sailed from Theramore to Menethil
+    // and was relocated to the Theramore dock position on the Eastern Kingdoms map, outside
+    // any loaded grid. Nothing on another map can be followed, so wait for the target to come.
+    if (owner.FindMap() != i_target->FindMap())
         return;
 
     if (owner.HasUnitState(UNIT_STATE_CAN_NOT_MOVE | UNIT_STATE_POSSESSED))
