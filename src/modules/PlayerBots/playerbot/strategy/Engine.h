@@ -111,6 +111,10 @@ namespace ai
         ActionNode* CreateActionNode(const std::string& name);
         virtual Action* InitializeAction(ActionNode* actionNode);
         virtual bool ListenAndExecute(Action* action, Event& event);
+        // Hands an external (packet) trigger back once its action has had its turn.
+        void ReleaseExternalEvent(const std::string& source);
+        // Drops armed entries whose TriggerNode is gone; called from Init().
+        void PruneUnhandledExternalEvents();
 
     private:
         void LogAction(const char* format, ...);
@@ -149,6 +153,9 @@ namespace ai
         ActionExecutionListeners actionExecutionListeners;
         BotState state;
         Action* lastExecutedAction;
+        // External (packet) triggers whose event is queued but has not reached its action yet,
+        // keyed by trigger name (= event source). Exempt from the end-of-tick trigger reset.
+        std::map<std::string, Trigger*> unhandledExternalEvents;
         // True while DoNextAction is walking `queue`. Reset() must not drain
         // the queue in that window; it sets reinitPending instead and
         // DoNextAction re-inits once the walk is over.
