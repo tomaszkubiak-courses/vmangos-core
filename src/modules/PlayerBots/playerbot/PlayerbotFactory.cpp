@@ -25,6 +25,8 @@
 #endif
 #include "strategy/ItemVisitors.h"
 
+#include <unordered_set>
+
 using namespace ai;
 
 #define PLAYER_SKILL_INDEX(x)       (PLAYER_SKILL_INFO_1_1 + ((x)*3))
@@ -565,6 +567,32 @@ void PlayerbotFactory::AddConsumables()
    }
 }
 
+// From cmangos/playerbots 07c88e78. Every creature entry some world spawn can resolve to; a
+// spawn here names up to MAX_CREATURE_IDS_PER_SPAWN entries.
+static std::unordered_set<uint32> BuildSpawnedCreatureEntries()
+{
+    std::unordered_set<uint32> entries;
+
+    auto worker = [&entries](CreatureDataPair const& dataPair)
+    {
+        for (uint32 entry : dataPair.second.creature_id)
+            if (entry)
+                entries.insert(entry);
+        return false;
+    };
+    sObjectMgr.DoCreatureData(worker);
+
+    return entries;
+}
+
+// Tameable templates without a spawn (test, placeholder and unused rows) can never be tamed by a
+// player, so a hunter bot should not get one as its pet. Built once; no spawn data disables it.
+static bool HasWorldSpawn(uint32 entry)
+{
+    static std::unordered_set<uint32> const spawnedEntries = BuildSpawnedCreatureEntries();
+    return spawnedEntries.empty() || spawnedEntries.count(entry);
+}
+
 void PlayerbotFactory::InitPet()
 {
     // Randomize a new pet (only for hunters)
@@ -593,6 +621,9 @@ void PlayerbotFactory::InitPet()
                 continue;
 
             if ((int)co->level_min > (int)bot->GetLevel())
+                continue;
+
+            if (!HasWorldSpawn(id))
                 continue;
 
 			ids.push_back(id);
@@ -3914,6 +3945,38 @@ void PlayerbotFactory::InitTradeSkills()
 {
     uint16 firstSkill = sRandomPlayerbotMgr.GetValue(bot, "firstSkill");
     uint16 secondSkill = sRandomPlayerbotMgr.GetValue(bot, "secondSkill");
+    uint16 const storedFirstSkill = firstSkill;
+    uint16 const storedSecondSkill = secondSkill;
+
+    // From cmangos/playerbots 25fa7083: the professions the bot actually has win over the stored
+    // pair, which drifts once a bot learns one from a trainer. Two known professions are the pair;
+    // one known keeps its stored companion if there was one, and the gap is filled below.
+    std::vector<uint16> knownPrimarySkills;
+    for (uint32 tradeSkill : tradeSkills)
+        if (IsPrimaryProfession((uint16)tradeSkill) && bot->HasSkill((uint16)tradeSkill))
+            knownPrimarySkills.push_back((uint16)tradeSkill);
+
+    if (knownPrimarySkills.size() >= 2)
+    {
+        firstSkill = knownPrimarySkills[0];
+        secondSkill = knownPrimarySkills[1];
+    }
+    else if (knownPrimarySkills.size() == 1)
+    {
+        uint16 const known = knownPrimarySkills[0];
+        bool const wasStored = storedFirstSkill == known || storedSecondSkill == known;
+        uint16 const companion = storedFirstSkill == known ? storedSecondSkill : storedFirstSkill;
+
+        firstSkill = known;
+        secondSkill = (wasStored && companion != known && IsPrimaryProfession(companion)) ? companion : 0;
+    }
+
+    if (firstSkill == secondSkill)
+        secondSkill = 0;
+
+    uint16 const preservedFirstSkill = firstSkill;
+    uint16 const preservedSecondSkill = secondSkill;
+
     if (!firstSkill || !secondSkill)
     {
         std::vector<uint32> firstSkills;
@@ -3967,9 +4030,36 @@ void PlayerbotFactory::InitTradeSkills()
             secondSkill = secondSkills[urand(0, secondSkills.size() - 1)];
         }
 
-        sRandomPlayerbotMgr.SetValue(bot, "firstSkill", firstSkill);
-        sRandomPlayerbotMgr.SetValue(bot, "secondSkill", secondSkill);
+        // Keep what the bot already has; the random pick only fills the gap.
+        if (preservedFirstSkill)
+        {
+            if (preservedFirstSkill == secondSkill)
+                secondSkill = firstSkill;
+            firstSkill = preservedFirstSkill;
+        }
+        if (preservedSecondSkill)
+            secondSkill = preservedSecondSkill;
+        if (firstSkill == secondSkill)
+            secondSkill = 0;
+
+        // Whatever is still missing takes the first free primary profession.
+        static uint16 const primarySkills[] = { SKILL_ALCHEMY, SKILL_BLACKSMITHING, SKILL_ENCHANTING, SKILL_ENGINEERING,
+            SKILL_HERBALISM, SKILL_LEATHERWORKING, SKILL_MINING, SKILL_SKINNING, SKILL_TAILORING };
+        for (uint16 candidate : primarySkills)
+        {
+            if (firstSkill && secondSkill)
+                break;
+            if (!firstSkill)
+                firstSkill = candidate;
+            else if (!secondSkill && candidate != firstSkill)
+                secondSkill = candidate;
+        }
     }
+
+    if (firstSkill != storedFirstSkill)
+        sRandomPlayerbotMgr.SetValue(bot, "firstSkill", firstSkill);
+    if (secondSkill != storedSecondSkill)
+        sRandomPlayerbotMgr.SetValue(bot, "secondSkill", secondSkill);
 
     SetRandomSkill(SKILL_FIRST_AID);
     SetRandomSkill(SKILL_FISHING);
@@ -4100,9 +4190,31 @@ void PlayerbotFactory::UpdateTradeSkills()
     auto pmo = sPerformanceMonitor.start(PERF_MON_RNDBOT, "PlayerbotFactory_Skills2");
     for (int i = 0; i < sizeof(tradeSkills) / sizeof(uint32); ++i)
     {
-        if (bot->GetSkillValue(tradeSkills[i]) == 1)
+        // From cmangos/playerbots 25fa7083: not one of the bot's own professions at skill 1.
+        if (bot->GetSkillValue(tradeSkills[i]) == 1 && !IsAssignedProfession((uint16)tradeSkills[i]))
             bot->SetSkill(tradeSkills[i], 0, 0, 0);
     }
+}
+
+bool PlayerbotFactory::IsPrimaryProfession(uint16 id) const
+{
+    SkillLineEntry const* skill = sSkillLineStore.LookupEntry(id);
+    return skill && skill->categoryId == SKILL_CATEGORY_PROFESSION;
+}
+
+bool PlayerbotFactory::IsAssignedProfession(uint16 id) const
+{
+    SkillLineEntry const* skill = sSkillLineStore.LookupEntry(id);
+    if (!skill)
+        return false;
+
+    if (skill->categoryId == SKILL_CATEGORY_SECONDARY)
+        return true;
+
+    if (skill->categoryId != SKILL_CATEGORY_PROFESSION)
+        return false;
+
+    return id == sRandomPlayerbotMgr.GetValue(bot, "firstSkill") || id == sRandomPlayerbotMgr.GetValue(bot, "secondSkill");
 }
 
 void PlayerbotFactory::InitSkills()

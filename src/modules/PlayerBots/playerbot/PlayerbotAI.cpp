@@ -2,6 +2,7 @@
 #include "playerbot/playerbot.h"
 #include "playerbot/AiContextAugment.h"
 #include "playerbot/PerformanceMonitor.h"
+#include "playerbot/strategy/values/Stances.h"
 #include <stdarg.h>
 #include <iomanip>
 
@@ -158,6 +159,19 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
     engines[(uint8)BotState::BOT_STATE_DEAD] = AiFactory::createDeadEngine(bot, this, aiObjectContext);
     engines[(uint8)BotState::BOT_STATE_REACTION] = reactionEngine = AiFactory::createReactionEngine(bot, this, aiObjectContext);
 
+    // From cmangos/playerbots eda0c9e3: every bot gets a combat stance from its role - a tank
+    // turns the target away, melee stands behind it, ranged stays near. ChaseTo positions melee by
+    // it, replacing the "set behind" action.
+    if (StanceValue* stanceValue = (StanceValue*)aiObjectContext->GetValue<Stance*>("stance"))
+    {
+        if (IsTank(bot))
+            stanceValue->Load("turnback");
+        else if (!IsRanged(bot))
+            stanceValue->Load("behind");
+        else
+            stanceValue->Load("near");
+    }
+
     for (uint8 e = 0; e < (uint8)BotState::BOT_STATE_ALL; e++)
     {
         engines[e]->initMode = false;
@@ -193,8 +207,9 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
     botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_STATUS, "bg status");
     botOutgoingPacketHandlers.AddHandler(SMSG_GROUP_INVITE, "group invite");
     botOutgoingPacketHandlers.AddHandler(SMSG_GUILD_INVITE, "guild accept");
-    botOutgoingPacketHandlers.AddHandler(BUY_ERR_NOT_ENOUGHT_MONEY, "not enough money");
-    botOutgoingPacketHandlers.AddHandler(BUY_ERR_REPUTATION_REQUIRE, "not enough reputation");
+    // From cmangos/playerbots 511efbfd: these two were BuyResult values registered as opcodes, so
+    // they answered opcodes 2 and 12, which the server never sends. The reason is in SMSG_BUY_FAILED.
+    botOutgoingPacketHandlers.AddHandler(SMSG_BUY_FAILED, "buy failed");
     botOutgoingPacketHandlers.AddHandler(SMSG_GROUP_SET_LEADER, "group set leader");
     botOutgoingPacketHandlers.AddHandler(SMSG_FORCE_RUN_SPEED_CHANGE, "check mount state");
     // shouldDelay=true: ExternalEventHelper::HandlePacket() returns false when the 'resurrect request'
@@ -1390,6 +1405,71 @@ void PlayerbotAI::HandleCommands()
     }
 }
 
+void PlayerbotAI::RunOnOwningThread(Player* target, std::function<void(Player*)> action)
+{
+    if (!target || !action)
+        return;
+
+    // IsSafe() holds when target shares this bot's map and instance and is not mid-teleport, so
+    // this thread owns it.
+    if (target->IsInWorld() && IsSafe(target))
+    {
+        action(target);
+        return;
+    }
+
+    ObjectGuid const targetGuid = target->GetObjectGuid();
+    sWorld.GetMessager().AddMessage([targetGuid, action](World* /*world*/)
+    {
+        Player* p = sObjectMgr.GetPlayer(targetGuid);
+        if (p && p->IsInWorld() && !p->IsBeingTeleported())
+            action(p);
+    });
+}
+
+bool PlayerbotAI::SendSummonRequest(Player* summoner, Player* target)
+{
+    if (!summoner)
+        return false;
+
+    float x, y, z;
+    summoner->GetPosition(x, y, z);
+    return SendSummonRequest(summoner, target, summoner->GetMapId(), x, y, z);
+}
+
+bool PlayerbotAI::SendSummonRequest(Player* summoner, Player* target, uint32 mapId, float x, float y, float z)
+{
+    if (!summoner || !target || !target->GetSession())
+        return false;
+
+    // HandleSummonResponseOpcode refuses dead or fighting players; let the caller teleport them.
+    if (!target->IsAlive() || target->IsInCombat())
+        return false;
+
+    target->SendSummonRequest(summoner->GetObjectGuid(), mapId, summoner->GetZoneId(), x, y, z);
+    return true;
+}
+
+bool PlayerbotAI::SendResurrectRequest(Player* summoner, Player* target, uint32 mapId, float x, float y, float z)
+{
+    if (!summoner || !target || !target->GetSession())
+        return false;
+
+    if (target->IsAlive() || target->IsRessurectRequested())
+        return false;
+
+    // A player resurrector makes ResurrectUsingRequestData teleport the target to this spot first.
+    target->SetResurrectRequestData(summoner->GetObjectGuid(), mapId, summoner->GetInstanceId(), x, y, z, target->GetOrientation(),
+        target->GetMaxHealth(), target->GetMaxPower(POWER_MANA));
+
+    auto packet = std::make_unique<WorldPackets::Spell::ResurrectRequest>();
+    packet->casterGuid = summoner->GetObjectGuid();
+    packet->sickness = false;
+    packet->delayed = false;
+    target->GetSession()->SendPacket(std::move(packet));
+    return true;
+}
+
 void PlayerbotAI::UpdateAIInternal(uint32 elapsed, bool minimal)
 {
     SC_PHASE("UpdateAIInternal.entry", bot ? bot->GetName() : "(null)");
@@ -2391,6 +2471,14 @@ void PlayerbotAI::DoNextAction(bool min)
 
     Group *group = bot->GetGroup();
 
+    // From cmangos/playerbots cc4134b2: a strategy reset deferred by the throttle below.
+    if (tickResetStrategiesPending && time(NULL) - lastTickResetStrategies >= 2)
+    {
+        lastTickResetStrategies = time(NULL);
+        tickResetStrategiesPending = false;
+        ResetStrategies();
+    }
+
     // A test-harness login keeps its externally-assigned master. The two
     // self-heals below both fire on the harness setup (the GM driver is
     // deliberately neither a group member nor the group leader): the first
@@ -2406,7 +2494,14 @@ void PlayerbotAI::DoNextAction(bool min)
     {
         master = IsRealPlayer() ? bot : nullptr;
         SetMaster(master);
-        ResetStrategies();
+        // At most one strategy reset every two seconds; a later one waits for the next tick.
+        if (time(NULL) - lastTickResetStrategies >= 2)
+        {
+            lastTickResetStrategies = time(NULL);
+            ResetStrategies();
+        }
+        else
+            tickResetStrategiesPending = true;
     }
 
     // test BG master set
@@ -2501,7 +2596,13 @@ void PlayerbotAI::DoNextAction(bool min)
         {
             master = newMaster;
             SetMaster(newMaster);
-            ResetStrategies();
+            if (time(NULL) - lastTickResetStrategies >= 2)
+            {
+                lastTickResetStrategies = time(NULL);
+                ResetStrategies();
+            }
+            else
+                tickResetStrategiesPending = true;
 
             if (sRandomPlayerbotMgr.IsFreeBot(bot))
             {
@@ -2522,11 +2623,17 @@ void PlayerbotAI::DoNextAction(bool min)
 
     // fix bots in BG not having proper strategies
 #ifdef MANGOSBOT_ZERO
-    if (bot->InBattleGround() && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT))
+    if (bot->InBattleGround() && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT) && time(NULL) - lastTickResetStrategies >= 2)
+    {
+        lastTickResetStrategies = time(NULL);
         ResetStrategies();
+    }
 #else
-    if ((bot->InBattleGround() && (!bot->IsBeingTeleported() && !bot->InArena()) && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT)) || ((!bot->IsBeingTeleported()&&bot->InArena()) && !HasStrategy("arena", BotState::BOT_STATE_NON_COMBAT)))
+    if (((bot->InBattleGround() && (!bot->IsBeingTeleported() && !bot->InArena()) && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT)) || ((!bot->IsBeingTeleported()&&bot->InArena()) && !HasStrategy("arena", BotState::BOT_STATE_NON_COMBAT))) && time(NULL) - lastTickResetStrategies >= 2)
+    {
+        lastTickResetStrategies = time(NULL);
         ResetStrategies();
+    }
 #endif
 
     if (master && master->IsInWorld())
@@ -2830,6 +2937,20 @@ void PlayerbotAI::ResetStrategies(bool autoLoad)
     AiFactory::AddDefaultNonCombatStrategies(bot, this, engines[(uint8)BotState::BOT_STATE_NON_COMBAT]);
     AiFactory::AddDefaultDeadStrategies(bot, this, engines[(uint8)BotState::BOT_STATE_DEAD]);
     AiFactory::AddDefaultReactionStrategies(bot, this, reactionEngine);
+
+    // From cmangos/playerbots eda0c9e3: every bot gets a combat stance from its role - a tank
+    // turns the target away, melee stands behind it, ranged stays near. ChaseTo positions melee by
+    // it, replacing the "set behind" action.
+    if (StanceValue* stanceValue = (StanceValue*)aiObjectContext->GetValue<Stance*>("stance"))
+    {
+        if (IsTank(bot))
+            stanceValue->Load("turnback");
+        else if (!IsRanged(bot))
+            stanceValue->Load("behind");
+        else
+            stanceValue->Load("near");
+    }
+
     if (autoLoad && HasPlayerRelation()) sPlayerbotDbStore.Load(this);
 
     // A role handed out by the dungeon finder wins over both the talent spec

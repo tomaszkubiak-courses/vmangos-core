@@ -2863,7 +2863,9 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
                 {
                     Player* member = gref->getSource();
                     PlayerbotAI* ai = GetBotAI(bot);
-                    if (ai && bot != member)
+                    // From cmangos/playerbots 53ebb2d4: the check was on the teleporting bot's AI,
+                    // then the member's AI was dereferenced - null for a real player in the group.
+                    if (ai && member && bot != member)
                     {
                         if (member->IsTaxiFlying())
                             member->GetMotionMaster()->MovementExpired();
@@ -2873,7 +2875,8 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
                         member->GetMotionMaster()->Clear();
                         member->TeleportTo(loc.mapId, x, y, z, 0);
                         member->SendHeartBeat();
-                        GetBotAI(member)->Reset(true);
+                        if (PlayerbotAI* memberAi = GetBotAI(member))
+                            memberAi->Reset(true);
                     }
 
                 }

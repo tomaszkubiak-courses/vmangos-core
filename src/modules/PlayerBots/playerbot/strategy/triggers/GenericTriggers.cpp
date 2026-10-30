@@ -5,6 +5,10 @@
 #include "playerbot/PlayerbotAIConfig.h"
 #include "playerbot/strategy/values/PositionValue.h"
 #include "playerbot/strategy/values/AoeValues.h"
+#include "playerbot/ServerFacade.h"
+#include "playerbot/strategy/generic/CombatStrategy.h"
+#include "playerbot/strategy/generic/PullStrategy.h"
+#include "Formulas.h"
 #include "playerbot/strategy/values/NearestGameObjects.h"
 #include "Maps/GridNotifiers.h"
 #include "Maps/GridNotifiersImpl.h"
@@ -151,7 +155,10 @@ bool OutNumberedTrigger::IsActive()
     int32 botLevel = bot->GetLevel();
     float healthMod = bot->GetHealthPercent() / 100.0f;
     uint32 friendPower = 100 + 100 * healthMod, foePower = 0;
-    for (auto &attacker : ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("possible attack targets")->Get())
+    uint32 grayCount = 0;
+    // From cmangos/playerbots 490f9b95: count what is attacking the bot, not every mob that could;
+    // a solo bot ran from large groups that were never going to fight it.
+    for (auto &attacker : ai->GetAiObjectContext()->GetValue<std::list<ObjectGuid>>("attackers")->Get())
     {
         Creature* creature = ai->GetCreature(attacker);
         if (!creature)
@@ -162,11 +169,23 @@ bool OutNumberedTrigger::IsActive()
 
         int32 dLevel = creature->GetLevel() - botLevel;
 
+        // From cmangos/playerbots beed4ab6: a grey attacker weighs nothing on its own, an
+        // attacker up to three levels above weighs the same as an even one, and each level past
+        // that adds a full share - `dLevel * 200` made one mob two levels up outweigh a solo bot.
+        if (int32(creature->GetLevel()) <= int32(MaNGOS::XP::GetGrayLevel(botLevel)))
+        {
+            grayCount++;
+            continue;
+        }
+
         healthMod = creature->GetHealthPercent() / 100.0f;
 
-        if(dLevel > -10)
-            foePower += std::max(100 + 10 * dLevel, dLevel * 200) * healthMod;
+        uint32 const weight = dLevel > 3 ? 100 + (dLevel - 3) * 100 : 100;
+        foePower += weight * healthMod;
     }
+
+    if (grayCount > 10)
+        foePower += 50 * grayCount;
 
     if (!foePower)
         return false;
@@ -186,7 +205,7 @@ bool OutNumberedTrigger::IsActive()
             friendPower += std::max(200 + 20 * dLevel, dLevel * 200)* healthMod;
     }
 
-    return friendPower < foePower;
+    return foePower > 2 * friendPower;
 }
 
 bool BuffTrigger::IsActive()
@@ -256,7 +275,22 @@ bool InvalidTargetTrigger::IsActive()
 
 bool NoTargetTrigger::IsActive()
 {
-	return !AI_VALUE(Unit*, "current target") || AI_VALUE2(bool, "invalid target", "current target");
+	if (!AI_VALUE(Unit*, "current target") || AI_VALUE2(bool, "invalid target", "current target"))
+		return true;
+
+	// From cmangos/playerbots 21b8aef2 and f6f1d3f2: a target kept out of combat, while the bot
+	// stands still or has not changed position for a minute, is no target either. The bot went
+	// idle on a distant target it was never going to fight. Not while waiting for an attack,
+	// pulling, or looting.
+	if (!sServerFacade.IsInCombat(bot) && bot->IsAlive() &&
+		(bot->IsStopped() || AI_VALUE2(uint32, "time since last change", "current position") > 60) &&
+		!WaitForAttackStrategy::ShouldWait(ai) &&
+		!(PullStrategy::Get(ai) && PullStrategy::Get(ai)->HasPullStarted() &&
+			time(0) - PullStrategy::Get(ai)->GetPullStartTime() < PullStrategy::GetMaxPullTime()) &&
+		!bot->GetLootGuid() && !AI_VALUE(bool, "has available loot"))
+		return true;
+
+	return false;
 }
 
 bool MyAttackerCountTrigger::IsActive()

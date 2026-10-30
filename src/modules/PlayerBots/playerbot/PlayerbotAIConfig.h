@@ -123,6 +123,7 @@ public:
     uint32 autoGearQualityLimit = 0;  // like autoGearScoreLimit: 0 = no cap (mod-dungeon-clear reads it for its test sidecar)
     bool allowGuildBots;
     bool allowMultiAccountAltBots;
+    uint32 motionlessGiveUpSec;
     uint32 globalCoolDown, reactDelay, maxWaitForMove, expireActionTime, dispelAuraDuration, passiveDelay, repeatDelay,
         errorDelay, rpgDelay, sitDelay, returnDelay, lootDelay;
     // How much longer than the straight-line run a bot is allowed for a journey, and the

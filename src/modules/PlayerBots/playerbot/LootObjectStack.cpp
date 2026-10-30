@@ -343,7 +343,9 @@ bool LootObject::IsLootPossible(Player* bot)
 
     AiObjectContext* context = ai->GetAiObjectContext();
 
-    if (!AI_VALUE2_LAZY(bool, "should loot object", std::to_string(guid.GetRawValue())))
+    // From cmangos/playerbots a0818eb6: not the lazy value - a stale answer sent the bot back and
+    // forth between the loot and its rpg or travel target.
+    if (!AI_VALUE2(bool, "should loot object", std::to_string(guid.GetRawValue())))
         return false;
 
     // Check if the game object has quest loot and bot has the quest for it

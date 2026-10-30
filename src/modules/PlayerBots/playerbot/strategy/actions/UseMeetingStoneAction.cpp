@@ -212,6 +212,35 @@ bool SummonAction::Teleport(Player* requester, Player *summoner, Player *player)
 
             if (summoner->IsWithinLOS(x, y, z + player->GetCollisionHeight(), true))
             {
+                // From cmangos/playerbots 53ebb2d4: a player on another map belongs to that map's
+                // thread, and teleporting or resurrecting it from here races its own update. Ask
+                // it instead - a summon request, or a resurrect request when it is dead - and only
+                // fall back to a teleport run from the world thread.
+                if (player != bot && !ai->IsSafe(player))
+                {
+                    if (sServerFacade.UnitIsDead(player))
+                        return sServerFacade.IsAlive(summoner) && PlayerbotAI::SendResurrectRequest(summoner, player, mapId, x, y, z);
+
+                    if (!PlayerbotAI::SendSummonRequest(summoner, player, mapId, x, y, z))
+                    {
+                        ai->RunOnOwningThread(player, [mapId, x, y, z](Player* p)
+                        {
+                            if (p->IsTaxiFlying())
+                            {
+                                p->GetTaxi().ClearTaxiDestinations();
+                                p->GetMotionMaster()->MovementExpired();
+                            }
+
+                            p->GetMotionMaster()->Clear();
+                            p->TeleportTo(mapId, x, y, z, 0);
+                            if (IsRealPlayer(p))
+                                p->SendHeartBeat();
+                        });
+                    }
+
+                    return true;
+                }
+
                 if (sServerFacade.UnitIsDead(player) && sServerFacade.IsAlive(summoner))
                 {
                     if (!ai->IsSafe(player) || !ai->IsSafe(summoner))

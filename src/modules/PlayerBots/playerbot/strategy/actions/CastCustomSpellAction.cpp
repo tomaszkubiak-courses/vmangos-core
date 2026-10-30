@@ -384,23 +384,19 @@ bool CastCustomSpellAction::CastSummonPlayer(Player* requester, std::string comm
                 {
                     if (membersAroundSummoner >= 3)
                     {
-                        if (IsRealPlayer(target))
+                        // From cmangos/playerbots 53ebb2d4: the target accepts a normal summon
+                        // request and teleports itself on its own map thread. Only one that cannot
+                        // (dead, in combat) is teleported, from a thread that owns it.
+                        if (!PlayerbotAI::SendSummonRequest(bot, target))
                         {
-                            float x, y, z;
-                            bot->GetPosition(x, y, z);
-                            target->SetSummonPoint(bot->GetMapId(), x, y, z);
-
-                            WorldPacket data(SMSG_SUMMON_REQUEST, 8 + 4 + 4);
-                            data << bot->GetObjectGuid();
-                            data << uint32(bot->GetZoneId());
-                            data << uint32(MAX_PLAYER_SUMMON_DELAY * IN_MILLISECONDS);
-                            target->GetSession()->SendPacket(&data);
-                        }
-                        else
-                        {
-                            target->TeleportTo(bot->GetMapId(), bot->GetPositionX(), bot->GetPositionY(), bot->GetPositionZ(), bot->GetOrientation());
-                            if (IsRealPlayer(target))
-                                target->SendHeartBeat();
+                            uint32 const destMapId = bot->GetMapId();
+                            float const destX = bot->GetPositionX(), destY = bot->GetPositionY(), destZ = bot->GetPositionZ(), destO = bot->GetOrientation();
+                            ai->RunOnOwningThread(target, [destMapId, destX, destY, destZ, destO](Player* t)
+                            {
+                                t->TeleportTo(destMapId, destX, destY, destZ, destO);
+                                if (IsRealPlayer(t))
+                                    t->SendHeartBeat();
+                            });
                         }
 
                         std::ostringstream msg;

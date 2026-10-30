@@ -857,12 +857,28 @@ TravelPath MovementAction::ResolveMovePath(const WorldPosition& startPosition, c
     // following call for as long as the destination holds. Nothing walks straight up, so refuse
     // to invent a step that rises further than it travels along the ground; the caller treats an
     // empty path as a failed move and picks something else.
+    //
+    // From cmangos/playerbots 8b043a04: nor invent one to another map - a point move ignores the
+    // map and the bot walks towards that map's coordinates on its own - or one further than the
+    // navmesh pathfinder can build, which goes through terrain and under the map. Battlegrounds
+    // keep the long straight step.
     if (outMovePath.empty())
     {
         float const rise = endPosition.getZ() - startPosition.getZ();
         float const ground = sqrt(startPosition.sqDistance2d(endPosition));
 
-        if (startPosition.getMapId() != endPosition.getMapId() || rise < 5.0f || ground >= rise)
+        if (startPosition.getMapId() != endPosition.getMapId() ||
+            (!bot->InBattleGround() && sServerFacade.IsDistanceGreaterThan(totalDistance, sPlayerbotAIConfig.sightDistance * 3)))
+        {
+            if (mover == bot)
+                ai->StopMoving();
+            else
+                mover->StopMoving();
+
+            return outMovePath;
+        }
+
+        if (rise < 5.0f || ground >= rise)
             outMovePath.addPoint(endPosition);
     }
 
@@ -2836,8 +2852,24 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
     }
 #endif
 
-    if (ai->HasStrategy("behind", BotState::BOT_STATE_COMBAT))
-        angle = GetFollowAngle() / 3 + obj->GetOrientation() + M_PI;
+    // From cmangos/playerbots eda0c9e3: a melee bot chasing an enemy takes its angle from its
+    // combat stance, set from its role in PlayerbotAI; the "behind" strategy angle is gone with it.
+    if (!ai->IsRanged(bot) && obj->IsUnit() && sServerFacade.IsHostileTo(bot, static_cast<Unit*>(obj)))
+    {
+        Unit* target = static_cast<Unit*>(obj);
+        Stance* stance = AI_VALUE(Stance*, "stance");
+
+        if (stance && stance->getName() != "turnback")
+        {
+            WorldLocation stanceLoc = stance->GetLocation();
+
+            if (!Formation::IsNullLocation(stanceLoc) && stanceLoc.mapId != uint32(-1))
+            {
+                float const absAngle = atan2(stanceLoc.y - target->GetPositionY(), stanceLoc.x - target->GetPositionX());
+                angle = absAngle - target->GetOrientation();
+            }
+        }
+    }
 
     UpdateMovementState();
 
@@ -3196,29 +3228,6 @@ bool MovementAction::Flee(Unit *target)
         succeeded = MoveNear(fleeTarget);
     }
 
-    if (!ai->HasRealPlayerMaster() && !ai->IsRealPlayer(target))
-    {
-        bool fullDistance = false;
-        if (target->IsPlayer())
-            fullDistance = true;
-        if (WorldPosition(bot).isOverworld())
-            fullDistance = true;
-
-        float distance = fullDistance ? (ai->GetRange("flee") * 2) : ai->GetRange("flee");
-
-        MotionMaster* mm = bot->GetMotionMaster();
-
-        if (mm->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
-        {
-            // Penqle's ChaseMovementGenerator is templated; ServerFacade returns safe defaults.
-            if (sServerFacade.GetChaseTarget(bot) == target && sServerFacade.GetChaseOffset(bot) == distance)
-                return true;
-        }
-
-        mm->MoveChase(target, distance, WorldPosition(bot).getAngleTo(target));
-        return true;
-    }
-
     // Generate a position to flee
     if(!succeeded)
     {
@@ -3263,8 +3272,31 @@ bool MovementAction::Flee(Unit *target)
         float rx, ry, rz;
         if (!manager.CalculateDestination(&rx, &ry, &rz))
         {
-            ai->TellError(GetMaster(), "Nowhere to flee");
-            return false;
+            // From cmangos/playerbots 7f9ab943: keeping the flee distance by chasing the target
+            // was what a bot without a real player master always did, and out in the wild on
+            // rough terrain that chase broke the flee. It is now only the fallback when no flee
+            // point can be found.
+            AI_VALUE(LastMovement&, "last movement").lastFlee = time(0);
+
+            if (ai->HasRealPlayerMaster() || ai->IsRealPlayer(target))
+            {
+                ai->TellError(GetMaster(), "Nowhere to flee");
+                return false;
+            }
+
+            float const distance = fullDistance ? (ai->GetRange("flee") * 2) : ai->GetRange("flee");
+
+            MotionMaster* mm = bot->GetMotionMaster();
+
+            if (mm->GetCurrentMovementGeneratorType() == CHASE_MOTION_TYPE)
+            {
+                // Penqle's ChaseMovementGenerator is templated; ServerFacade returns safe defaults.
+                if (sServerFacade.GetChaseTarget(bot) == target && sServerFacade.GetChaseOffset(bot) == distance)
+                    return true;
+            }
+
+            mm->MoveChase(target, distance, WorldPosition(bot).getAngleTo(target));
+            return true;
         }
 
         if(MoveTo(target->GetMapId(), rx, ry, rz))
@@ -3664,6 +3696,11 @@ bool MoveToLootAction::Execute(Event& event)
     bool los = sServerFacade.IsWithinLOSInMap(bot, wo);
     float dist = sServerFacade.GetDistance2d(bot, wo);
     bool moved = los ? MoveNear(wo, sPlayerbotAIConfig.contactDistance) : MoveTo(WorldPosition(wo));
+
+    // From cmangos/playerbots ac013df6: wait out the short move, or the next tick issues it again
+    // and the bot stutters towards the loot.
+    if (los && moved)
+        WaitForReach(bot->GetDistance(wo));
 
     // Without a way there the bot would pick the same loot again every tick.
     if (!moved)

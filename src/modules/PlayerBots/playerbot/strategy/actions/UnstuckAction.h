@@ -23,4 +23,22 @@ public:
 #endif
 };
 
+// From cmangos/playerbots 6823423e: a combat where nobody exchanged damage while the bot stood
+// still is dropped, so the state machine decides again.
+class DropStandoffAction : public Action
+{
+public:
+    DropStandoffAction(PlayerbotAI* ai) : Action(ai, "drop standoff") {}
+    virtual bool Execute(Event& event) override;
+};
+
+// From cmangos/playerbots 6823423e: drops the target when one movement action has been looping
+// without the bot moving, losing health or changing target.
+class ReleaseStuckMovementAction : public Action
+{
+public:
+    ReleaseStuckMovementAction(PlayerbotAI* ai) : Action(ai, "release stuck movement") {}
+    virtual bool Execute(Event& event) override;
+};
+
 #endif

@@ -17,9 +17,9 @@ void MeleeCombatStrategy::InitCombatTriggers(std::list<TriggerNode*> &triggers)
 
 void SetBehindCombatStrategy::InitCombatTriggers(std::list<TriggerNode*> &triggers)
 {
-    triggers.push_back(new TriggerNode(
-        "not behind target",
-        NextAction::array(0, new NextAction("set behind", ACTION_HIGH), NULL)));
+    // From cmangos/playerbots eda0c9e3: off - the combat stance puts melee behind the target.
+    // "set behind" ran 4.3 million times in a 36 hour run, 3.8 million of them impossible. Rogue
+    // and feral strategies, which need the back for backstab and shred, keep their own triggers.
 }
 
 void ChaseJumpStrategy::InitNonCombatTriggers(std::list<TriggerNode*>& triggers)

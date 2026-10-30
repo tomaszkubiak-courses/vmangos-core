@@ -139,6 +139,8 @@ void Engine::Init()
         MultiplyAndPush(strategy->getDefaultActions(state), 0.0f, false, Event(), "default");
     }
 
+    PruneUnhandledExternalEvents();
+
 	if (testMode)
 	{
         FILE* file = fopen("test.log", "w");
@@ -199,6 +201,12 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
                 // NOTE: queue.Pop() deletes basket
                 actionNode = queue.Pop();
                 popped = true;
+
+                // From cmangos/playerbots b3995619: the event has had its turn now, so its
+                // trigger is handed back - even when the action turns out unknown, useless or
+                // impossible, or does nothing with the packet. Left armed, the same packet would
+                // be queued again every tick.
+                ReleaseExternalEvent(event.getSource());
             }
         }
 
@@ -305,6 +313,8 @@ bool Engine::DoNextAction(Unit* unit, int depth, bool minimal, bool isStunned)
 
                         if (actionExecuted)
                         {
+                            TrackLoop(action);
+
                             LogAction("A:%s - OK", action->getName().c_str());
                             sPlayerbotAIConfig.logActionOutcome(actionName, PlayerbotAIConfig::ActionOutcome::Succeeded);
                             MultiplyAndPush(actionNode->getContinuers(), 0, false, event, "cont");
@@ -716,7 +726,12 @@ void Engine::ProcessTriggers(bool minimal)
             if (!event)
                 continue;
 
-            MultiplyAndPush(node->getHandlers(), 0.0f, false, event, "trigger");
+            // An external (packet) event is a one-shot obligation: keep the trigger armed until
+            // its action has had its turn, so a basket that loses this tick or is dropped from the
+            // queue is pushed again instead of lost. Arm it only when something was pushed.
+            if (MultiplyAndPush(node->getHandlers(), 0.0f, false, event, "trigger") && trigger->IsExternalEvent())
+                unhandledExternalEvents[trigger->getName()] = trigger;
+
             LogAction("T:%s", trigger->getName().c_str());
         }
     }
@@ -729,7 +744,50 @@ void Engine::ProcessTriggers(bool minimal)
             continue;
 
         Trigger* trigger = node->getTrigger();
-        if (trigger) trigger->Reset();
+        if (!trigger)
+            continue;
+
+        // Deliberately left armed: its event has not reached an action yet (see above).
+        if (unhandledExternalEvents.find(trigger->getName()) != unhandledExternalEvents.end())
+            continue;
+
+        trigger->Reset();
+    }
+}
+
+void Engine::ReleaseExternalEvent(const std::string& source)
+{
+    auto it = unhandledExternalEvents.find(source);
+    if (it == unhandledExternalEvents.end())
+        return;
+
+    it->second->Reset();
+    unhandledExternalEvents.erase(it);
+}
+
+void Engine::PruneUnhandledExternalEvents()
+{
+    for (auto it = unhandledExternalEvents.begin(); it != unhandledExternalEvents.end();)
+    {
+        bool held = false;
+        for (std::list<TriggerNode*>::iterator i = triggers.begin(); i != triggers.end(); i++)
+        {
+            if (*i && (*i)->getName() == it->first)
+            {
+                held = true;
+                break;
+            }
+        }
+
+        // Its node is gone (strategy teardown), so nothing could ever release it - hand the
+        // trigger back rather than let it suppress later packets of the same opcode.
+        if (!held)
+        {
+            it->second->Reset();
+            it = unhandledExternalEvents.erase(it);
+        }
+        else
+            ++it;
     }
 }
 
@@ -997,4 +1055,43 @@ void Engine::LogValues()
 
     std::string text = ai->GetAiObjectContext()->FormatValues();
     sLog.outDebug( "Values for %s: %s", bot->GetName(), text.c_str());
+}
+
+// From cmangos/playerbots 6823423e. Counts how long the same movement action has been executing
+// without the bot moving five yards, losing or gaining health in combat, or changing target, into
+// "movement loop age"; the "movement loop stuck" trigger acts on it.
+void Engine::TrackLoop(Action* action)
+{
+    Player* bot = ai->GetBot();
+    if (!bot || !action)
+        return;
+
+    AiObjectContext* context = aiObjectContext;
+    WorldPosition pos(bot);
+    Unit* currentTarget = AI_VALUE(Unit*, "current target");
+    ObjectGuid const currentTargetGuid = currentTarget ? currentTarget->GetObjectGuid() : ObjectGuid();
+
+    bool const sameLoop = action->IsMovement() && action->getName() == lastLoopAction && pos.isFinite();
+    float const moved = !sameLoop || lastLoopMap != pos.getMapId() ? 1000000.0f :
+        sqrt((pos.getX() - lastLoopX) * (pos.getX() - lastLoopX) + (pos.getY() - lastLoopY) * (pos.getY() - lastLoopY));
+    bool const hasLife = moved > 5.0f || (bot->IsInCombat() && bot->GetHealth() != lastLoopHealth) || (lastLoopTarget && currentTargetGuid != lastLoopTarget);
+
+    if (hasLife)
+    {
+        lastLoopAction = action->getName();
+        lastLoopStart = time(0);
+        lastLoopMap = pos.getMapId();
+        lastLoopX = pos.getX();
+        lastLoopY = pos.getY();
+        lastLoopHealth = bot->GetHealth();
+        lastLoopTarget = currentTargetGuid;
+        SET_AI_VALUE(int, "movement loop age", 0);
+        return;
+    }
+
+    int const age = int(time(0) - lastLoopStart);
+    SET_AI_VALUE(int, "movement loop age", age);
+
+    if (age >= int(sPlayerbotAIConfig.motionlessGiveUpSec))
+        lastLoopStart = time(0);
 }

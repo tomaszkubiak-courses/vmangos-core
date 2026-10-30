@@ -1,4 +1,6 @@
 #pragma once
+
+#include <cmath>
 #define DT_POLYREF64 1
 
 #include "ObjectMgr.h"
@@ -93,6 +95,10 @@ namespace ai
 
         //Operators
         operator bool() const { return  this->x != 0 || this->y != 0 || this->z != 0; }
+        // From cmangos/playerbots d3c3d7a6: a NaN or infinite coordinate handed to the VMap
+        // or navmesh queries walks off the end of their grids.
+        bool isFinite() const { return std::isfinite(this->x) && std::isfinite(this->y) && std::isfinite(this->z); }
+        static void logNonFinite(char const* site, WorldPosition const& a, WorldPosition const* b = nullptr);
         bool operator==(const WorldPosition& p1) const { return this->mapId == p1.mapId && this->x == p1.x && this->y == p1.y && this->z == p1.z && this->o == p1.o; }
         bool operator!=(const WorldPosition& p1) const { return this->mapId != p1.mapId || this->x != p1.x || this->y != p1.y || this->z != p1.z || this->o != p1.o; }
         
@@ -238,9 +244,17 @@ namespace ai
         bool GetHitPosition(WorldPosition& pos) const { return getMap(getFirstInstanceId())->GetLosHitPosition(this->x, this->y, this->z, pos.x, pos.y, pos.z,0, 0.0f);};
 #else
         // Penqle uses lowercase isInLineOfSight (cmangos uppercase IsInLineOfSight).
-        bool IsInLineOfSight(WorldPosition pos, float heightMod = 0.5f) const { return this->mapId == pos.mapId && getMap(getFirstInstanceId()) && getMap(getFirstInstanceId())->isInLineOfSight(this->x, this->y, this->z + heightMod, pos.x, pos.y, pos.z + heightMod, true); }
+        bool IsInLineOfSight(WorldPosition pos, float heightMod = 0.5f) const
+        {
+            if (!isFinite() || !pos.isFinite()) { logNonFinite("IsInLineOfSight", *this, &pos); return false; }
+            return this->mapId == pos.mapId && getMap(getFirstInstanceId()) && getMap(getFirstInstanceId())->isInLineOfSight(this->x, this->y, this->z + heightMod, pos.x, pos.y, pos.z + heightMod, true);
+        }
         // Penqle's equivalent of cmangos's GetHitPosition is GetLosHitPosition (signature: srcX,Y,Z, destX,Y,Z, modifyDist).
-        bool GetHitPosition(WorldPosition& pos) { return getMap(getFirstInstanceId())->GetLosHitPosition(this->x, this->y, this->z, pos.x, pos.y, pos.z, 0.0f);};
+        bool GetHitPosition(WorldPosition& pos)
+        {
+            if (!isFinite() || !pos.isFinite()) { logNonFinite("GetHitPosition", *this, &pos); return false; }
+            return getMap(getFirstInstanceId())->GetLosHitPosition(this->x, this->y, this->z, pos.x, pos.y, pos.z, 0.0f);
+        }
 #endif
 
 

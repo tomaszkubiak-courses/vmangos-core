@@ -20,9 +20,27 @@
 
 #include <numeric>
 #include <iomanip>
+#include <atomic>
+#include <cmath>
 
 using namespace ai;
 using namespace MaNGOS;
+
+void WorldPosition::logNonFinite(char const* site, WorldPosition const& a, WorldPosition const* b)
+{
+    static std::atomic<uint32> logCount(0);
+    uint32 const count = ++logCount;
+
+    if (count > 100 && (count % 1000) != 0)
+        return;
+
+    if (b)
+        sLog.outError("[BOT NANPOS] %s: non-finite position, call %u. A(map %u): %.2f,%.2f,%.2f B(map %u): %.2f,%.2f,%.2f",
+            site, count, a.getMapId(), a.x, a.y, a.z, b->getMapId(), b->x, b->y, b->z);
+    else
+        sLog.outError("[BOT NANPOS] %s: non-finite position, call %u. A(map %u): %.2f,%.2f,%.2f",
+            site, count, a.getMapId(), a.x, a.y, a.z);
+}
 
 WorldPosition::WorldPosition(const uint32 mapId, const GuidPosition& guidP, uint32 instanceId)
 {
@@ -339,6 +357,12 @@ bool WorldPosition::IsInStaticLineOfSight(WorldPosition pos, float heightMod) co
     float dstX = pos.x;
     float dstY = pos.y;
     float dstZ = pos.z + heightMod;
+
+    if (!isFinite() || !pos.isFinite())
+    {
+        logNonFinite("IsInStaticLineOfSight", *this, &pos);
+        return false;
+    }
 
     return VMAP::VMapFactory::createOrGetVMapManager()->isInLineOfSight(this->mapId, srcX, srcY, srcZ, dstX, dstY, dstZ, true);
 }
@@ -662,6 +686,12 @@ bool WorldPosition::isOnTransport(GenericTransport* transport)
 
     below.setZ(below.getZ() - 5.0f);
 
+    if (!isFinite())
+    {
+        logNonFinite("isOnTransport", *this);
+        return false;
+    }
+
     bool result0 = VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(this->mapId, this->x, this->y, this->z + 0.5f, below.getX(), below.getY(), below.getZ(), below.x, below.y, below.z, 0.0f);
 
     if (result0)
@@ -710,6 +740,12 @@ bool WorldPosition::SetOnTransport(GenericTransport* transport, int32 startHeigh
 
     start.setZ(transPos.getZ() + startHeight);
     below.setZ(transPos.getZ() + endHeight);
+
+    if (!isFinite())
+    {
+        logNonFinite("SetOnTransport", *this);
+        return false;
+    }
 
     bool result = VMAP::VMapFactory::createOrGetVMapManager()->getObjectHitPos(this->mapId, this->x, this->y, this->z, below.getX(), below.getY(), below.getZ(), below.x, below.y, below.z, 0.0f);
 
@@ -1272,6 +1308,11 @@ bool WorldPosition::isUnderground() const
             return false;
         else if (this->z < groundZ)
             return true;
+    }
+    else if (groundZ <= INVALID_HEIGHT)
+    {
+        // No ground and no water found at all is not proof of being under it.
+        return false;
     }
 
     return true;
