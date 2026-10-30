@@ -2636,7 +2636,9 @@ void RandomPlayerbotMgr::RandomTeleport(Player* bot, std::vector<WorldLocation> 
                         ForEachPlayerbot([&](Player* otherBot)
                         {
                             // Only check the bots that are on the same zone
-                            if (otherBot && !otherBot->IsBeingTeleported() && zoneId == otherBot->GetZoneId())
+                            // IsInWorld() first: GetZoneId() needs the map, and a bot being
+                            // teleported or logging out has none.
+                            if (otherBot && otherBot->IsInWorld() && !otherBot->IsBeingTeleported() && zoneId == otherBot->GetZoneId())
                             {
                                 if (l.fDist(WorldPosition(otherBot)) <= sPlayerbotAIConfig.randomBotTeleportNearPlayerMaxAmountRadius)
                                 {

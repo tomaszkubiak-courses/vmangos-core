@@ -74,18 +74,43 @@ namespace ai
                     ai->TellPlayerNoFacing(GetMaster(), out);
                 }
                 
+                bool moved;
                 if (inLos && isFriend && (range <= ai->GetRange("follow")))
                 {
-                    return MoveNear(target, chaseDist);
+                    moved = MoveNear(target, chaseDist);
                 }
                 else
                 {
-                    return ChaseTo(target, chaseDist, bot->GetAngle(target));
+                    moved = ChaseTo(target, chaseDist, bot->GetAngle(target));
                 }
+
+                // From cmangos/playerbots ca228f7c: a target the bot fails to move towards 15
+                // times in a row is dropped instead of being chased forever.
+                if (!moved)
+                {
+                    if (++reachFails >= 15)
+                    {
+                        reachFails = 0;
+
+                        SET_AI_VALUE(Unit*, "old target", target);
+                        SET_AI_VALUE(Unit*, "current target", nullptr);
+                        if (AI_VALUE(ObjectGuid, "attack target") == target->GetObjectGuid())
+                            SET_AI_VALUE(ObjectGuid, "attack target", ObjectGuid());
+
+                        bot->SetSelectionGuid(ObjectGuid());
+                        bot->AttackStop();
+                    }
+                }
+                else
+                    reachFails = 0;
+
+                return moved;
             }
 
             return false;
         }
+
+        uint32 reachFails = 0;
 
         // True for reach actions whose target is always meant to be attacked
         // (melee, pull) - false for "reach spell", which is also used to close

@@ -1187,6 +1187,8 @@ uint32 PlayerbotHolder::GetAccountId(std::string name)
 {
     uint32 accountId = 0;
 
+    // name comes from chat (".bot add <name>")
+    LoginDatabase.escape_string(name);
     auto results = LoginDatabase.PQuery("SELECT id FROM account WHERE username = '%s'", name.c_str());
     if(results)
     {
@@ -1909,26 +1911,27 @@ std::string PlayerbotHolder::HandleBotDo(Player* bot, Player* master, const std:
 
     Action* action = nullptr;
 
-    size_t i = std::string::npos;
+    std::string probe = param;
     while (true)
     {
-        action = ai->GetAiObjectContext()->GetAction(param);
+        action = ai->GetAiObjectContext()->GetAction(probe);
 
         if (action)
             break;
 
-        size_t found = param.rfind(" ", i);
+        size_t found = probe.rfind(' ');
         if (found == std::string::npos || !found)
             break;
 
-        actionName = param.substr(0, found);
-        subparam = param.substr(found + 1);
-
-        i = found - 1;
+        actionName = probe.substr(0, found);
+        probe = actionName;
     }
 
     if (!action)
         return "action not found";
+
+    if (param.size() > probe.size() && param.compare(0, probe.size(), probe) == 0 && param[probe.size()] == ' ')
+        subparam = param.substr(probe.size() + 1);
 
     ai->RecordMessages(true, true);
 
@@ -2428,7 +2431,9 @@ void PlayerbotHolder::CreateBot(Player* master, const std::string param, std::li
 
     if (!name.empty())
     {
-        auto result = CharacterDatabase.PQuery("SELECT guid FROM characters WHERE name = '%s'", name.c_str());
+        std::string sqlName = name;
+        CharacterDatabase.escape_string(sqlName);
+        auto result = CharacterDatabase.PQuery("SELECT guid FROM characters WHERE name = '%s'", sqlName.c_str());
         if (result)
         {
             messages.push_back("Name already exists");

@@ -508,6 +508,18 @@ bool MovementAction::UseTransport(PlayerbotAI* ai, uint32 entry, WorldPosition d
     Player* bot = ai->GetBot();
     WorldPosition botPos(bot);
 
+    // From cmangos/playerbots a1b03eda: the Thunder Bluff Mesa elevators (Elevatorcar.m2,
+    // display 360) stop at the top and the bottom on the same x and y, so a 2D distance took the
+    // car at the other stop for the one at the dock. Measure those in 3D.
+    auto dockDistanceSq = [&dockPosition](GenericTransport* trans) -> float
+    {
+        GameObjectInfo const* info = sGOStorage.LookupEntry<GameObjectInfo>(trans->GetEntry());
+        if (info && info->displayId == 360)
+            return dockPosition.sqDistance(WorldPosition(trans));
+
+        return dockPosition.sqDistance2d(WorldPosition(trans));
+    };
+
     GenericTransport* transport = bot->GetTransport();
 
     if (transport)
@@ -520,7 +532,7 @@ bool MovementAction::UseTransport(PlayerbotAI* ai, uint32 entry, WorldPosition d
         // A caller that is boarding passes no exit (WorldPosition() is map 0, 0,0,0). A bot
         // already aboard at its boarding dock used to be "moved off" to that empty exit and
         // teleported to the world origin; with no exit there is nothing to get off to yet.
-        if (exitPosition && dockPosition.mapId == bot->GetMapId() && dockPosition.sqDistance2d(transport) < INTERACTION_DISTANCE * INTERACTION_DISTANCE)
+        if (exitPosition && dockPosition.mapId == bot->GetMapId() && dockDistanceSq(transport) < INTERACTION_DISTANCE * INTERACTION_DISTANCE)
         {
             MoveOffTransport(ai, exitPosition, doTeleport);
             ai->TellDebug(ai->GetMaster(), "Leaving transport " + transportName, "debug move");
@@ -549,7 +561,7 @@ bool MovementAction::UseTransport(PlayerbotAI* ai, uint32 entry, WorldPosition d
 
     for (auto& trans : dockPosition.getTransports(entry))
     {
-        float distance = dockPosition.sqDistance2d(trans);
+        float distance = dockDistanceSq(trans);
 
         // This was `minDist && distance > minDist`, which reads a candidate at distance zero
         // as "nothing chosen yet" and lets the next one in the set replace it. The Vator
@@ -570,7 +582,7 @@ bool MovementAction::UseTransport(PlayerbotAI* ai, uint32 entry, WorldPosition d
             transportName = data->name;
     }
 
-    if (transport && dockPosition.mapId == bot->GetMapId() && dockPosition.sqDistance2d(transport) < INTERACTION_DISTANCE * INTERACTION_DISTANCE)
+    if (transport && dockPosition.mapId == bot->GetMapId() && dockDistanceSq(transport) < INTERACTION_DISTANCE * INTERACTION_DISTANCE)
     {
         // Walking aboard a vessel that has not stopped at the dock lands the bot in the water,
         // where it drowns - the Menethil dock deaths, corpses left floating at the waterline
@@ -1389,14 +1401,15 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
         return false;
     }
 
-    if (movePath.getFront().getMapId() == endPos.getMapId() && !endPos.isUnderWater())
+    // Only touch points on the map the bot is actually on, so a cross-map destination can never
+    // resolve another map's terrain/VMap. (The old front-map guard did not imply the bot's map.)
+    // Keep the "don't surface a deliberate dive" rule, but only for a destination on our own map.
+    bool endUnderwater = endPos.getMapId() == bot->GetMapId() && endPos.isUnderWater();
+    for (auto& p : movePath.getPath())
     {
-        for (auto& p : movePath.getPath())
+        if (p.point.getMapId() == bot->GetMapId() && p.point.isUnderWater() && !endUnderwater)
         {
-            if (p.point.isUnderWater())
-            {
-                p.point.setAtWaterSurface();
-            }
+            p.point.setAtWaterSurface();
         }
     }
 
@@ -1455,7 +1468,8 @@ bool MovementAction::MoveTo2(const WorldPosition& endPos, bool idle, bool react,
 #ifndef MANGOSBOT_ZERO
     if (BotIsFreeFlying(bot))
     {
-        if (bot->HasMovementFlag(MOVEFLAG_SWIMMING) && startPos.isInWater() && !startPos.isUnderWater() && !endPos.isInWater())
+        if (bot->HasMovementFlag(MOVEFLAG_SWIMMING) && startPos.isInWater() && !startPos.isUnderWater() &&
+            (endPos.getMapId() != bot->GetMapId() || !endPos.isInWater()))
         {
             generatePath = true;
         }
