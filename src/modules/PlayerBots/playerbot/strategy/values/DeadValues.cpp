@@ -54,6 +54,14 @@ GuidPosition GraveyardValue::Calculate()
         // the zone link entirely.
         ClosestGrave = GetClosestGraveyardOnMap(refPosition);
     }
+    else if (WorldPosition(ClosestGrave).isNearEnemyGuardFor(bot->GetTeam()))
+    {
+        // A neutral graveyard can stand inside the other faction's town. The Hinterlands
+        // ghosts of both factions go to Aerie Peak's, and Horde bots that revived there were
+        // attacked by the Wildhammer Sentries: one bot died to them 65 times in a 36 hour run,
+        // within minutes of reviving. Take the nearest one clear of hostile guards instead.
+        ClosestGrave = GetClosestGraveyardOnMap(refPosition);
+    }
 
     if (!ClosestGrave)
     {
@@ -89,6 +97,9 @@ WorldSafeLocsEntry const* GraveyardValue::GetClosestGraveyardOnMap(WorldPosition
             continue;
 
         if (graveyardCoreEntry->map_id != refPosition.getMapId())
+            continue;
+
+        if (WorldPosition(graveyardCoreEntry).isNearEnemyGuardFor(bot->GetTeam()))
             continue;
 
         float dist = WorldPosition(refPosition).sqDistance(graveyardCoreEntry);
@@ -135,6 +146,9 @@ WorldSafeLocsEntry const* GraveyardValue::GetAnotherAppropriateClosestGraveyard(
 
         //skip different maps (no need for other continents)
         if (graveyardCoreEntry->map_id != botMapId)
+            continue;
+
+        if (WorldPosition(graveyardCoreEntry).isNearEnemyGuardFor(bot->GetTeam()))
             continue;
 
         uint32 graveyardZoneId = sTerrainMgr.GetZoneId(graveyardCoreEntry->map_id, graveyardCoreEntry->x, graveyardCoreEntry->y, graveyardCoreEntry->z);
@@ -272,6 +286,11 @@ bool ShouldSpiritHealerValue::Calculate()
     GridMapLiquidData liquid;
     if (corpse->GetMapId() == bot->GetMapId() && bot->GetMap()->GetTerrain()->getLiquidStatus(corpse->GetPositionX(), corpse->GetPositionY(), corpse->GetPositionZ() + 0.01f, MAP_ALL_LIQUIDS, &liquid) &&
         (liquid.type_flags & MAP_LIQUID_TYPE_DEEP_WATER))
+        return true;
+
+    // The same goes for a corpse among the other faction's guards: most likely they killed the
+    // bot there, and they are still standing over it. The best graveyard is never one of theirs.
+    if (WorldPosition(corpse).isNearEnemyGuardFor(bot->GetTeam()))
         return true;
 
     uint32 deadTime = time(nullptr) - corpse->GetGhostTime();
