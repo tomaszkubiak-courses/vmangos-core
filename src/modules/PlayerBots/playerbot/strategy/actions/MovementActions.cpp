@@ -2852,8 +2852,24 @@ bool MovementAction::ChaseTo(WorldObject* obj, float distance, float angle)
     }
 #endif
 
-    if (ai->HasStrategy("behind", BotState::BOT_STATE_COMBAT))
-        angle = GetFollowAngle() / 3 + obj->GetOrientation() + M_PI;
+    // From cmangos/playerbots eda0c9e3: a melee bot chasing an enemy takes its angle from its
+    // combat stance, set from its role in PlayerbotAI; the "behind" strategy angle is gone with it.
+    if (!ai->IsRanged(bot) && obj->IsUnit() && sServerFacade.IsHostileTo(bot, static_cast<Unit*>(obj)))
+    {
+        Unit* target = static_cast<Unit*>(obj);
+        Stance* stance = AI_VALUE(Stance*, "stance");
+
+        if (stance && stance->getName() != "turnback")
+        {
+            WorldLocation stanceLoc = stance->GetLocation();
+
+            if (!Formation::IsNullLocation(stanceLoc) && stanceLoc.mapId != uint32(-1))
+            {
+                float const absAngle = atan2(stanceLoc.y - target->GetPositionY(), stanceLoc.x - target->GetPositionX());
+                angle = absAngle - target->GetOrientation();
+            }
+        }
+    }
 
     UpdateMovementState();
 

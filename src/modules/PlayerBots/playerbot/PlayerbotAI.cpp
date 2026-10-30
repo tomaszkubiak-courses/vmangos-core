@@ -2,6 +2,7 @@
 #include "playerbot/playerbot.h"
 #include "playerbot/AiContextAugment.h"
 #include "playerbot/PerformanceMonitor.h"
+#include "playerbot/strategy/values/Stances.h"
 #include <stdarg.h>
 #include <iomanip>
 
@@ -157,6 +158,19 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
     engines[(uint8)BotState::BOT_STATE_NON_COMBAT] = AiFactory::createNonCombatEngine(bot, this, aiObjectContext);
     engines[(uint8)BotState::BOT_STATE_DEAD] = AiFactory::createDeadEngine(bot, this, aiObjectContext);
     engines[(uint8)BotState::BOT_STATE_REACTION] = reactionEngine = AiFactory::createReactionEngine(bot, this, aiObjectContext);
+
+    // From cmangos/playerbots eda0c9e3: every bot gets a combat stance from its role - a tank
+    // turns the target away, melee stands behind it, ranged stays near. ChaseTo positions melee by
+    // it, replacing the "set behind" action.
+    if (StanceValue* stanceValue = (StanceValue*)aiObjectContext->GetValue<Stance*>("stance"))
+    {
+        if (IsTank(bot))
+            stanceValue->Load("turnback");
+        else if (!IsRanged(bot))
+            stanceValue->Load("behind");
+        else
+            stanceValue->Load("near");
+    }
 
     for (uint8 e = 0; e < (uint8)BotState::BOT_STATE_ALL; e++)
     {
@@ -2923,6 +2937,20 @@ void PlayerbotAI::ResetStrategies(bool autoLoad)
     AiFactory::AddDefaultNonCombatStrategies(bot, this, engines[(uint8)BotState::BOT_STATE_NON_COMBAT]);
     AiFactory::AddDefaultDeadStrategies(bot, this, engines[(uint8)BotState::BOT_STATE_DEAD]);
     AiFactory::AddDefaultReactionStrategies(bot, this, reactionEngine);
+
+    // From cmangos/playerbots eda0c9e3: every bot gets a combat stance from its role - a tank
+    // turns the target away, melee stands behind it, ranged stays near. ChaseTo positions melee by
+    // it, replacing the "set behind" action.
+    if (StanceValue* stanceValue = (StanceValue*)aiObjectContext->GetValue<Stance*>("stance"))
+    {
+        if (IsTank(bot))
+            stanceValue->Load("turnback");
+        else if (!IsRanged(bot))
+            stanceValue->Load("behind");
+        else
+            stanceValue->Load("near");
+    }
+
     if (autoLoad && HasPlayerRelation()) sPlayerbotDbStore.Load(this);
 
     // A role handed out by the dungeon finder wins over both the talent spec
