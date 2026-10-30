@@ -2391,6 +2391,14 @@ void PlayerbotAI::DoNextAction(bool min)
 
     Group *group = bot->GetGroup();
 
+    // From cmangos/playerbots cc4134b2: a strategy reset deferred by the throttle below.
+    if (tickResetStrategiesPending && time(NULL) - lastTickResetStrategies >= 2)
+    {
+        lastTickResetStrategies = time(NULL);
+        tickResetStrategiesPending = false;
+        ResetStrategies();
+    }
+
     // A test-harness login keeps its externally-assigned master. The two
     // self-heals below both fire on the harness setup (the GM driver is
     // deliberately neither a group member nor the group leader): the first
@@ -2406,7 +2414,14 @@ void PlayerbotAI::DoNextAction(bool min)
     {
         master = IsRealPlayer() ? bot : nullptr;
         SetMaster(master);
-        ResetStrategies();
+        // At most one strategy reset every two seconds; a later one waits for the next tick.
+        if (time(NULL) - lastTickResetStrategies >= 2)
+        {
+            lastTickResetStrategies = time(NULL);
+            ResetStrategies();
+        }
+        else
+            tickResetStrategiesPending = true;
     }
 
     // test BG master set
@@ -2501,7 +2516,13 @@ void PlayerbotAI::DoNextAction(bool min)
         {
             master = newMaster;
             SetMaster(newMaster);
-            ResetStrategies();
+            if (time(NULL) - lastTickResetStrategies >= 2)
+            {
+                lastTickResetStrategies = time(NULL);
+                ResetStrategies();
+            }
+            else
+                tickResetStrategiesPending = true;
 
             if (sRandomPlayerbotMgr.IsFreeBot(bot))
             {
@@ -2522,11 +2543,17 @@ void PlayerbotAI::DoNextAction(bool min)
 
     // fix bots in BG not having proper strategies
 #ifdef MANGOSBOT_ZERO
-    if (bot->InBattleGround() && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT))
+    if (bot->InBattleGround() && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT) && time(NULL) - lastTickResetStrategies >= 2)
+    {
+        lastTickResetStrategies = time(NULL);
         ResetStrategies();
+    }
 #else
-    if ((bot->InBattleGround() && (!bot->IsBeingTeleported() && !bot->InArena()) && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT)) || ((!bot->IsBeingTeleported()&&bot->InArena()) && !HasStrategy("arena", BotState::BOT_STATE_NON_COMBAT)))
+    if (((bot->InBattleGround() && (!bot->IsBeingTeleported() && !bot->InArena()) && !HasStrategy("battleground", BotState::BOT_STATE_NON_COMBAT)) || ((!bot->IsBeingTeleported()&&bot->InArena()) && !HasStrategy("arena", BotState::BOT_STATE_NON_COMBAT))) && time(NULL) - lastTickResetStrategies >= 2)
+    {
+        lastTickResetStrategies = time(NULL);
         ResetStrategies();
+    }
 #endif
 
     if (master && master->IsInWorld())

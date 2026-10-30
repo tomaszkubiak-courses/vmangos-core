@@ -876,6 +876,8 @@ protected:
     bool fallAfterJump;
     time_t strandedCheckTimer = 0;
     uint32 faceTargetUpdateDelay;
+    time_t lastTickResetStrategies = 0;
+    bool tickResetStrategiesPending = false;
     bool isPlayerFriend = false;
     bool needsFreshBuild = false;
     bool isMovingToTransport = false;
