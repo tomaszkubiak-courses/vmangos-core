@@ -138,6 +138,11 @@ bool ItemBag::Add(ItemPrototype const* proto)
     if (proto->Duration > 0)
         return false;
 
+    // From cmangos/playerbots 39d47006: the server refuses conjured items only in a player's sell
+    // request; the bot adds auctions directly, so it filters them here.
+    if (proto->Flags & ITEM_FLAG_CONJURED)
+        return false;
+
     if (proto->Area)
         return false;
 

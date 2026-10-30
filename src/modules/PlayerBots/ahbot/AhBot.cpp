@@ -729,7 +729,8 @@ int AhBot::AddAuction(int auction, Category* category, ItemPrototype const* prot
     if (!stackCount)
         stackCount = 1;
 
-    if (urand(0, 100) <= sAhBotConfig.underPriceProbability * 100)
+    // From cmangos/playerbots 39d47006: urand(0, ...) under-priced 1 auction in 101 at probability 0.
+    if (urand(1, 100) <= sAhBotConfig.underPriceProbability * 100)
         price = price * 100 / urand(100, 200);
 
     uint32 bidPrice = PricingStrategy::RoundPrice(stackCount * price);
