@@ -2,6 +2,7 @@
 #include "playerbot/playerbot.h"
 #include "LootTriggers.h"
 #include "playerbot/LootObjectStack.h"
+#include "playerbot/strategy/values/FreeMoveValues.h"
 #include "playerbot/PlayerbotAIConfig.h"
 
 #include "playerbot/ServerFacade.h"
@@ -40,6 +41,14 @@ bool FarFromCurrentLootTrigger::IsActive()
             if (sServerFacade.GetDistance2d(master, creature) > safeRange)
                 return false;
         }
+    }
+
+    // From cmangos/playerbots a0818eb6: loot outside the bot's free move range (stay, guard,
+    // the distance a random bot may stray) is not worth walking to and walking back from.
+    if (WorldObject* wo = loot.GetWorldObject(bot))
+    {
+        if (!CanFreeMoveValue::CanFreeMoveTo(ai, WorldPosition(wo)))
+            return false;
     }
 
     // Must agree with "can loot" and OpenLootAction::DoLoot, or the bot either sits short of

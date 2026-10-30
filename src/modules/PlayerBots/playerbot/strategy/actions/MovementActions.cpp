@@ -3665,6 +3665,11 @@ bool MoveToLootAction::Execute(Event& event)
     float dist = sServerFacade.GetDistance2d(bot, wo);
     bool moved = los ? MoveNear(wo, sPlayerbotAIConfig.contactDistance) : MoveTo(WorldPosition(wo));
 
+    // From cmangos/playerbots ac013df6: wait out the short move, or the next tick issues it again
+    // and the bot stutters towards the loot.
+    if (los && moved)
+        WaitForReach(bot->GetDistance(wo));
+
     // Without a way there the bot would pick the same loot again every tick.
     if (!moved)
     {
