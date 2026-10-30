@@ -193,8 +193,9 @@ PlayerbotAI::PlayerbotAI(Player* bot) :
     botOutgoingPacketHandlers.AddHandler(SMSG_BATTLEFIELD_STATUS, "bg status");
     botOutgoingPacketHandlers.AddHandler(SMSG_GROUP_INVITE, "group invite");
     botOutgoingPacketHandlers.AddHandler(SMSG_GUILD_INVITE, "guild accept");
-    botOutgoingPacketHandlers.AddHandler(BUY_ERR_NOT_ENOUGHT_MONEY, "not enough money");
-    botOutgoingPacketHandlers.AddHandler(BUY_ERR_REPUTATION_REQUIRE, "not enough reputation");
+    // From cmangos/playerbots 511efbfd: these two were BuyResult values registered as opcodes, so
+    // they answered opcodes 2 and 12, which the server never sends. The reason is in SMSG_BUY_FAILED.
+    botOutgoingPacketHandlers.AddHandler(SMSG_BUY_FAILED, "buy failed");
     botOutgoingPacketHandlers.AddHandler(SMSG_GROUP_SET_LEADER, "group set leader");
     botOutgoingPacketHandlers.AddHandler(SMSG_FORCE_RUN_SPEED_CHANGE, "check mount state");
     // shouldDelay=true: ExternalEventHelper::HandlePacket() returns false when the 'resurrect request'

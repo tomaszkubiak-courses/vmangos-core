@@ -47,12 +47,8 @@ void WorldPacketHandlerStrategy::InitNonCombatTriggers(std::list<TriggerNode*> &
         NextAction::array(0, /*new NextAction("leader", relevance),*/ new NextAction("reset ai soft", relevance), NULL)));
 
     triggers.push_back(new TriggerNode(
-        "not enough money",
-        NextAction::array(0, new NextAction("tell not enough money", relevance), NULL)));
-
-    triggers.push_back(new TriggerNode(
-        "not enough reputation",
-        NextAction::array(0, new NextAction("tell not enough reputation", relevance), NULL)));
+        "buy failed",
+        NextAction::array(0, new NextAction("tell buy failed", relevance), NULL)));
 
     triggers.push_back(new TriggerNode(
         "cannot equip",
