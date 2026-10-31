@@ -970,6 +970,46 @@ const Action* PlayerbotAI::GetLastExecutedAction(BotState state) const
     return nullptr;
 }
 
+std::string PlayerbotAI::GetLastAction(BotState state)
+{
+    Engine* engine = engines[(uint8)state];
+    if (engine)
+    {
+        return engine->GetLastAction();
+    }
+
+    return "";
+}
+
+std::string PlayerbotAI::GetLastExecutedActionName(BotState state)
+{
+    const Action* action = GetLastExecutedAction(state);
+    if (action)
+    {
+        return const_cast<Action*>(action)->getName();
+    }
+
+    return "";
+}
+
+std::string PlayerbotAI::GetLastActionDecision(BotState state)
+{
+    // The engine's lastAction is a tick log joined by '|'; the final segment is the decision taken.
+    std::string log = GetLastAction(state);
+
+    size_t pos = log.find_last_of('|');
+    std::string segment = (pos == std::string::npos) ? log : log.substr(pos + 1);
+
+    size_t begin = segment.find_first_not_of(" \t\r\n");
+    if (begin == std::string::npos)
+    {
+        return "";
+    }
+
+    size_t end = segment.find_last_not_of(" \t\r\n");
+    return segment.substr(begin, end - begin + 1);
+}
+
 bool PlayerbotAI::IsImmuneToSpell(uint32 spellId) const
 {
     for (std::list<uint32>::iterator i = sPlayerbotAIConfig.immuneSpellIds.begin(); i != sPlayerbotAIConfig.immuneSpellIds.end(); ++i)
