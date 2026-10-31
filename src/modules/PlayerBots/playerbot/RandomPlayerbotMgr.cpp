@@ -57,32 +57,6 @@ INSTANTIATE_SINGLETON_1(RandomPlayerbotMgr);
 #endif
 
 #ifdef MANGOS
-class PrintStatsThread: public ACE_Task <ACE_MT_SYNCH>
-{
-public:
-    int svc(void) { sRandomPlayerbotMgr.PrintStats(); return 0; }
-};
-#endif
-#ifdef CMANGOS
-void PrintStatsThread(uint32 requesterGuid)
-{
-    sRandomPlayerbotMgr.PrintStats(requesterGuid);
-}
-#endif
-
-void activatePrintStatsThread(uint32 requesterGuid)
-{
-#ifdef MANGOS
-    PrintStatsThread *thread = new PrintStatsThread();
-    thread->activate();
-#endif
-#ifdef CMANGOS
-    std::thread t(PrintStatsThread, requesterGuid);
-    t.detach();
-#endif
-}
-
-#ifdef MANGOS
 class CheckBgQueueThread : public ACE_Task <ACE_MT_SYNCH>
 {
 public:
@@ -5344,21 +5318,22 @@ std::list<std::string> RandomPlayerbotMgr::HandleConsoleReset(std::string param)
 
 std::list<std::string> RandomPlayerbotMgr::HandleConsoleStats(std::string param)
 {
-    // In-game callers pass their player guid (set by HandlePlayerbotConsoleCommand).
-    // The RA console has no session, so param is empty -> build the histogram
-    // synchronously and return it. RA commands run on the world thread
-    // (World::ProcessCliCommands), so this pass is safe.
+    // In-game callers pass their player guid (set by HandlePlayerbotConsoleCommand)
+    // and get the long report sent to them; the RA console has no session, so param
+    // is empty and the summary is returned. Both run on the world thread - chat
+    // commands are PACKET_PROCESS_WORLD, RA commands World::ProcessCliCommands - so
+    // reading bot values here is safe, which it was not from a detached thread.
     if (!Qualified::isValidNumberString(param))
     {
         return FormatBotStats(GatherBotStats());
     }
 
     std::list<std::string> messages;
-    std::string msg = "Stats requested.";
+    std::string msg = "Stats printed.";
     messages.push_back(msg);
 
     ObjectGuid guid = ObjectGuid(uint64(std::stoull(param)));
-    activatePrintStatsThread(guid);
+    PrintStats(guid.GetCounter());
     return messages;
 }
 
