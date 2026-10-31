@@ -795,6 +795,8 @@ public:
     void SetActionDuration(uint32 duration);
 
     const Action* GetLastExecutedAction(BotState state) const;
+    std::string GetLastAction(BotState state);
+    std::string GetLastExecutedActionName(BotState state);
 
     bool IsImmuneToSpell(uint32 spellId) const;
 
